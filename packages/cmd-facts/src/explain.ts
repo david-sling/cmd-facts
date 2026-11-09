@@ -4,6 +4,9 @@ import { buildRegistry } from './registry.ts'
 import type { Registry, RegistryOptions } from './registry.ts'
 import type { FlagRule, Role, Rule } from './entry.ts'
 import { tokenize } from './line.ts'
+import type { Op, Step } from './line.ts'
+import { flatten, partsOf } from './tell.ts'
+import type { Part } from './tell.ts'
 
 export type ArgSlot = { index: number; value: string; role: Role; flag?: string }
 
@@ -20,6 +23,17 @@ export type Explanation = {
   origin: string | null
   subcommand?: string
   facts: Facts
+  /**
+   * The sentence to show a person: `facts.says` where the row stands alone, and the row's slotted sentence with
+   * this command's own arguments in it where it has one — `Removes a.txt and b.txt from this computer.`
+   */
+  sentence: string
+  /**
+   * The same sentence before it was joined, so a consumer can render the row's words and the command's own text
+   * apart. Prefer it over `sentence` wherever there is somewhere to put the values: argument text is
+   * attacker-controlled, and in `sentence` it is inside the words a person is about to trust.
+   */
+  parts: Part[]
   args: ArgSlot[]
   /** Flags on this command line that widened the fact set, in the form the table declares them. */
   escalated: string[]
@@ -39,6 +53,16 @@ export type Explanation = {
   attribution: Attribution[]
   /** The chain was still handing over when it hit the depth limit, so `facts` is a floor for that reason too. */
   truncated?: true
+  /**
+   * The commands this line runs, where it runs more than one: `curl … | sh`, `a && b`, `a; b`. Each is explained in
+   * full, and `facts` here is every one of them widened together, so a consumer that reads nothing but the top of
+   * the answer is told the worst of what the line does rather than being told nothing at all.
+   *
+   * Each step's `args` index into that step's own words, not into the whole line.
+   */
+  steps?: Explanation[]
+  /** The operator that joined this step to the one before it, on a step. Absent on the first and on a whole line. */
+  after?: Op
 }
 
 export const UNKNOWN: Facts = {
@@ -61,6 +85,15 @@ export const UNKNOWN: Facts = {
  * makes it more than one, or a quote that never closes. Nothing is split and nothing is guessed — explaining the
  * part that happened to parse would be worse than admitting the line was not read.
  */
+/** What each operator does, as its own sentence, so the step sentences around it keep their own capitals. */
+const CONNECTIVE: Record<Op, string> = {
+  '|': ' What it prints is given to the next command. ',
+  '&&': ' Only if that works, the next command runs. ',
+  '||': ' Only if that fails, the next command runs. ',
+  ';': ' Then the next command runs. ',
+  '&': ' It keeps running while the next command starts. ',
+}
+
 export const UNREAD_LINE: Facts = {
   effectAtLeast: ['execute'],
   reversible: 'unknown',
@@ -72,8 +105,23 @@ export const UNREAD_LINE: Facts = {
   repeatSafe: false,
   confidence: 'unknown',
   source: 'unknown',
-  says: 'This is more than one command, or could not be read as one.',
+  says: 'This line could not be read as a command.',
   note: 'Nothing here describes what will run. The facts shown are the widest ones, not a measurement.',
+}
+
+/** The outer row for a line that runs several commands. What each one does is on `steps`. */
+const MANY: Facts = {
+  effectAtLeast: ['execute'],
+  reversible: 'unknown',
+  network: 'arbitrary',
+  privilege: 'none',
+  opaque: true,
+  handsOverTo: 'the commands on this line, each of which is answered for on its own',
+  touchesCredentials: false,
+  repeatSafe: false,
+  confidence: 'derived',
+  source: 'nested',
+  says: 'This line runs more than one command.',
 }
 
 /**
@@ -169,12 +217,17 @@ function nestedAt(argv: string[], args: ArgSlot[], rule: Rule): number | undefin
   return at < argv.length ? at : undefined
 }
 
+const told = (facts: Facts, args: ArgSlot[]): { sentence: string; parts: Part[] } => {
+  const parts = partsOf(facts, args)
+  return { sentence: flatten(parts), parts }
+}
+
 function at(registry: Registry, program: string, argv: string[], depth: number): Explanation {
   const name = basename(program)
   const found = registry.lookup(name)
   if (!found) {
     const args: ArgSlot[] = argv.slice(1).map((value, n) => ({ index: n + 1, value, role: 'unknown' as Role }))
-    return { program, name, key: null, origin: null, facts: UNKNOWN, args, escalated: [], attribution: [] }
+    return { program, name, key: null, origin: null, facts: UNKNOWN, ...told(UNKNOWN, args), args, escalated: [], attribution: [] }
   }
 
   const { key, entry, origin, trimmed } = found
@@ -200,15 +253,13 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
   const offset = depth < MAX_DEPTH ? wanted : undefined
   if (offset === undefined) {
     const stopped = wanted !== undefined ? { truncated: true as const } : {}
-    return { ...head, ...parsed, attribution: own, ...stopped }
+    return { ...head, ...parsed, ...told(parsed.facts, parsed.args), attribution: own, ...stopped }
   }
 
   const inner = at(registry, argv[offset]!, argv.slice(offset), depth + 1)
-  const runs: Explanation = {
-    ...inner,
-    facts: merge(inner.facts, { confidence: 'derived', source: 'nested' }),
-    args: inner.args.map((a) => ({ ...a, index: a.index + offset })),
-  }
+  const shifted = inner.args.map((a) => ({ ...a, index: a.index + offset }))
+  const innerFacts = merge(inner.facts, { confidence: 'derived', source: 'nested' })
+  const runs: Explanation = { ...inner, facts: innerFacts, ...told(innerFacts, shifted), args: shifted }
   // The inner command widens the outer one but can never clear it: the name on the line was not resolved to a
   // program, and in `xargs rm` the arguments it will be handed are not on this line at all. Confidence comes up
   // with the rest, so a fact set that absorbed an untrusted or unknown row cannot still read `verified`.
@@ -221,7 +272,82 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
     confidence: runs.facts.confidence,
     repeatSafe: false,
   })
-  return { ...head, ...parsed, facts, runs, attribution: unionByPack(own, runs.attribution) }
+  return { ...head, ...parsed, facts, ...told(facts, parsed.args), runs, attribution: unionByPack(own, runs.attribution) }
+}
+
+/** Widen one fact set by another, treating the second as an overlay of everything it claims. */
+const widenBy = (base: Facts, other: Facts): Facts =>
+  merge(base, {
+    effect: effectsOf(other),
+    reversible: other.reversible,
+    network: other.network,
+    privilege: other.privilege,
+    touchesCredentials: other.touchesCredentials,
+    repeatSafe: other.repeatSafe,
+    confidence: other.confidence,
+    ...(other.opaque ? { opaque: true as const, handsOverTo: other.handsOverTo } : {}),
+  })
+
+/**
+ * One command of a line, with what the line does to its output folded in. A redirection is the shell's doing rather
+ * than the program's, so it widens the step: `echo x > notes.txt` creates and writes a file that `echo` knows nothing
+ * about. The written path joins `args` only after the sentence has been built, so it can never quietly fill a slot
+ * meant for a file the command was pointed at.
+ */
+function stepOf(registry: Registry, step: Step): Explanation {
+  const e = at(registry, step.argv[0]!, step.argv, 0)
+  const joined = step.after ? { after: step.after } : {}
+  if (!step.redirects.length) return { ...e, ...joined }
+
+  const writes = step.redirects.filter((r) => r.op !== '<')
+  let facts = e.facts
+  if (writes.length) {
+    facts = merge(facts, {
+      effect: ['create', 'write'],
+      reversible: writes.some((w) => w.op === '>') ? 'no' : 'unknown',
+      ...(writes.some((w) => w.op === '>>') ? { repeatSafe: false } : {}),
+    })
+  }
+  if (writes.length !== step.redirects.length) facts = merge(facts, { effect: ['read'] })
+
+  const parts: Part[] = [...partsOf(facts, e.args)]
+  for (const r of step.redirects) {
+    parts.push({ kind: 'text', text: r.op === '<' ? ' It is given what is in ' : ' What it prints is written to ' })
+    parts.push({ kind: 'values', values: [r.path], role: 'path', flag: r.op })
+    parts.push({ kind: 'text', text: '.' })
+  }
+  const args: ArgSlot[] = [
+    ...e.args,
+    ...step.redirects.map((r, n) => ({ index: step.argv.length + n, value: r.path, role: 'path' as Role, flag: r.op })),
+  ]
+  return { ...e, facts, args, parts, sentence: flatten(parts), ...joined }
+}
+
+/** A line that runs several commands: every step answered on its own, and all of them widened into one fact set. */
+function lineOf(registry: Registry, input: string, read: Step[]): Explanation {
+  const steps = read.map((step) => stepOf(registry, step))
+  const folded = steps.reduce<Facts>((acc, e) => widenBy(acc, e.facts), MANY)
+  const facts = merge(folded, { says: MANY.says })
+
+  const parts: Part[] = []
+  for (const [n, step] of steps.entries()) {
+    if (n > 0) parts.push({ kind: 'text', text: CONNECTIVE[step.after ?? ';'] })
+    parts.push(...step.parts)
+  }
+  const attribution = steps.reduce<Attribution[]>((acc, e) => unionByPack(acc, e.attribution), [])
+  return {
+    program: input,
+    name: input,
+    key: null,
+    origin: null,
+    facts,
+    sentence: flatten(parts),
+    parts,
+    args: [],
+    escalated: [],
+    attribution,
+    steps,
+  }
 }
 
 export type Explainer = ((input: Input) => Explanation) & { registry: Registry }
@@ -242,9 +368,20 @@ export function createExplainer(opts: RegistryOptions): Explainer {
     }
     const read = tokenize(input)
     if (!read.ok) {
-      return { program: input, name: input, key: null, origin: null, facts: UNREAD_LINE, args: [], escalated: [], attribution: [] }
+      return {
+        program: input,
+        name: input,
+        key: null,
+        origin: null,
+        facts: UNREAD_LINE,
+        ...told(UNREAD_LINE, []),
+        args: [],
+        escalated: [],
+        attribution: [],
+      }
     }
-    return at(registry, read.argv[0]!, read.argv, 0)
+    const only = read.steps.length === 1 ? read.steps[0]! : undefined
+    return only ? stepOf(registry, only) : lineOf(registry, input, read.steps)
   }
 
   return Object.assign(explain, { registry })

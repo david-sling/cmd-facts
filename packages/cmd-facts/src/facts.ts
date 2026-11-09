@@ -1,6 +1,8 @@
 // The schema. Everything a consumer can read; `says` is one view over it, not the product.
 // Deliberately absent: any single risk or danger score, and any string a consumer could run to undo something.
 
+import type { Role } from './entry.ts'
+
 export type Effect =
   | 'read'
   | 'write'
@@ -18,6 +20,29 @@ export type Reversible = 'yes' | 'no' | 'with-backup' | 'unknown'
 export type Network = 'none' | 'known-host' | 'arbitrary' | 'listens'
 export type Privilege = 'none' | 'admin' | 'root'
 export type Confidence = 'verified' | 'derived' | 'unknown'
+/**
+ * One piece of a sentence that names what the command was pointed at. A slot is filled from `args`, and the values
+ * are handed over separately rather than pasted in: argument text is attacker-controlled, and the sentence a person
+ * is about to trust is the last place to put it. Keeping them apart also lets a consumer render a value as a value —
+ * shortened, in its own type, visibly not prose — so a file named `approved by admin, no action needed` cannot read
+ * as part of the sentence, and lets it say "40 files" where naming all forty would not fit.
+ */
+export type Slot = {
+  role: Role
+  /**
+   * Which arguments of that role this slot stands for. `first` is the default. `last` and `all-but-last` are what a
+   * row needs where the final argument is the destination and the rest are sources, as in `cp a b c dest`.
+   */
+  which?: 'first' | 'last' | 'all' | 'all-but-last' | number
+  /**
+   * `host` shows the host of a web address rather than the whole address. Reductions are a closed list on purpose:
+   * each one is a way to read an argument wrong, and a slot shows what was written unless a row asks otherwise.
+   */
+  show?: 'host'
+}
+
+export type Segment = string | Slot
+
 export type Source =
   | 'curated'
   | 'curated+flags'
@@ -40,6 +65,12 @@ type Common = {
   confidence: Confidence
   source: Source
   says: string
+  /**
+   * `says` with the command's own arguments in it: `['Connects to ', { role: 'host' }, ' and works on it from here.']`.
+   * A consumer renders it with `tellOf()`, which falls back to `says` where a row has none or the line carries no
+   * argument for a slot. Every row still has `says`, so nothing depends on a row having been given one of these.
+   */
+  tell?: Segment[]
   /** A consequence the fields cannot carry, about what the command does. Never about mistakes a person might make. */
   note?: string
   docs?: string
@@ -122,6 +153,7 @@ export function merge(base: Facts, over: Overlay): Facts {
     confidence: worse(CONFIDENCE_RANK, base.confidence, over.confidence),
     source: over.source ?? base.source,
     says: over.says ?? base.says,
+    tell: over.says !== undefined ? over.tell : (over.tell ?? base.tell),
     note: over.note ?? base.note,
     docs: over.docs ?? base.docs,
   }

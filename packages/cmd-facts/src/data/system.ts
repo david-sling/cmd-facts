@@ -2,6 +2,28 @@ import { fact, opaqueFact } from '../entry.ts'
 import type { Entry } from '../entry.ts'
 
 export const SYSTEM: Record<string, Entry> = {
+  // `echo` and `printf` are given no slotted sentence: the words they are handed are one message, and listing them
+  // with commas would read as though each were a separate thing.
+  echo: {
+    facts: fact('Shows a line of text.', { docs: 'man 1 echo' }),
+    operands: ['text'],
+  },
+  printf: {
+    facts: fact('Shows text, laid out to a pattern.', { docs: 'man 1 printf' }),
+    operands: ['pattern', 'text'],
+  },
+  uname: {
+    facts: fact('Shows which kind of computer and system this is.', { docs: 'man 1 uname' }),
+  },
+  pwd: {
+    facts: fact('Shows which folder this is working in.', { docs: 'man 1 pwd' }),
+  },
+  whoami: {
+    facts: fact('Shows which account on this computer is being used.', { docs: 'man 1 whoami' }),
+  },
+  date: {
+    facts: fact('Shows what day and time it is now.', { docs: 'man 1 date' }),
+  },
   ps: { facts: fact('Lists the programs running on this computer.', { docs: 'man 1 ps' }) },
   top: {
     facts: fact('Shows the programs running right now, and how much of the computer each one is using.', {
@@ -12,6 +34,7 @@ export const SYSTEM: Record<string, Entry> = {
     facts: fact('Stops a running program.', {
       effect: ['terminate'],
       reversible: 'no',
+      tell: ['Stops the program running as ', { role: 'pid', which: 'all' }, '.'],
       note: 'Anything the program had not saved is lost.',
       docs: 'man 1 kill',
     }),
@@ -19,7 +42,14 @@ export const SYSTEM: Record<string, Entry> = {
     flags: [
       {
         flags: ['-9', '-KILL'],
-        facts: { says: 'Stops a running program at once, without letting it finish what it was doing.' },
+        facts: {
+          says: 'Stops a running program at once, without letting it finish what it was doing.',
+          tell: [
+            'Stops the program running as ',
+            { role: 'pid', which: 'all' },
+            ' at once, without letting it finish what it was doing.',
+          ],
+        },
       },
     ],
   },
@@ -235,6 +265,8 @@ export const SYSTEM: Record<string, Entry> = {
     flags: [
       {
         flags: ['-setdnsservers'],
+        takesValue: true,
+        role: 'service',
         facts: {
           effect: ['configure'],
           reversible: 'unknown',
@@ -245,6 +277,8 @@ export const SYSTEM: Record<string, Entry> = {
       },
       {
         flags: ['-setwebproxy', '-setsecurewebproxy', '-setsocksfirewallproxy'],
+        takesValue: true,
+        role: 'service',
         facts: {
           effect: ['configure'],
           reversible: 'unknown',
@@ -255,6 +289,8 @@ export const SYSTEM: Record<string, Entry> = {
       },
       {
         flags: ['-setairportnetwork'],
+        takesValue: true,
+        role: 'device',
         facts: {
           effect: ['configure'],
           reversible: 'yes',
@@ -265,6 +301,8 @@ export const SYSTEM: Record<string, Entry> = {
       },
       {
         flags: ['-setairportpower', '-setv4off', '-setv4dhcp', '-setv4manual'],
+        takesValue: true,
+        role: 'service',
         facts: { effect: ['configure'], reversible: 'yes', says: 'Changes whether and how this computer connects to a network.' },
       },
     ],
@@ -273,6 +311,8 @@ export const SYSTEM: Record<string, Entry> = {
     facts: fact('Asks Apple which updates are available for macOS.', { network: 'known-host', docs: 'man 8 softwareupdate' }),
     flags: [
       {
+        // Left without `takesValue` on purpose: the name of an update is optional here, and `-i -a` is the common
+        // form, so declaring a value would read that `-a` as the name of an update.
         flags: ['-i', '--install'],
         facts: {
           effect: ['install', 'write'],

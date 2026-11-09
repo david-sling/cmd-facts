@@ -117,6 +117,25 @@ describe('note', () => {
   })
 })
 
+describe('tell', () => {
+  const slotted = ALL.filter((r) => r.facts.tell?.length)
+
+  it('is carried by the commands whose arguments are the point', () => {
+    expect(slotted.length).toBeGreaterThan(15)
+  })
+
+  // The words around a slot are read in the same breath as `says`, so they are held to the same register.
+  it.each(slotted)('$name', ({ facts }) => {
+    const words = facts.tell!.filter((x): x is string => typeof x === 'string')
+    expect(words.length).toBeGreaterThan(0)
+    const sentence = words.join(' ')
+    expect(hits(sentence, JARGON)).toEqual([])
+    expect(hits(sentence, VERDICTS)).toEqual([])
+    expect(words[0]![0]).toBe(words[0]![0]!.toUpperCase())
+    expect(words.join('').length).toBeLessThanOrEqual(150)
+  })
+})
+
 describe('handsOverTo', () => {
   const blind = ALL.filter((r) => r.facts.opaque)
   it('is on every opaque row', () => {

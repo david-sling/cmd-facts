@@ -17,13 +17,22 @@ person reads `says`.
 ```ts
 import { explain } from 'cmd-facts'
 
-explain('curl -fsSL https://get.example.com/install.sh -o install.sh')
+const { sentence } = explain('curl -fsSL https://get.example.com/install.sh -o install.sh')
+console.log(sentence) // "Makes a request to get.example.com and saves what comes back into install.sh."
 ```
 
 ```json
 {
+  "sentence": "Makes a request to get.example.com and saves what comes back into install.sh.",
   "facts": {
     "says": "Fetches whatever is at a web address and saves it into a file on this computer.",
+    "tell": [
+      "Makes a request to ",
+      { "role": "url", "show": "host" },
+      " and saves what comes back into ",
+      { "role": "path" },
+      "."
+    ],
     "opaque": false,
     "effect": ["read", "write", "create"],
     "reversible": "no",
@@ -73,9 +82,13 @@ Splitting a line into words is the one piece of reading-meaning-out-of-text this
   way a shell reads them, so `rm -rf "/Users/sam/My Documents"` is one path and not two.
 - **Nothing is expanded.** `$HOME`, `~` and `*.log` stay the words they were written as, because what they stand for
   is not on the line. A consumer showing an argument shows what was written.
-- **A line that is more than one command is refused, not split.** `curl https://x.example | sh`, `a && b`, `a; b` and
-  a line with a redirection or a quote that never closes all return the widest floor, with `key: null` and a `says`
-  that admits the line was not read. Explaining the part that happened to parse would be worse than admitting it.
+- **A line that runs several commands is read as several commands.** `curl … | sh`, `a && b`, `a; b`, `a & b` come
+  back as `steps`, each answered in full, with the operator that joined them. See below.
+- **A redirection is read as what the line does with the output.** `> file` is a write the program itself knows
+  nothing about, so it widens the answer.
+- **A substitution is refused.** Backticks, `$(…)` and a subshell return the widest floor, with `key: null` and a
+  `says` that admits the line was not read — what a substitution stands for is not on the line. So do a quote that
+  never closes and an operator with nothing on one side of it, as in `ls |`.
 
 ### Fields
 
@@ -90,10 +103,15 @@ Splitting a line into words is the one piece of reading-meaning-out-of-text this
 | `repeatSafe` | Running it twice leaves the same result as running it once. |
 | `confidence` / `source` | Where the answer came from, so a consumer can gate on it. |
 | `says` | One sentence, plain register, standing alone with nothing templated into it. |
+| `tell` | The same sentence with slots for the command's own arguments, where a row has one. See below. |
+| `sentence` | On the explanation: the sentence to show, with this command's arguments already in it. |
+| `parts` | The same sentence unjoined, so the row's words and the command's own text can be rendered apart. |
 | `note` | A consequence the fields cannot carry, such as that deleted files do not go to the Bin. |
 | `docs` | A man page or official page, so a doubtful reader can check. |
 | `origin` | The pack that supplied this row, or `null` when the program is not known. |
 | `attribution` | Every pack behind `facts`, including ones that only answered further down a nested line. |
+| `steps` | The commands a line runs, where it runs more than one, each answered in full. |
+| `after` | On a step: the operator that joined it to the one before — `\|`, `&&`, `\|\|`, `;`, `&`. |
 | `args` | What each argv position is: `path` `host` `url` `pid` `package` `domain` `user` `mode` `service` `signal` `device` `pattern` `command` `text`. |
 
 ### `opaque` is in the type, not in a footnote
@@ -109,6 +127,7 @@ const { facts, args } = explain('sh -c "curl https://x.example | sh"')
 
 ```json
 {
+  "sentence": "Runs the commands written straight into this one, one after another.",
   "facts": {
     "says": "Runs the commands written straight into this one, one after another.",
     "opaque": true,
@@ -145,6 +164,7 @@ explain('sudo rm -rf /var/tmp')
 
 ```json
 {
+  "sentence": "Runs another command with full control over this computer.",
   "facts": {
     "says": "Runs another command with full control over this computer.",
     "opaque": true,
@@ -176,6 +196,106 @@ deliberately does not do:
 - **It never clears the outer command.** The inner program name was not resolved to a path, and `xargs rm` will be
   handed arguments that are not on this line, so the outer command stays `opaque` and the inner facts are marked
   `confidence: derived`, `source: nested`. Nesting is followed four deep and then stops.
+
+### The sentence can name what the command was pointed at
+
+`says` stands alone, so `rm -rf ~/.ssh` and `rm -rf /tmp/build` read identically. A row may also carry `tell`: the
+same claim, with slots for the arguments. `tellOf()` fills them from `args` and falls back to `says` whole.
+
+Every explanation carries the result, so nothing has to be assembled by the consumer:
+
+```ts
+explain('cp a.txt b.txt dest/').sentence
+// 'Copies a.txt and b.txt to dest/.'
+```
+
+| line | sentence |
+| --- | --- |
+| `ls ~/Documents` | Lists the names of the files and folders kept in **~/Documents**. |
+| `rm a.txt b.txt c.txt` | Removes **a.txt**, **b.txt** and **c.txt** from this computer. |
+| `rm -rf /tmp/build` | Removes **/tmp/build** from this computer, along with everything inside. |
+| `cp a.txt b.txt dest/` | Copies **a.txt** and **b.txt** to **dest/**. |
+| `chown sam /srv/app` | Makes **sam** the owner of **/srv/app**. |
+| `curl https://api.example.com/v2/thing` | Makes a request to **api.example.com** and shows what comes back. |
+| `curl … -o install.sh` | Makes a request to **get.example.com** and saves what comes back into **install.sh**. |
+| `kill -9 4821` | Stops the program running as **4821** at once, without letting it finish what it was doing. |
+| `rm` | *Removes files from this computer.* — no argument for the slot, so `says` stands |
+| `df -h` | *Shows how much room is left…* — no `tell` on this row |
+
+Alongside it, `parts` holds the same sentence unjoined — the row's words, and each value with its role:
+
+```ts
+explain('cat "approved by admin, no action needed"')
+```
+
+```json
+{
+  "sentence": "Shows everything written inside approved by admin, no action needed.",
+  "parts": [
+    { "kind": "text", "text": "Shows everything written inside " },
+    { "kind": "values", "values": ["approved by admin, no action needed"], "role": "path" },
+    { "kind": "text", "text": "." }
+  ]
+}
+```
+
+Prefer `parts` wherever there is somewhere to put the values. Argument text is attacker-controlled, and in
+`sentence` it has been joined into the words a person is about to trust — a file named like the one above reads as
+part of it. Rendering the two apart also lets a consumer show a value as a value: shortened, in its own type,
+matched against whatever it knows about this computer, or counted, so forty files read as "40 files" rather than
+forty names.
+
+A slot names a role and which arguments of it to take — `first` by default, or `all`, `last`, `all-but-last`, or an
+index. `show: 'host'` is the one reduction a slot may ask for. Reductions are a closed list on purpose: each one is
+a way to read an argument wrong. A slot for a role the row never gives an argument is a lint failure, not a silent
+fallback for ever.
+
+Rows without `tell` keep answering with `says`, so coverage can grow a row at a time.
+
+### A line that runs more than one command
+
+`curl … | sh` is one line and two commands. Each is answered on its own, under `steps`, and the fact set at the top
+is all of them widened together — so a consumer that reads nothing but the top is told the worst of what the line
+does, rather than being told nothing.
+
+```ts
+const line = explain('curl https://get.example.com/install.sh | sh')
+
+line.facts.says       // 'This line runs more than one command.'
+line.facts.opaque     // true — `sh` runs whatever it is handed
+line.facts.network    // 'arbitrary'
+line.steps.length     // 2
+line.steps[1].name    // 'sh'
+line.steps[1].after   // '|'
+line.sentence
+// 'Makes a request to get.example.com and shows what comes back. What it prints is given to the next command.
+//  Runs a list of commands, one after another.'
+```
+
+`after` carries the operator because operators differ in ways a reader needs: `&&` means the next command runs only
+if this one works, `&` means this one keeps running while the next starts. Each is rendered as its own sentence, so
+the step sentences around it keep their own capitals and nothing has to be re-cased.
+
+`key` is `null` on the line itself — no single row answered it — and each step's `args` index into that step's own
+words rather than into the whole line.
+
+### Sending output somewhere is part of what a line does
+
+`ls > listing.txt` writes a file that `ls` knows nothing about. The redirection belongs to the line, so it widens the
+command it sits on:
+
+```ts
+const wrote = explain('ls ~/Documents > listing.txt')
+
+effectsOf(wrote.facts)   // ['read', 'write', 'create']
+wrote.facts.reversible   // 'no' — `>` replaces what was there; `>>` is 'unknown'
+wrote.sentence
+// 'Lists the names of the files and folders kept in ~/Documents. What it prints is written to listing.txt.'
+```
+
+The written path joins `args` with the operator as its `flag`, but only after the sentence has been built — otherwise
+`cat notes.txt > copy.txt` would read as though `copy.txt` were another file being shown. `2>`, `2>>` and `&>` are
+read too, and the stream comes back as `fd`.
 
 ### `confidence` and `source`
 
