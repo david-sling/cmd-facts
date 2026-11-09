@@ -42,6 +42,33 @@ export const FILES: Record<string, Entry> = {
       },
     ],
   },
+  wc: {
+    facts: fact('Counts the lines, words and letters in a file.', {
+      tell: ['Counts the lines, words and letters in ', { role: 'path', which: 'all' }, '.'],
+      docs: 'man 1 wc',
+    }),
+    operands: ['path'],
+  },
+  tee: {
+    facts: fact('Saves what it is given into a file, and shows it as well.', {
+      effect: ['read', 'create', 'write'],
+      reversible: 'no',
+      tell: ['Saves what it is given into ', { role: 'path', which: 'all' }, ', and shows it as well.'],
+      note: REPLACED,
+      docs: 'man 1 tee',
+    }),
+    operands: ['path'],
+    flags: [
+      {
+        flags: ['-a', '--append'],
+        facts: {
+          repeatSafe: false,
+          says: 'Adds what it is given to the end of a file, and shows it as well.',
+          tell: ['Adds what it is given to the end of ', { role: 'path', which: 'all' }, ', and shows it as well.'],
+        },
+      },
+    ],
+  },
   grep: {
     facts: fact('Searches files for the lines that contain a piece of text.', {
       tell: ['Searches ', { role: 'path', which: 'all' }, ' for the lines that contain ', { role: 'pattern' }, '.'],

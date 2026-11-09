@@ -2,6 +2,25 @@ import { fact, opaqueFact } from '../entry.ts'
 import type { Entry } from '../entry.ts'
 
 export const SYSTEM: Record<string, Entry> = {
+  // `echo` and `printf` are given no slotted sentence: the words they are handed are one message, and listing them
+  // with commas would read as though each were a separate thing.
+  echo: {
+    facts: fact('Shows a line of text.', { docs: 'man 1 echo' }),
+    operands: ['text'],
+  },
+  printf: {
+    facts: fact('Shows text, laid out to a pattern.', { docs: 'man 1 printf' }),
+    operands: ['pattern', 'text'],
+  },
+  pwd: {
+    facts: fact('Shows which folder this is working in.', { docs: 'man 1 pwd' }),
+  },
+  whoami: {
+    facts: fact('Shows which account on this computer is being used.', { docs: 'man 1 whoami' }),
+  },
+  date: {
+    facts: fact('Shows what day and time it is now.', { docs: 'man 1 date' }),
+  },
   ps: { facts: fact('Lists the programs running on this computer.', { docs: 'man 1 ps' }) },
   top: {
     facts: fact('Shows the programs running right now, and how much of the computer each one is using.', {

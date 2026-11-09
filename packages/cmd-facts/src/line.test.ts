@@ -214,6 +214,15 @@ describe('a redirection is the line’s doing, not the program’s', () => {
     expect(e.sentence).toBe('Shows everything written inside notes.txt. What it prints is written to copy.txt.')
   })
 
+  // The line this whole shape exists for: nothing about `echo` writes a file, and the line does.
+  it('accounts for a line that writes a file the program knows nothing about', () => {
+    const e = explain('echo "ssh-rsa AAAA" >> ~/.ssh/authorized_keys')
+    expect(e.key).toBe('echo')
+    expect(e.sentence).toBe('Shows a line of text. What it prints is written to ~/.ssh/authorized_keys.')
+    expect(effectsOf(e.facts)).toEqual(expect.arrayContaining(['create', 'write']))
+    expect(e.args.at(-1)).toMatchObject({ value: '~/.ssh/authorized_keys', role: 'path', flag: '>>' })
+  })
+
   it('appending is not the same as replacing', () => {
     expect(explain('echo x >> log').facts.reversible).toBe('unknown')
     expect(explain('echo x >> log').facts.repeatSafe).toBe(false)
