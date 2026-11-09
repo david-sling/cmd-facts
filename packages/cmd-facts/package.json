@@ -1,6 +1,6 @@
 {
   "name": "cmd-facts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Structured facts about what a command does, for people who have to approve it.",
   "license": "MIT",
   "repository": {
