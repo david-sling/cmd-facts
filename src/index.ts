@@ -1,0 +1,7 @@
+export { explain, basename, UNKNOWN } from './explain.ts'
+export type { ArgSlot, Explanation } from './explain.ts'
+export { effectsOf, isComplete, merge, sortEffects, EFFECTS, REVERSIBLE, NETWORK, PRIVILEGE, CONFIDENCE } from './facts.ts'
+export type { Blind, Confidence, Effect, Facts, Network, Overlay, Privilege, Reversible, Source, Transparent } from './facts.ts'
+export { fact, opaqueFact, ROLES } from './entry.ts'
+export type { Entry, FlagRule, Role, Rule } from './entry.ts'
+export { COMMANDS } from './data/index.ts'
