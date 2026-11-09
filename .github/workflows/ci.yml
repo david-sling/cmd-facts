@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A second push to a branch makes the run already in flight pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22.18 is the floor `engines` claims. This runs the sources under vitest, which
+        # does its own transform, so it says the code works on that Node - not that an
+        # installed copy can be imported there.
+        node: ['22.18', '24']
+
+    name: Node ${{ matrix.node }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Test
+        run: pnpm -r test
+
+      - name: Typecheck
+        run: pnpm -r typecheck
