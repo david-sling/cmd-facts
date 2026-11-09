@@ -37,12 +37,12 @@ export const basename = (p: string) => p.split('/').filter(Boolean).pop() ?? p
 const isFlag = (t: string) => t.length > 1 && t.startsWith('-')
 const VERSION_SUFFIX = /^([A-Za-z_][A-Za-z_-]*?)[0-9][0-9.]*$/
 
-function lookup(name: string): { key: string; entry: Entry } | undefined {
+function lookup(name: string): { key: string; entry: Entry; trimmed: boolean } | undefined {
   const exact = COMMANDS[name]
-  if (exact) return { key: name, entry: exact }
+  if (exact) return { key: name, entry: exact, trimmed: false }
   const stem = VERSION_SUFFIX.exec(name)?.[1]
   const entry = stem ? COMMANDS[stem] : undefined
-  return entry?.versioned ? { key: stem!, entry } : undefined
+  return entry?.versioned ? { key: stem!, entry, trimmed: true } : undefined
 }
 
 function flagsOf(rule: Rule, token: string): FlagRule[] {
@@ -115,7 +115,7 @@ export function explain(input: { program: string; argv: string[] }): Explanation
     return { program, name, key: null, facts: UNKNOWN, args, escalated: [] }
   }
 
-  const { key, entry } = found
+  const { key, entry, trimmed } = found
   const word = argv[1]
   const wantsSub = entry.sub !== undefined && word !== undefined && !isFlag(word)
   const sub = wantsSub ? entry.sub![word] : undefined
@@ -127,6 +127,6 @@ export function explain(input: { program: string; argv: string[] }): Explanation
       ? merge(entry.facts, { confidence: 'derived', source: 'subcommand-miss' })
       : entry.facts
 
-  const parsed = parse(argv, start, rule, base)
+  const parsed = parse(argv, start, rule, trimmed ? merge(base, { source: 'name-fallback' }) : base)
   return { program, name, key, ...(wantsSub ? { subcommand: word } : {}), ...parsed }
 }

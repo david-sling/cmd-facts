@@ -23,7 +23,7 @@ export const SECRETS: Record<string, Entry> = {
             facts: {
               touchesCredentials: true,
               says: 'Shows a saved password in plain view, as readable text.',
-              note: 'Once shown, the password is readable by whoever can see this output.',
+              note: 'Once shown, the password is readable by anyone who can see what this command prints.',
             },
           },
         ],
@@ -41,7 +41,7 @@ export const SECRETS: Record<string, Entry> = {
             facts: {
               touchesCredentials: true,
               says: 'Shows a saved website password in plain view, as readable text.',
-              note: 'Once shown, the password is readable by whoever can see this output.',
+              note: 'Once shown, the password is readable by anyone who can see what this command prints.',
             },
           },
         ],

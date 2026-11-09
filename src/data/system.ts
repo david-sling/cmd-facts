@@ -51,7 +51,13 @@ export const SYSTEM: Record<string, Entry> = {
     flagStyle: 'words',
   },
   log: {
-    facts: fact('Reads the record macOS keeps of what programs on this computer have been doing.', { docs: 'man 1 log' }),
+    facts: fact('Reads or clears the record macOS keeps of what programs on this computer have been doing.', {
+      effect: ['read', 'delete'],
+      reversible: 'unknown',
+      privilege: 'admin',
+      repeatSafe: false,
+      docs: 'man 1 log',
+    }),
     flagStyle: 'words',
     sub: {
       show: {
@@ -297,7 +303,7 @@ export const SYSTEM: Record<string, Entry> = {
         operands: ['device'],
       },
       unmount: {
-        facts: fact('Disconnects a disk so it can be unplugged without harm.', {
+        facts: fact('Disconnects a disk so that it can be unplugged.', {
           effect: ['terminate', 'configure'],
           docs: 'man 8 diskutil',
         }),

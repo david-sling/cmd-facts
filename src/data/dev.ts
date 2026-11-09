@@ -166,11 +166,19 @@ const nodePackager = (docs: string): Entry => ({
       operands: ['package'],
     },
     uninstall: {
-      facts: fact('Takes a ready-made code package out of the project.', { effect: ['delete', 'write'], reversible: 'yes', docs }),
+      facts: fact('Takes a ready-made code package out of the project.', {
+        effect: ['delete', 'write'],
+        reversible: 'unknown',
+        docs,
+      }),
       operands: ['package'],
     },
     remove: {
-      facts: fact('Takes a ready-made code package out of the project.', { effect: ['delete', 'write'], reversible: 'yes', docs }),
+      facts: fact('Takes a ready-made code package out of the project.', {
+        effect: ['delete', 'write'],
+        reversible: 'unknown',
+        docs,
+      }),
       operands: ['package'],
     },
     run: {
