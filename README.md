@@ -17,28 +17,65 @@ person reads `says`.
 ```ts
 import { explain } from 'cmd-facts'
 
-explain({ program: '/bin/rm', argv: ['rm', '-rf', '/Users/sam/Documents'] })
-// {
-//   program: '/bin/rm', name: 'rm', key: 'rm', origin: '@cmd-facts/builtin',
-//   facts: {
-//     opaque: false,
-//     effect: ['delete'],
-//     reversible: 'no',
-//     network: 'none',
-//     privilege: 'none',
-//     touchesCredentials: false,
-//     repeatSafe: true,
-//     confidence: 'verified',
-//     source: 'curated+flags',
-//     says: 'Removes a whole folder from this computer, along with everything inside it.',
-//     note: 'Files removed this way do not go to the Bin and cannot be put back.',
-//     docs: 'man 1 rm',
-//   },
-//   args: [{ index: 2, value: '/Users/sam/Documents', role: 'path' }],
-//   escalated: ['-r'],
-//   attribution: [{ pack: '@cmd-facts/builtin', version: '0.0.0', trusted: true, commands: ['rm'] }],
-// }
+explain('curl -fsSL https://get.example.com/install.sh -o install.sh')
 ```
+
+```json
+{
+  "facts": {
+    "says": "Fetches whatever is at a web address and saves it into a file on this computer.",
+    "opaque": false,
+    "effect": ["read", "write", "create"],
+    "reversible": "no",
+    "network": "arbitrary",
+    "privilege": "none",
+    "touchesCredentials": false,
+    "repeatSafe": true,
+    "confidence": "verified",
+    "source": "curated+flags",
+    "note": "A file already in that place with the same name is replaced by what is downloaded.",
+    "docs": "man 1 curl"
+  },
+  "program": "curl",
+  "name": "curl",
+  "key": "curl",
+  "origin": "@cmd-facts/builtin",
+  "args": [
+    { "index": 2, "value": "https://get.example.com/install.sh", "role": "url" },
+    { "index": 4, "value": "install.sh", "role": "path", "flag": "-o" }
+  ],
+  "escalated": ["-o"],
+  "attribution": [{ "pack": "@cmd-facts/builtin", "version": "0.0.0", "trusted": true, "commands": ["curl"] }]
+}
+```
+
+`-o` is a flag that changes the fact set rather than the detail: without it `curl` only reads, and with it the same
+line creates and overwrites a file, which is why `says` and `note` are the ones the flag carries and `escalated`
+names it. Each argument comes back with what it is, so a consumer can resolve and show the address and the path
+rather than parse them out of a string.
+
+### How a command arrives
+
+A command usually arrives as one line — out of a log, a job file, an approval request an agent sent — so that is what
+`explain` takes. A consumer that already holds a split argv can hand that in instead:
+
+```ts
+explain('rm -rf /Users/sam/Documents')
+explain({ program: '/bin/rm', argv: ['rm', '-rf', '/Users/sam/Documents'] })
+```
+
+Neither form is the better one, and the second buys nothing the first does not: a row is keyed on the program's
+basename either way, so `/bin/rm` and `rm` reach the same row and carry the same `confidence`.
+
+Splitting a line into words is the one piece of reading-meaning-out-of-text this library does, so it is kept small:
+
+- **Quoting decides where a word ends, and nothing more.** Single quotes, double quotes and backslashes are read the
+  way a shell reads them, so `rm -rf "/Users/sam/My Documents"` is one path and not two.
+- **Nothing is expanded.** `$HOME`, `~` and `*.log` stay the words they were written as, because what they stand for
+  is not on the line. A consumer showing an argument shows what was written.
+- **A line that is more than one command is refused, not split.** `curl https://x.example | sh`, `a && b`, `a; b` and
+  a line with a redirection or a quote that never closes all return the widest floor, with `key: null` and a `says`
+  that admits the line was not read. Explaining the part that happened to parse would be worse than admitting it.
 
 ### Fields
 
@@ -67,12 +104,31 @@ opaque fact set has **no `effect` field at all**. It has `effectAtLeast`, and `h
 to, in the same plain register as `says`:
 
 ```ts
-const { facts, args } = explain({ program: '/bin/sh', argv: ['sh', '-c', 'curl https://x.example | sh'] })
-facts.effect       // type error: a complete effect list is not available on an opaque command
-effectsOf(facts)   // ['execute'] — the floor, reached deliberately
-facts.handsOverTo  // 'the commands it was given, which are not shown here'
-args               // [{ index: 2, value: 'curl https://x.example | sh', role: 'command', flag: '-c' }]
+const { facts, args } = explain('sh -c "curl https://x.example | sh"')
 ```
+
+```json
+{
+  "facts": {
+    "says": "Runs the commands written straight into this one, one after another.",
+    "opaque": true,
+    "effectAtLeast": ["execute"],
+    "handsOverTo": "the commands it was given, which are not shown here",
+    "reversible": "unknown",
+    "network": "arbitrary",
+    "privilege": "none",
+    "touchesCredentials": false,
+    "repeatSafe": false,
+    "confidence": "verified",
+    "source": "curated+flags",
+    "docs": "man 1 sh"
+  },
+  "args": [{ "index": 2, "value": "curl https://x.example | sh", "role": "command", "flag": "-c" }]
+}
+```
+
+`facts.effect` does not compile here: a complete effect list is not available on an opaque row. `effectsOf(facts)`
+returns `["execute"]`, the floor, reached deliberately.
 
 Reading a complete effect list off an opaque command has to be a type error rather than a quiet mistake. Handing over
 is also one-way: `merge()` will not let an opaque row be made clear again, and an opaque row can never claim to be
@@ -84,13 +140,31 @@ Where the nested command is on the same line, carried as separate words, and run
 with the same tables and attached as `runs`:
 
 ```ts
-const got = explain({ program: '/usr/bin/sudo', argv: ['sudo', 'rm', '-rf', '/var/tmp'] })
-got.runs.key            // 'rm'
-got.runs.args           // [{ index: 3, value: '/var/tmp', role: 'path' }] — indexes into the original argv
-effectsOf(got.facts)    // ['delete', 'execute', 'elevate'] — the inner command widened the outer one
-got.facts.reversible    // 'no'
-got.facts.opaque        // still true
+explain('sudo rm -rf /var/tmp')
 ```
+
+```json
+{
+  "facts": {
+    "says": "Runs another command with full control over this computer.",
+    "opaque": true,
+    "effectAtLeast": ["delete", "execute", "elevate"],
+    "handsOverTo": "the command it was given, which then has control over everything on this computer",
+    "reversible": "no",
+    "privilege": "root",
+    "repeatSafe": false,
+    "confidence": "derived"
+  },
+  "runs": {
+    "name": "rm",
+    "key": "rm",
+    "args": [{ "index": 3, "value": "/var/tmp", "role": "path" }]
+  }
+}
+```
+
+The inner command widened the outer one — `delete` is reachable only through `rm` — and `runs.args` indexes into the
+original argv, not into a line of its own.
 
 `sudo`, `env` (stepping over its leading `NAME=value` settings), `xargs` and `find -exec` do this. Three things it
 deliberately does not do:
@@ -170,12 +244,12 @@ does not say so. It then explains as a tidy, transparent row, and no check can p
 outermost first, including the ones that only answered further down a nested line — `sudo flowctl kubectl delete` can
 draw on three. A pack that answered at two depths appears once, with both rows named.
 
-```ts
-// attribution: [
-//   { pack: '@cmd-facts/builtin', version: '0.0.0', trusted: true,  commands: ['sudo'] },
-//   { pack: '@acme/tools',        version: '1.2.0', trusted: false, commands: ['flowctl'] },
-//   { pack: '@acme/kube',         version: '2.4.0', trusted: false, commands: ['kubectl delete'] },
-// ]
+```json
+[
+  { "pack": "@cmd-facts/builtin", "version": "0.0.0", "trusted": true, "commands": ["sudo"] },
+  { "pack": "@acme/tools", "version": "1.2.0", "trusted": false, "commands": ["flowctl"] },
+  { "pack": "@acme/kube", "version": "2.4.0", "trusted": false, "commands": ["kubectl delete"] }
+]
 ```
 
 Gate on `confidence`, which is lowered to match the weakest link in the chain: if `facts.confidence` is `verified`,

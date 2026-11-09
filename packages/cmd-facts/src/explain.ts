@@ -3,6 +3,7 @@ import type { Facts } from './facts.ts'
 import { buildRegistry } from './registry.ts'
 import type { Registry, RegistryOptions } from './registry.ts'
 import type { FlagRule, Role, Rule } from './entry.ts'
+import { tokenize } from './line.ts'
 
 export type ArgSlot = { index: number; value: string; role: Role; flag?: string }
 
@@ -54,6 +55,34 @@ export const UNKNOWN: Facts = {
   says: 'This runs a program that is not in the list of known commands.',
   note: 'Nothing here describes what the program does. The facts shown are the widest ones, not a measurement.',
 }
+
+/**
+ * A line that was handed over as one string and could not be read as a single command: it carries an operator that
+ * makes it more than one, or a quote that never closes. Nothing is split and nothing is guessed — explaining the
+ * part that happened to parse would be worse than admitting the line was not read.
+ */
+export const UNREAD_LINE: Facts = {
+  effectAtLeast: ['execute'],
+  reversible: 'unknown',
+  network: 'arbitrary',
+  privilege: 'none',
+  opaque: true,
+  handsOverTo: 'whatever this line turns out to run, which is not read here',
+  touchesCredentials: false,
+  repeatSafe: false,
+  confidence: 'unknown',
+  source: 'unknown',
+  says: 'This is more than one command, or could not be read as one.',
+  note: 'Nothing here describes what will run. The facts shown are the widest ones, not a measurement.',
+}
+
+/**
+ * What a consumer can hand in. A whole line is how a command usually arrives — out of a log, a job file, an agent's
+ * request — and a split argv is how a program that already holds one passes it on. Neither is the better form: a
+ * line is split into words and then answered by exactly the same path, and a row is keyed on the program's basename
+ * either way, so handing in a path never bought a stronger answer than handing in a name.
+ */
+export type Input = string | { program: string; argv: string[] }
 
 export const basename = (p: string) => p.split('/').filter(Boolean).pop() ?? p
 const isFlag = (t: string) => t.length > 1 && t.startsWith('-')
@@ -195,7 +224,7 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
   return { ...head, ...parsed, facts, runs, attribution: unionByPack(own, runs.attribution) }
 }
 
-export type Explainer = ((input: { program: string; argv: string[] }) => Explanation) & { registry: Registry }
+export type Explainer = ((input: Input) => Explanation) & { registry: Registry }
 
 /**
  * Facts about one command, from its resolved program path and its argv, answered out of the packs given here.
@@ -206,7 +235,17 @@ export type Explainer = ((input: { program: string; argv: string[] }) => Explana
  */
 export function createExplainer(opts: RegistryOptions): Explainer {
   const registry = buildRegistry(opts)
-  const explain = (input: { program: string; argv: string[] }): Explanation =>
-    at(registry, input.program, input.argv.length ? input.argv : [basename(input.program)], 0)
+
+  const explain = (input: Input): Explanation => {
+    if (typeof input !== 'string') {
+      return at(registry, input.program, input.argv.length ? input.argv : [basename(input.program)], 0)
+    }
+    const read = tokenize(input)
+    if (!read.ok) {
+      return { program: input, name: input, key: null, origin: null, facts: UNREAD_LINE, args: [], escalated: [], attribution: [] }
+    }
+    return at(registry, read.argv[0]!, read.argv, 0)
+  }
+
   return Object.assign(explain, { registry })
 }
