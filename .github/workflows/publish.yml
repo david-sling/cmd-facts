@@ -1,0 +1,62 @@
+name: Publish
+
+# Publishing is deliberate: a release drafted and published in the GitHub UI is what
+# sends a version to npm. Nothing ships on a plain push or merge.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # npm reads this short-lived OIDC token to verify which workflow is asking to
+      # publish. It is what replaces a stored NPM_TOKEN, and it is also what lets npm
+      # attach a provenance attestation to the release.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Trusted publishing needs npm 11.5.1 or newer, which is not always the npm
+      # bundled with the Node release above.
+      - name: Use an npm that can publish without a token
+        run: npm install -g npm@latest
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The tag the release was cut from has to name the version being published, or the
+      # release notes on GitHub describe something other than what lands on npm.
+      - name: Check the tag names the version
+        working-directory: packages/cmd-facts
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(npm pkg get version | tr -d '"')"
+          if [ "$tag" != "$version" ]; then
+            echo "Release tag $GITHUB_REF_NAME does not name version $version" >&2
+            exit 1
+          fi
+
+      - name: Test
+        run: pnpm -r test
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      # `prepack` builds and copies the root README in, and `files` excludes the tests, so
+      # what this uploads is the tarball `npm pack` shows locally.
+      - name: Publish
+        working-directory: packages/cmd-facts
+        run: npm publish --access public
