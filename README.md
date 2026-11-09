@@ -82,9 +82,13 @@ Splitting a line into words is the one piece of reading-meaning-out-of-text this
   way a shell reads them, so `rm -rf "/Users/sam/My Documents"` is one path and not two.
 - **Nothing is expanded.** `$HOME`, `~` and `*.log` stay the words they were written as, because what they stand for
   is not on the line. A consumer showing an argument shows what was written.
-- **A line that is more than one command is refused, not split.** `curl https://x.example | sh`, `a && b`, `a; b` and
-  a line with a redirection or a quote that never closes all return the widest floor, with `key: null` and a `says`
-  that admits the line was not read. Explaining the part that happened to parse would be worse than admitting it.
+- **A line that runs several commands is read as several commands.** `curl … | sh`, `a && b`, `a; b`, `a & b` come
+  back as `steps`, each answered in full, with the operator that joined them. See below.
+- **A redirection is read as what the line does with the output.** `> file` is a write the program itself knows
+  nothing about, so it widens the answer.
+- **A substitution is refused.** Backticks, `$(…)` and a subshell return the widest floor, with `key: null` and a
+  `says` that admits the line was not read — what a substitution stands for is not on the line. So do a quote that
+  never closes and an operator with nothing on one side of it, as in `ls |`.
 
 ### Fields
 
@@ -106,6 +110,8 @@ Splitting a line into words is the one piece of reading-meaning-out-of-text this
 | `docs` | A man page or official page, so a doubtful reader can check. |
 | `origin` | The pack that supplied this row, or `null` when the program is not known. |
 | `attribution` | Every pack behind `facts`, including ones that only answered further down a nested line. |
+| `steps` | The commands a line runs, where it runs more than one, each answered in full. |
+| `after` | On a step: the operator that joined it to the one before — `\|`, `&&`, `\|\|`, `;`, `&`. |
 | `args` | What each argv position is: `path` `host` `url` `pid` `package` `domain` `user` `mode` `service` `signal` `device` `pattern` `command` `text`. |
 
 ### `opaque` is in the type, not in a footnote
@@ -245,6 +251,51 @@ a way to read an argument wrong. A slot for a role the row never gives an argume
 fallback for ever.
 
 Rows without `tell` keep answering with `says`, so coverage can grow a row at a time.
+
+### A line that runs more than one command
+
+`curl … | sh` is one line and two commands. Each is answered on its own, under `steps`, and the fact set at the top
+is all of them widened together — so a consumer that reads nothing but the top is told the worst of what the line
+does, rather than being told nothing.
+
+```ts
+const line = explain('curl https://get.example.com/install.sh | sh')
+
+line.facts.says       // 'This line runs more than one command.'
+line.facts.opaque     // true — `sh` runs whatever it is handed
+line.facts.network    // 'arbitrary'
+line.steps.length     // 2
+line.steps[1].name    // 'sh'
+line.steps[1].after   // '|'
+line.sentence
+// 'Makes a request to get.example.com and shows what comes back. What it prints is given to the next command.
+//  Runs a list of commands, one after another.'
+```
+
+`after` carries the operator because operators differ in ways a reader needs: `&&` means the next command runs only
+if this one works, `&` means this one keeps running while the next starts. Each is rendered as its own sentence, so
+the step sentences around it keep their own capitals and nothing has to be re-cased.
+
+`key` is `null` on the line itself — no single row answered it — and each step's `args` index into that step's own
+words rather than into the whole line.
+
+### Sending output somewhere is part of what a line does
+
+`ls > listing.txt` writes a file that `ls` knows nothing about. The redirection belongs to the line, so it widens the
+command it sits on:
+
+```ts
+const wrote = explain('ls ~/Documents > listing.txt')
+
+effectsOf(wrote.facts)   // ['read', 'write', 'create']
+wrote.facts.reversible   // 'no' — `>` replaces what was there; `>>` is 'unknown'
+wrote.sentence
+// 'Lists the names of the files and folders kept in ~/Documents. What it prints is written to listing.txt.'
+```
+
+The written path joins `args` with the operator as its `flag`, but only after the sentence has been built — otherwise
+`cat notes.txt > copy.txt` would read as though `copy.txt` were another file being shown. `2>`, `2>>` and `&>` are
+read too, and the stream comes back as `fd`.
 
 ### `confidence` and `source`
 

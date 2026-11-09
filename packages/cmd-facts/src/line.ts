@@ -1,33 +1,69 @@
 /**
- * Splitting one string into words is the one piece of reading-meaning-out-of-text this library does, so it is kept
- * small, explicit, and quick to refuse.
+ * Reading one line as the commands it runs. This is the one piece of reading-meaning-out-of-text this library does,
+ * so it is kept to grammar: where a word ends, where a command ends, and where a command's output is sent. Splitting
+ * on an operator is the same kind of work as splitting on a space — it is what the line says, not what it means.
  *
- * It handles the part of the grammar that decides where a word ends — single quotes, double quotes, backslashes —
- * and nothing else. It expands nothing: a `$HOME` or a `*` stays the literal word it was written as, because what
- * those stand for is not on the line. And it refuses outright where a line means more than one command, rather than
- * splitting it somewhere and explaining the part it happened to keep.
+ * It expands nothing: a `$HOME` or a `*` stays the literal word it was written as, because what those stand for is
+ * not on the line. And it refuses a substitution outright, because the value of one is not on the line either.
  */
-export type Tokens = { ok: true; argv: string[] } | { ok: false; why: 'many' | 'unterminated' | 'empty' }
 
-// Everything that makes a line more than one command, or hands part of it somewhere this cannot follow.
-const OPERATOR = '|&;<>()`\n'
+/** How a command was joined to the one before it. */
+export type Op = '|' | '&&' | '||' | ';' | '&'
+
+/** Where a command's output was sent, or where its input was taken from. */
+export type Redirect = {
+  op: '>' | '>>' | '<'
+  path: string
+  /** The stream, where the line named one: `2> log` carries `'2'`. */
+  fd?: string
+}
+
+export type Step = {
+  argv: string[]
+  /** The operator that joined this command to the one before it. Absent on the first. */
+  after?: Op
+  redirects: Redirect[]
+}
+
+export type Tokens = { ok: true; steps: Step[] } | { ok: false; why: 'unterminated' | 'empty' | 'substitution' }
+
 // Inside double quotes a backslash only escapes these; before anything else it stays a backslash.
 const ESCAPABLE = '"\\`$\n'
+const DIGITS = /^[0-9]+$/
 
 export function tokenize(line: string): Tokens {
-  const argv: string[] = []
+  const steps: Step[] = []
+  let argv: string[] = []
+  let redirects: Redirect[] = []
+  let after: Op | undefined
   let word = ''
   let started = false
   let quote: '"' | "'" | null = null
+  let pending: { op: Redirect['op']; fd?: string } | null = null
 
-  const end = () => {
-    if (started) argv.push(word)
+  const endWord = () => {
+    if (!started) return
+    if (pending) {
+      redirects.push({ op: pending.op, path: word, ...(pending.fd ? { fd: pending.fd } : {}) })
+      pending = null
+    } else {
+      argv.push(word)
+    }
     word = ''
     started = false
   }
 
+  const endStep = (next: Op) => {
+    endWord()
+    if (argv.length || redirects.length) steps.push({ argv, ...(after ? { after } : {}), redirects })
+    argv = []
+    redirects = []
+    after = next
+  }
+
   for (let i = 0; i < line.length; i++) {
     const c = line[i]!
+    const next = line[i + 1]
 
     if (quote === "'") {
       if (c === "'") quote = null
@@ -40,7 +76,6 @@ export function tokenize(line: string): Tokens {
         quote = null
         continue
       }
-      const next = line[i + 1]
       if (c === '\\' && next !== undefined && ESCAPABLE.includes(next)) {
         word += next
         i++
@@ -56,7 +91,6 @@ export function tokenize(line: string): Tokens {
       continue
     }
     if (c === '\\') {
-      const next = line[i + 1]
       if (next === undefined) return { ok: false, why: 'unterminated' }
       word += next
       started = true
@@ -64,16 +98,64 @@ export function tokenize(line: string): Tokens {
       continue
     }
     if (c === ' ' || c === '\t') {
-      end()
+      endWord()
       continue
     }
-    if (OPERATOR.includes(c)) return { ok: false, why: 'many' }
+
+    // What a substitution or a subshell stands for is not on this line, so there is nothing here to read.
+    if (c === '`' || (c === '$' && next === '(') || c === '(' || c === ')') return { ok: false, why: 'substitution' }
+
+    if (c === '\n' || c === ';') {
+      endStep(';')
+      continue
+    }
+    if (c === '|') {
+      if (next === '|') i++
+      endStep(next === '|' ? '||' : '|')
+      continue
+    }
+    if (c === '&') {
+      // `&>` sends both streams to a file; it is a redirection, not a command boundary.
+      if (next === '>') {
+        endWord()
+        pending = { op: '>' }
+        i++
+        continue
+      }
+      if (next === '&') i++
+      endStep(next === '&' ? '&&' : '&')
+      continue
+    }
+    if (c === '>' || c === '<') {
+      // `2> log` names the stream in the word just read, which belongs to the redirection rather than to argv.
+      const fd = started && DIGITS.test(word) ? word : undefined
+      if (fd !== undefined) {
+        word = ''
+        started = false
+      } else {
+        endWord()
+      }
+      const double = c === '>' && next === '>'
+      if (double) i++
+      pending = { op: double ? '>>' : (c as Redirect['op']), ...(fd !== undefined ? { fd } : {}) }
+      continue
+    }
 
     word += c
     started = true
   }
 
   if (quote) return { ok: false, why: 'unterminated' }
-  end()
-  return argv.length ? { ok: true, argv } : { ok: false, why: 'empty' }
+  endWord()
+  if (pending) return { ok: false, why: 'unterminated' }
+  const trailing = after !== undefined && !argv.length && !redirects.length
+  if (argv.length || redirects.length) steps.push({ argv, ...(after ? { after } : {}), redirects })
+
+  if (!steps.length) return { ok: false, why: 'empty' }
+  // A command on one side of an operator and nothing on the other, as in `ls |` or `| ls`, is not a line this can
+  // account for: something was meant to run there and it is not written down.
+  if (trailing || steps[0]!.after !== undefined || steps.some((x) => !x.argv.length)) {
+    return { ok: false, why: 'unterminated' }
+  }
+  return { ok: true, steps }
 }

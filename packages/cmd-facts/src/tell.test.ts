@@ -88,7 +88,7 @@ describe('every explanation carries both halves', () => {
   })
 
   it('falls back to says on a line it could not read', () => {
-    const e = explain('curl x | sh')
+    const e = explain('echo `whoami`')
     expect(e.sentence).toBe(e.facts.says)
   })
 })
