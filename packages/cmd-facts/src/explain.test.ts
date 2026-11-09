@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { explain } from './explain.ts'
+import { explain } from './index.ts'
 import { effectsOf, isComplete, merge } from './facts.ts'
 import type { Facts } from './facts.ts'
 

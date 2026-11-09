@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { COMMANDS } from './data/index.ts'
+import { BUILTIN, COMMANDS } from './data/index.ts'
 import { rows } from './rows.ts'
 import { effectsOf } from './facts.ts'
-import { explain } from './explain.ts'
+import { explain } from './index.ts'
 import type { Facts, Network, Privilege } from './facts.ts'
 import type { Role, Rule } from './entry.ts'
 
-const ALL = rows()
+const ALL = rows(BUILTIN)
 const NET_RANK: Record<Network, number> = { none: 0, 'known-host': 1, listens: 2, arbitrary: 3 }
 const PRIV_RANK: Record<Privilege, number> = { none: 0, admin: 1, root: 2 }
 

@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/david-sling/cmd-facts/schema/pack.schema.json",
+  "title": "cmd-facts pack",
+  "description": "A set of command rows shipped under one name. The envelope borrows its field names from schema.org's SoftwareSourceCode; the rows do not, because no vocabulary out there describes what a command does to a computer. This schema is for authoring: validate() is what enforces these rules, and it also checks consistency a schema cannot express.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "version", "commands"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": {
+      "description": "Unique across the packs one consumer loads. This is the name `trust` and `override` refer to.",
+      "type": "string",
+      "pattern": "^(@[a-z0-9][a-z0-9._-]*/)?[a-z0-9][a-z0-9._-]*$"
+    },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "license": { "type": "string" },
+    "author": { "type": "string" },
+    "codeRepository": { "type": "string", "format": "uri" },
+    "commands": {
+      "description": "Keyed by the program basename a lookup will reach it by.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[A-Za-z0-9][\\w.+-]*$" },
+      "additionalProperties": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "effect": {
+      "type": "string",
+      "enum": ["read", "write", "create", "delete", "terminate", "install", "configure", "transmit", "execute", "elevate"]
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "path",
+        "host",
+        "url",
+        "pid",
+        "package",
+        "domain",
+        "user",
+        "mode",
+        "service",
+        "signal",
+        "device",
+        "pattern",
+        "command",
+        "text",
+        "unknown"
+      ]
+    },
+    "reversible": { "type": "string", "enum": ["yes", "no", "with-backup", "unknown"] },
+    "network": { "type": "string", "enum": ["none", "known-host", "arbitrary", "listens"] },
+    "privilege": { "type": "string", "enum": ["none", "admin", "root"] },
+    "confidence": { "type": "string", "enum": ["verified", "derived", "unknown"] },
+    "source": {
+      "type": "string",
+      "enum": ["curated", "curated+flags", "name-fallback", "subcommand-miss", "nested", "plugin", "unknown"]
+    },
+
+    "common": {
+      "type": "object",
+      "required": ["reversible", "network", "privilege", "touchesCredentials", "repeatSafe", "confidence", "source", "says"],
+      "properties": {
+        "reversible": { "$ref": "#/$defs/reversible" },
+        "network": { "$ref": "#/$defs/network" },
+        "privilege": { "$ref": "#/$defs/privilege" },
+        "touchesCredentials": {
+          "description": "Reaches secrets by nature of the program, whatever paths it was given.",
+          "type": "boolean"
+        },
+        "repeatSafe": {
+          "description": "Running it twice leaves the same result as running it once.",
+          "type": "boolean"
+        },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "source": { "$ref": "#/$defs/source" },
+        "says": {
+          "description": "One sentence, plain register, standing alone with nothing templated into it.",
+          "type": "string",
+          "minLength": 1
+        },
+        "note": {
+          "description": "A consequence the fields cannot carry. Never a mistake a person might make.",
+          "type": "string"
+        },
+        "docs": { "type": "string" }
+      }
+    },
+
+    "facts": {
+      "description": "A transparent row accounts for the command in full. A blind row hands over to something this library cannot see, so it carries `effectAtLeast` rather than `effect`.",
+      "oneOf": [{ "$ref": "#/$defs/transparent" }, { "$ref": "#/$defs/blind" }]
+    },
+
+    "transparent": {
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["opaque", "effect"],
+      "properties": {
+        "opaque": { "const": false },
+        "effect": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } }
+      }
+    },
+
+    "blind": {
+      "allOf": [{ "$ref": "#/$defs/common" }],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "required": ["opaque", "effectAtLeast", "handsOverTo"],
+      "properties": {
+        "opaque": { "const": true },
+        "effectAtLeast": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } },
+        "handsOverTo": {
+          "description": "What it handed over to, in the same plain register as `says`.",
+          "type": "string",
+          "minLength": 1
+        },
+        "reversible": { "type": "string", "enum": ["unknown", "no"] },
+        "repeatSafe": { "const": false }
+      }
+    },
+
+    "overlay": {
+      "description": "What a flag rule may add. Every field widens the claim; none of them can narrow it.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "effect": { "type": "array", "items": { "$ref": "#/$defs/effect" } },
+        "opaque": { "const": true },
+        "handsOverTo": { "type": "string" },
+        "reversible": { "$ref": "#/$defs/reversible" },
+        "network": { "$ref": "#/$defs/network" },
+        "privilege": { "$ref": "#/$defs/privilege" },
+        "touchesCredentials": { "const": true },
+        "repeatSafe": { "const": false },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "source": { "$ref": "#/$defs/source" },
+        "says": { "type": "string" },
+        "note": { "type": "string" },
+        "docs": { "type": "string" }
+      }
+    },
+
+    "flagRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["flags", "facts"],
+      "properties": {
+        "flags": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^-" } },
+        "facts": { "$ref": "#/$defs/overlay" },
+        "takesValue": { "type": "boolean" },
+        "role": { "$ref": "#/$defs/role" }
+      }
+    },
+
+    "ruleProperties": {
+      "type": "object",
+      "required": ["facts"],
+      "properties": {
+        "facts": { "$ref": "#/$defs/facts" },
+        "flagStyle": {
+          "description": "`words` turns off single-dash bundling for programs whose flags are whole words.",
+          "type": "string",
+          "enum": ["posix", "words"]
+        },
+        "flags": { "type": "array", "items": { "$ref": "#/$defs/flagRule" } },
+        "operands": {
+          "description": "Roles for the positional arguments; the last entry repeats for the rest.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/role" }
+        },
+        "values": {
+          "type": "object",
+          "propertyNames": { "pattern": "^-" },
+          "additionalProperties": { "$ref": "#/$defs/role" }
+        },
+        "nestedHere": {
+          "description": "The command it hands over to runs on this computer and is carried as separate words on this same line.",
+          "type": "boolean"
+        },
+        "assignmentsFirst": { "type": "boolean" }
+      }
+    },
+
+    "rule": {
+      "allOf": [{ "$ref": "#/$defs/ruleProperties" }],
+      "type": "object",
+      "unevaluatedProperties": false
+    },
+
+    "entry": {
+      "allOf": [{ "$ref": "#/$defs/ruleProperties" }],
+      "type": "object",
+      "unevaluatedProperties": false,
+      "properties": {
+        "versioned": {
+          "description": "The program answers to a version-suffixed name too: `python3` reaches the `python` row.",
+          "type": "boolean"
+        },
+        "sub": { "type": "object", "additionalProperties": { "$ref": "#/$defs/rule" } }
+      }
+    }
+  }
+}

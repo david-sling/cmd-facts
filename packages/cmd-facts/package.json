@@ -13,10 +13,12 @@
   "exports": {
     ".": "./src/index.ts",
     "./facts": "./src/facts.ts",
-    "./data": "./src/data/index.ts"
+    "./data": "./src/data/index.ts",
+    "./schema": "./schema/pack.schema.json"
   },
   "files": [
-    "src"
+    "src",
+    "schema"
   ],
   "scripts": {
     "test": "vitest run",
