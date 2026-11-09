@@ -1,0 +1,147 @@
+import { CONFIDENCE, EFFECTS, NETWORK, PRIVILEGE, RANK, REVERSIBLE, effectsOf } from './facts.ts'
+import type { Facts } from './facts.ts'
+import { ROLES } from './entry.ts'
+import type { Entry, Role, Rule } from './entry.ts'
+
+/**
+ * A set of command rows shipped under one name, so a consumer can answer for tools this package has never heard of.
+ *
+ * A pack is data and only data: no functions, no matchers, no hook into parsing. A pack that could run code during a
+ * lookup would see the command line, and nothing in this library is allowed to read meaning out of argument text.
+ *
+ * The envelope borrows its field names from schema.org's SoftwareSourceCode, so a manifest reads like any other
+ * package manifest. The rows do not, and deliberately: there is no vocabulary out there for what a command does to a
+ * computer, and bending one into shape would cost the `opaque` union that makes reading `effect` off a blind row a
+ * type error rather than a lookup that quietly returns nothing.
+ */
+export type Pack = {
+  /** Unique across the packs one consumer loads. This is the name `trust` and `override` refer to. */
+  name: string
+  version: string
+  description?: string
+  license?: string
+  author?: string
+  codeRepository?: string
+  commands: Record<string, Entry>
+}
+
+/** One thing wrong with a pack, named where a person can find it. */
+export type Problem = { where: string; says: string }
+
+type Bad = (where: string, says: string) => void
+
+const PACK_NAME = /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/
+// A command name is the program basename `explain()` will look it up by, so a slash or a space could never match.
+const COMMAND_NAME = /^[A-Za-z0-9][\w.+-]*$/
+
+const has = <T extends string>(all: T[], v: unknown): v is T => all.includes(v as T)
+
+/**
+ * Everything a pack has to hold to be safe to load: the shape of a fact set, the internal consistency the built-in
+ * table holds itself to, and the grammar rules that decide where parsing recurses.
+ *
+ * Not checked here: register, jargon and the rest of the copy lints. Those are editorial, they are enforced on the
+ * built-in table by the test suite, and a third-party pack should not fail to load because a sentence reads badly.
+ * A pack author who wants them can run `rows(pack)` through the same lints.
+ */
+export function validate(pack: Pack): Problem[] {
+  const problems: Problem[] = []
+  const bad: Bad = (where, says) => void problems.push({ where, says })
+
+  if (!PACK_NAME.test(pack?.name ?? '')) bad(String(pack?.name), 'A pack name is lowercase, optionally scoped: `@acme/kubectl`.')
+  if (!pack?.version?.trim()) bad(pack?.name ?? '(pack)', 'A pack has to carry a version, so a consumer can record which one answered.')
+  if (!pack?.commands || typeof pack.commands !== 'object') {
+    bad(pack?.name ?? '(pack)', 'A pack has to carry a `commands` table.')
+    return problems
+  }
+
+  for (const [name, entry] of Object.entries(pack.commands)) {
+    if (!COMMAND_NAME.test(name)) bad(name, 'A command name is the program basename, with no slash and no spaces.')
+    checkRule(bad, name, entry)
+    for (const [word, sub] of Object.entries(entry.sub ?? {})) {
+      checkRule(bad, `${name} ${word}`, sub)
+      checkStandIn(bad, `${name} ${word}`, entry.facts, sub.facts)
+    }
+  }
+  return problems
+}
+
+function checkFacts(bad: Bad, where: string, f: Facts) {
+  if (!f || typeof f !== 'object') return bad(where, 'The row carries no fact set.')
+  if (!f.says?.trim()) bad(where, 'Every row needs a `says` sentence; it is what a person reads.')
+  if (!has(REVERSIBLE, f.reversible)) bad(where, `\`reversible\` is one of ${REVERSIBLE.join(', ')}.`)
+  if (!has(NETWORK, f.network)) bad(where, `\`network\` is one of ${NETWORK.join(', ')}.`)
+  if (!has(PRIVILEGE, f.privilege)) bad(where, `\`privilege\` is one of ${PRIVILEGE.join(', ')}.`)
+  if (!has(CONFIDENCE, f.confidence)) bad(where, `\`confidence\` is one of ${CONFIDENCE.join(', ')}.`)
+  if (typeof f.touchesCredentials !== 'boolean') bad(where, '`touchesCredentials` is a boolean.')
+  if (typeof f.repeatSafe !== 'boolean') bad(where, '`repeatSafe` is a boolean.')
+
+  const effect = effectsOf(f) ?? []
+  if (!effect.length) bad(where, 'A row has to name at least one effect.')
+  for (const e of effect) if (!has(EFFECTS, e)) bad(where, `\`${e}\` is not one of the known effects.`)
+
+  // The same consistency the built-in table holds itself to. A row that contradicts itself is worse than no row:
+  // it reads as a measurement.
+  if (effect.includes('delete') && f.reversible === 'yes') bad(where, 'A row that deletes cannot also say it can be put back.')
+  if (effect.includes('transmit') && f.network === 'none') bad(where, 'A row that sends something cannot claim it touches no network.')
+  if (effect.includes('elevate') && f.privilege === 'none') bad(where, 'A row that elevates cannot claim it needs no privilege.')
+  if (f.privilege === 'root' && !effect.includes('elevate')) bad(where, 'A row that runs as root has to name the `elevate` effect.')
+
+  if (f.opaque) {
+    if (!f.handsOverTo?.trim()) bad(where, 'An opaque row has to name what it hands over to, in the same register as `says`.')
+    if (f.reversible !== 'unknown' && f.reversible !== 'no') bad(where, 'An opaque row cannot promise that anything can be put back.')
+    if (f.repeatSafe) bad(where, 'An opaque row cannot claim it is safe to repeat.')
+  }
+}
+
+function checkRule(bad: Bad, where: string, rule: Rule) {
+  checkFacts(bad, where, rule.facts)
+
+  const named: Array<[string, Role]> = [
+    ...(rule.operands ?? []).map((r, i): [string, Role] => [`operand ${i}`, r]),
+    ...Object.entries(rule.values ?? {}),
+  ]
+  for (const [at, role] of named) if (!has(ROLES, role)) bad(where, `\`${role}\` at ${at} is not a known role.`)
+  for (const flag of Object.keys(rule.values ?? {})) if (!flag.startsWith('-')) bad(where, `\`${flag}\` has to be declared with its dash.`)
+
+  // A position that holds another command is the handover itself, so a row that can produce one has to be opaque.
+  const fixed: Role[] = [...(rule.operands ?? []), ...Object.values(rule.values ?? {})]
+  if (fixed.includes('command') && !rule.facts?.opaque) bad(where, 'A row that holds another command in a position has to be opaque.')
+
+  for (const f of rule.flags ?? []) {
+    const at = `${where} ${f.flags?.[0] ?? '(unnamed flag)'}`
+    if (!f.flags?.length) {
+      bad(where, 'A flag rule has to name at least one flag.')
+      continue
+    }
+    for (const flag of f.flags) if (!flag.startsWith('-')) bad(at, `\`${flag}\` has to be declared with its dash.`)
+    if (f.role && !has(ROLES, f.role)) bad(at, `\`${f.role}\` is not a known role.`)
+    if (f.role && !f.takesValue) bad(at, 'A flag that gives its value a role has to take a value.')
+    if (!Object.keys(f.facts ?? {}).length && !f.takesValue) bad(at, 'A flag that changes nothing and takes no value does not belong in the table.')
+    if (f.role === 'command' && !(rule.facts?.opaque || f.facts?.opaque === true)) {
+      bad(at, 'A flag that holds another command has to leave the row opaque.')
+    }
+    // A flag may only widen the row it sits on, so a consumer that gated on the bare command is never surprised.
+    // `opaque` is typed as `true | undefined`, but a pack can arrive as JSON, so the check reads the value rather
+    // than trusting the type.
+    if ((f.facts as Record<string, unknown> | undefined)?.['opaque'] === false) bad(at, 'A flag cannot make an opaque row clear again.')
+    if (f.facts?.repeatSafe === true) bad(at, 'A flag cannot claim a row is safe to repeat.')
+    if (f.facts?.touchesCredentials === false) bad(at, 'A flag cannot withdraw `touchesCredentials`.')
+    if (f.facts?.reversible && rule.facts?.reversible === 'no') bad(at, 'A flag cannot soften a row that says nothing can be put back.')
+  }
+
+  const recurses = fixed.includes('command') || (rule.flags ?? []).some((f) => f.role === 'command')
+  if (rule.nestedHere && !recurses) bad(where, 'A row that follows a nested command needs a position that holds one.')
+  if (rule.assignmentsFirst && !rule.nestedHere) bad(where, '`assignmentsFirst` only means something where a nested command is followed.')
+}
+
+/** The base row is what an unrecognised subcommand falls back to, so it may not promise anything a known one breaks. */
+function checkStandIn(bad: Bad, where: string, base: Facts, sub: Facts) {
+  if (!base || !sub) return
+  if (sub.reversible !== 'yes' && base.reversible === 'yes') bad(where, 'The base row says it can be put back, and this subcommand cannot.')
+  if (!sub.repeatSafe && base.repeatSafe) bad(where, 'The base row says it is safe to repeat, and this subcommand is not.')
+  if (sub.touchesCredentials && !base.touchesCredentials) bad(where, 'The base row does not reach secrets, and this subcommand does.')
+  if (sub.opaque && !base.opaque) bad(where, 'The base row is clear, and this subcommand hands over.')
+  if (RANK.network[base.network] < RANK.network[sub.network]) bad(where, 'The base row claims less network reach than this subcommand has.')
+  if (RANK.privilege[base.privilege] < RANK.privilege[sub.privilege]) bad(where, 'The base row claims less privilege than this subcommand needs.')
+}

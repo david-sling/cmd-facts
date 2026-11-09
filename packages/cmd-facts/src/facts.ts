@@ -18,7 +18,15 @@ export type Reversible = 'yes' | 'no' | 'with-backup' | 'unknown'
 export type Network = 'none' | 'known-host' | 'arbitrary' | 'listens'
 export type Privilege = 'none' | 'admin' | 'root'
 export type Confidence = 'verified' | 'derived' | 'unknown'
-export type Source = 'curated' | 'curated+flags' | 'name-fallback' | 'subcommand-miss' | 'nested' | 'unknown'
+export type Source =
+  | 'curated'
+  | 'curated+flags'
+  | 'name-fallback'
+  | 'subcommand-miss'
+  | 'nested'
+  /** A row from a pack the consumer did not vouch for. It arrives `derived` whatever it was written as. */
+  | 'plugin'
+  | 'unknown'
 
 type Common = {
   reversible: Reversible
@@ -83,6 +91,18 @@ const REVERSIBLE_RANK: Record<Reversible, number> = { yes: 0, 'with-backup': 1, 
 const NETWORK_RANK: Record<Network, number> = { none: 0, 'known-host': 1, listens: 2, arbitrary: 3 }
 const PRIVILEGE_RANK: Record<Privilege, number> = { none: 0, admin: 1, root: 2 }
 const CONFIDENCE_RANK: Record<Confidence, number> = { verified: 0, derived: 1, unknown: 2 }
+
+/**
+ * How wide each value is. Exported because anything that compares two fact sets — a pack's own lints, a consumer
+ * deciding whether an update made a claim weaker — has to order them the way `merge` does, and the declaration
+ * order of the arrays above is not that order.
+ */
+export const RANK = {
+  reversible: REVERSIBLE_RANK,
+  network: NETWORK_RANK,
+  privilege: PRIVILEGE_RANK,
+  confidence: CONFIDENCE_RANK,
+} as const
 
 const worse = <T extends string>(rank: Record<T, number>, a: T, b: T | undefined) =>
   b !== undefined && rank[b] > rank[a] ? b : a

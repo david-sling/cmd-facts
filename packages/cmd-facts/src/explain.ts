@@ -1,9 +1,13 @@
 import { effectsOf, merge } from './facts.ts'
 import type { Facts } from './facts.ts'
-import { COMMANDS } from './data/index.ts'
-import type { Entry, FlagRule, Role, Rule } from './entry.ts'
+import { buildRegistry } from './registry.ts'
+import type { Registry, RegistryOptions } from './registry.ts'
+import type { FlagRule, Role, Rule } from './entry.ts'
 
 export type ArgSlot = { index: number; value: string; role: Role; flag?: string }
+
+/** A pack that stands behind some part of this explanation, and the rows of it that answered. */
+export type Attribution = { pack: string; version: string; trusted: boolean; commands: string[] }
 
 export type Explanation = {
   /** The resolved program path, as handed in. On a nested explanation it is the name as written on the line. */
@@ -11,6 +15,8 @@ export type Explanation = {
   name: string
   /** The table row this was answered from, or null when the program is not known. */
   key: string | null
+  /** The pack that supplied this row, or null when the program is not known. `runs` carries its own. */
+  origin: string | null
   subcommand?: string
   facts: Facts
   args: ArgSlot[]
@@ -23,6 +29,15 @@ export type Explanation = {
    * `confidence: derived`, and the outer command stays opaque whatever the inner one turns out to be.
    */
   runs?: Explanation
+  /**
+   * Every pack behind `facts`, outermost first, including the ones that only answered further down `runs`. A line
+   * can stack several: in `sudo flowctl run kubectl delete` each of the three names can come from a different pack,
+   * and the top-level fact set absorbs all of them. Read it for the audit log; gate on `confidence`, which is
+   * lowered to match the weakest link in the chain.
+   */
+  attribution: Attribution[]
+  /** The chain was still handing over when it hit the depth limit, so `facts` is a floor for that reason too. */
+  truncated?: true
 }
 
 export const UNKNOWN: Facts = {
@@ -42,14 +57,16 @@ export const UNKNOWN: Facts = {
 
 export const basename = (p: string) => p.split('/').filter(Boolean).pop() ?? p
 const isFlag = (t: string) => t.length > 1 && t.startsWith('-')
-const VERSION_SUFFIX = /^([A-Za-z_][A-Za-z_-]*?)[0-9][0-9.]*$/
 
-function lookup(name: string): { key: string; entry: Entry; trimmed: boolean } | undefined {
-  const exact = COMMANDS[name]
-  if (exact) return { key: name, entry: exact, trimmed: false }
-  const stem = VERSION_SUFFIX.exec(name)?.[1]
-  const entry = stem ? COMMANDS[stem] : undefined
-  return entry?.versioned ? { key: stem!, entry, trimmed: true } : undefined
+/** Fold the packs behind a nested chain into one list, outermost first, each pack named once. */
+function unionByPack(outer: Attribution[], inner: Attribution[]): Attribution[] {
+  const out = outer.map((a) => ({ ...a, commands: [...a.commands] }))
+  for (const a of inner) {
+    const held = out.find((o) => o.pack === a.pack)
+    if (!held) out.push({ ...a, commands: [...a.commands] })
+    else for (const c of a.commands) if (!held.commands.includes(c)) held.commands.push(c)
+  }
+  return out
 }
 
 function flagsOf(rule: Rule, token: string): FlagRule[] {
@@ -123,15 +140,15 @@ function nestedAt(argv: string[], args: ArgSlot[], rule: Rule): number | undefin
   return at < argv.length ? at : undefined
 }
 
-function at(program: string, argv: string[], depth: number): Explanation {
+function at(registry: Registry, program: string, argv: string[], depth: number): Explanation {
   const name = basename(program)
-  const found = lookup(name)
+  const found = registry.lookup(name)
   if (!found) {
     const args: ArgSlot[] = argv.slice(1).map((value, n) => ({ index: n + 1, value, role: 'unknown' as Role }))
-    return { program, name, key: null, facts: UNKNOWN, args, escalated: [] }
+    return { program, name, key: null, origin: null, facts: UNKNOWN, args, escalated: [], attribution: [] }
   }
 
-  const { key, entry, trimmed } = found
+  const { key, entry, origin, trimmed } = found
   const word = argv[1]
   const wantsSub = entry.sub !== undefined && word !== undefined && !isFlag(word)
   const sub = wantsSub ? entry.sub![word] : undefined
@@ -144,33 +161,52 @@ function at(program: string, argv: string[], depth: number): Explanation {
       : entry.facts
 
   const parsed = parse(argv, start, rule, trimmed ? merge(base, { source: 'name-fallback' }) : base)
-  const head = { program, name, key, ...(wantsSub ? { subcommand: word } : {}) }
+  const head = { program, name, key, origin: origin.pack, ...(wantsSub ? { subcommand: word } : {}) }
+  // The row that answered, not the words on the line: an unrecognised subcommand was answered by the base row.
+  const own: Attribution[] = [
+    { pack: origin.pack, version: origin.version, trusted: origin.trusted, commands: [sub ? `${key} ${word}` : key] },
+  ]
 
-  const offset = depth < MAX_DEPTH ? nestedAt(argv, parsed.args, rule) : undefined
-  if (offset === undefined) return { ...head, ...parsed }
+  const wanted = nestedAt(argv, parsed.args, rule)
+  const offset = depth < MAX_DEPTH ? wanted : undefined
+  if (offset === undefined) {
+    const stopped = wanted !== undefined ? { truncated: true as const } : {}
+    return { ...head, ...parsed, attribution: own, ...stopped }
+  }
 
-  const inner = at(argv[offset]!, argv.slice(offset), depth + 1)
+  const inner = at(registry, argv[offset]!, argv.slice(offset), depth + 1)
   const runs: Explanation = {
     ...inner,
     facts: merge(inner.facts, { confidence: 'derived', source: 'nested' }),
     args: inner.args.map((a) => ({ ...a, index: a.index + offset })),
   }
   // The inner command widens the outer one but can never clear it: the name on the line was not resolved to a
-  // program, and in `xargs rm` the arguments it will be handed are not on this line at all.
+  // program, and in `xargs rm` the arguments it will be handed are not on this line at all. Confidence comes up
+  // with the rest, so a fact set that absorbed an untrusted or unknown row cannot still read `verified`.
   const facts = merge(parsed.facts, {
     effect: effectsOf(runs.facts),
     reversible: runs.facts.reversible,
     network: runs.facts.network,
     privilege: runs.facts.privilege,
     touchesCredentials: runs.facts.touchesCredentials,
+    confidence: runs.facts.confidence,
     repeatSafe: false,
   })
-  return { ...head, ...parsed, facts, runs }
+  return { ...head, ...parsed, facts, runs, attribution: unionByPack(own, runs.attribution) }
 }
 
+export type Explainer = ((input: { program: string; argv: string[] }) => Explanation) & { registry: Registry }
+
 /**
- * Facts about one command, from its resolved program path and its argv. Nothing is read from the agent that asked
- * for it, and nothing is inferred from the text of an argument.
+ * Facts about one command, from its resolved program path and its argv, answered out of the packs given here.
+ * Nothing is read from the agent that asked for it, and nothing is inferred from the text of an argument.
+ *
+ * Every pack is validated and every conflict settled while this is called, so the explainer it returns does no
+ * trust checking and no resolution of its own: it reads a flat table.
  */
-export const explain = (input: { program: string; argv: string[] }): Explanation =>
-  at(input.program, input.argv.length ? input.argv : [basename(input.program)], 0)
+export function createExplainer(opts: RegistryOptions): Explainer {
+  const registry = buildRegistry(opts)
+  const explain = (input: { program: string; argv: string[] }): Explanation =>
+    at(registry, input.program, input.argv.length ? input.argv : [basename(input.program)], 0)
+  return Object.assign(explain, { registry })
+}

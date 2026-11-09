@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { rows } from './rows.ts'
-import { COMMANDS } from './data/index.ts'
+import { BUILTIN, COMMANDS } from './data/index.ts'
 import { UNKNOWN } from './explain.ts'
 
 // Terms that belong to people who already know what a command is. The replacement is in brackets.
@@ -82,7 +82,7 @@ const VERDICTS = [
 const hits = (text: string, words: string[]) =>
   words.filter((w) => new RegExp(`\\b${w}\\b`, 'i').test(text))
 
-const ALL = [...rows().map((r) => ({ name: r.name, facts: r.facts })), { name: '(unknown program)', facts: UNKNOWN }]
+const ALL = [...rows(BUILTIN).map((r) => ({ name: r.name, facts: r.facts })), { name: '(unknown program)', facts: UNKNOWN }]
 
 describe('says', () => {
   it.each(ALL)('$name', ({ facts }) => {
