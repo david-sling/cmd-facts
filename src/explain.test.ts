@@ -142,14 +142,81 @@ describe('opacity', () => {
     const exec = run('find . -exec rm {} +')
     expect(plain.facts.opaque).toBe(false)
     expect(exec.facts.opaque).toBe(true)
-    expect(exec.facts.reversible).toBe('unknown')
     expect(exec.facts.repeatSafe).toBe(false)
+    // It cannot promise anything can be put back, but `rm` lets it still say that something cannot be.
+    expect(exec.facts.reversible).toBe('no')
+    expect(run('sh -c anything').facts.reversible).toBe('unknown')
   })
 
   it('is set for the package installs that run set-up steps of their own', () => {
     for (const line of ['npm install', 'pnpm add left-pad', 'brew install wget', 'pip install requests']) {
       expect(run(line).facts.opaque, line).toBe(true)
     }
+  })
+})
+
+describe('the command inside the command', () => {
+  it('looks up a nested command that runs here, and says where it sits on the line', () => {
+    const got = run('sudo rm -rf /var/tmp')
+    expect(got.runs?.key).toBe('rm')
+    expect(got.runs?.facts.source).toBe('nested')
+    expect(got.runs?.facts.confidence).toBe('derived')
+    expect(got.runs?.args).toEqual([{ index: 3, value: '/var/tmp', role: 'path' }])
+  })
+
+  it('carries what the inner command does up to the outer one', () => {
+    const got = run('sudo rm -rf /var/tmp')
+    expect(effectsOf(got.facts)).toEqual(['delete', 'execute', 'elevate'])
+    expect(got.facts.privilege).toBe('root')
+    expect(got.facts.reversible).toBe('no')
+  })
+
+  it('never lets the inner command clear the outer one', () => {
+    for (const line of ['sudo ls /tmp', 'xargs ls', 'env PATH=/bin ls']) {
+      expect(run(line).facts.opaque, line).toBe(true)
+      expect(run(line).facts.repeatSafe, line).toBe(false)
+    }
+  })
+
+  it('steps over the settings env is given before the command', () => {
+    const got = run('env FOO=bar node app.js')
+    expect(got.runs?.key).toBe('node')
+    expect(got.runs?.args).toEqual([{ index: 3, value: 'app.js', role: 'path' }])
+  })
+
+  it('reads the command a search hands each file to', () => {
+    const got = run('find . -exec rm {} +')
+    expect(got.runs?.key).toBe('rm')
+    expect(effectsOf(got.facts)).toContain('delete')
+  })
+
+  it('will not split a string to find a command inside it', () => {
+    expect(run('sh -c rm').runs).toBeUndefined()
+    expect(run('node -e x').runs).toBeUndefined()
+  })
+
+  it('does not report a command that runs on another computer as one that runs here', () => {
+    expect(run('ssh host rm -rf /var/tmp').runs).toBeUndefined()
+  })
+
+  it('admits it when the inner command is not one it knows', () => {
+    const got = run('sudo frobnicate')
+    expect(got.runs?.key).toBeNull()
+    expect(got.runs?.facts.confidence).toBe('unknown')
+    expect(got.facts.opaque).toBe(true)
+  })
+
+  it('stops going deeper rather than following a line without end', () => {
+    const argv = [...Array(12).fill('sudo'), 'ls']
+    const got = explain({ program: '/usr/bin/sudo', argv })
+    let depth = 0
+    for (let e = got.runs; e; e = e.runs) depth++
+    expect(depth).toBeLessThanOrEqual(4)
+  })
+
+  it('has nothing to report where no command was given', () => {
+    expect(run('sudo').runs).toBeUndefined()
+    expect(run('xargs').runs).toBeUndefined()
   })
 })
 

@@ -388,6 +388,7 @@ export const DEV: Record<string, Entry> = {
     ),
     operands: ['command'],
     values: { '-u': 'user', '--user': 'user' },
+    nestedHere: true,
   },
   xargs: {
     facts: opaqueFact(
@@ -396,6 +397,7 @@ export const DEV: Record<string, Entry> = {
       { effect: ['execute'], network: 'arbitrary', docs: 'man 1 xargs' },
     ),
     operands: ['command'],
+    nestedHere: true,
   },
   make: {
     facts: opaqueFact(

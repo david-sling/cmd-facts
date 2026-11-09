@@ -41,6 +41,8 @@ export const SYSTEM: Record<string, Entry> = {
       },
     ),
     operands: ['command'],
+    nestedHere: true,
+    assignmentsFirst: true,
   },
   sw_vers: { facts: fact('Shows which version of macOS this computer is running.', { docs: 'man 1 sw_vers' }) },
   system_profiler: {

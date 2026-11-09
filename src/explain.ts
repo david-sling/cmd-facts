@@ -1,4 +1,4 @@
-import { merge } from './facts.ts'
+import { effectsOf, merge } from './facts.ts'
 import type { Facts } from './facts.ts'
 import { COMMANDS } from './data/index.ts'
 import type { Entry, FlagRule, Role, Rule } from './entry.ts'
@@ -6,7 +6,7 @@ import type { Entry, FlagRule, Role, Rule } from './entry.ts'
 export type ArgSlot = { index: number; value: string; role: Role; flag?: string }
 
 export type Explanation = {
-  /** The resolved program path, as handed in. */
+  /** The resolved program path, as handed in. On a nested explanation it is the name as written on the line. */
   program: string
   name: string
   /** The table row this was answered from, or null when the program is not known. */
@@ -16,6 +16,13 @@ export type Explanation = {
   args: ArgSlot[]
   /** Flags on this command line that widened the fact set, in the form the table declares them. */
   escalated: string[]
+  /**
+   * The command this one hands over to, where that command is on this same line and runs on this computer:
+   * `sudo rm -rf x`, `xargs rm`, `env FOO=1 node app.js`, `find . -exec rm {} +`. Its `args` indexes point into the
+   * original argv. Its facts are a floor: the inner program was never resolved to a path, so it is marked
+   * `confidence: derived`, and the outer command stays opaque whatever the inner one turns out to be.
+   */
+  runs?: Explanation
 }
 
 export const UNKNOWN: Facts = {
@@ -104,13 +111,19 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
   return { facts: out, args, escalated: [...new Set(escalated)] }
 }
 
-/**
- * Facts about one command, from its resolved program path and its argv. Nothing is read from the agent that asked
- * for it, and nothing is inferred from the text of an argument.
- */
-export function explain(input: { program: string; argv: string[] }): Explanation {
-  const { program } = input
-  const argv = input.argv.length ? input.argv : [basename(program)]
+const MAX_DEPTH = 4
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
+
+function nestedAt(argv: string[], args: ArgSlot[], rule: Rule): number | undefined {
+  if (!rule.nestedHere) return undefined
+  const slot = args.find((a) => a.role === 'command')
+  if (!slot) return undefined
+  let at = slot.index
+  if (rule.assignmentsFirst) while (at < argv.length && ASSIGNMENT.test(argv[at]!)) at++
+  return at < argv.length ? at : undefined
+}
+
+function at(program: string, argv: string[], depth: number): Explanation {
   const name = basename(program)
   const found = lookup(name)
   if (!found) {
@@ -131,5 +144,33 @@ export function explain(input: { program: string; argv: string[] }): Explanation
       : entry.facts
 
   const parsed = parse(argv, start, rule, trimmed ? merge(base, { source: 'name-fallback' }) : base)
-  return { program, name, key, ...(wantsSub ? { subcommand: word } : {}), ...parsed }
+  const head = { program, name, key, ...(wantsSub ? { subcommand: word } : {}) }
+
+  const offset = depth < MAX_DEPTH ? nestedAt(argv, parsed.args, rule) : undefined
+  if (offset === undefined) return { ...head, ...parsed }
+
+  const inner = at(argv[offset]!, argv.slice(offset), depth + 1)
+  const runs: Explanation = {
+    ...inner,
+    facts: merge(inner.facts, { confidence: 'derived', source: 'nested' }),
+    args: inner.args.map((a) => ({ ...a, index: a.index + offset })),
+  }
+  // The inner command widens the outer one but can never clear it: the name on the line was not resolved to a
+  // program, and in `xargs rm` the arguments it will be handed are not on this line at all.
+  const facts = merge(parsed.facts, {
+    effect: effectsOf(runs.facts),
+    reversible: runs.facts.reversible,
+    network: runs.facts.network,
+    privilege: runs.facts.privilege,
+    touchesCredentials: runs.facts.touchesCredentials,
+    repeatSafe: false,
+  })
+  return { ...head, ...parsed, facts, runs }
 }
+
+/**
+ * Facts about one command, from its resolved program path and its argv. Nothing is read from the agent that asked
+ * for it, and nothing is inferred from the text of an argument.
+ */
+export const explain = (input: { program: string; argv: string[] }): Explanation =>
+  at(input.program, input.argv.length ? input.argv : [basename(input.program)], 0)

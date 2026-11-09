@@ -18,7 +18,7 @@ export type Reversible = 'yes' | 'no' | 'with-backup' | 'unknown'
 export type Network = 'none' | 'known-host' | 'arbitrary' | 'listens'
 export type Privilege = 'none' | 'admin' | 'root'
 export type Confidence = 'verified' | 'derived' | 'unknown'
-export type Source = 'curated' | 'curated+flags' | 'name-fallback' | 'subcommand-miss' | 'unknown'
+export type Source = 'curated' | 'curated+flags' | 'name-fallback' | 'subcommand-miss' | 'nested' | 'unknown'
 
 type Common = {
   reversible: Reversible
@@ -108,5 +108,7 @@ export function merge(base: Facts, over: Overlay): Facts {
   const effect = sortEffects([...new Set([...effectsOf(base), ...(over.effect ?? [])])])
   if (!base.opaque && over.opaque !== true) return { ...common, opaque: false, effect }
   const handsOverTo = over.handsOverTo ?? (base.opaque ? base.handsOverTo : 'something this library cannot see')
-  return { ...common, reversible: 'unknown', repeatSafe: false, opaque: true, effectAtLeast: effect, handsOverTo }
+  // An opaque row cannot promise that anything can be put back, but it may still say that something cannot be.
+  const reversible = worse(REVERSIBLE_RANK, 'unknown', common.reversible)
+  return { ...common, reversible, repeatSafe: false, opaque: true, effectAtLeast: effect, handsOverTo }
 }

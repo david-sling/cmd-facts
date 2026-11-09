@@ -19,7 +19,7 @@ describe('a fact set holds together', () => {
     if (effect.includes('elevate')) expect(facts.privilege).not.toBe('none')
     if (facts.privilege === 'root') expect(effect).toContain('elevate')
     if (facts.opaque) {
-      expect(facts.reversible).toBe('unknown')
+      expect(['unknown', 'no']).toContain(facts.reversible)
       expect(facts.repeatSafe).toBe(false)
     }
     expect(facts.confidence).toBe('verified')
@@ -73,6 +73,12 @@ describe('the grammar layer is declared honestly', () => {
       for (const f of rule.flags ?? []) {
         if (f.role === 'command') expect(rule.facts.opaque || f.facts.opaque === true, `${name} ${f.flags[0]}`).toBe(true)
       }
+      // Opacity is already checked above wherever a `command` role can appear; what this adds is that a rule which
+      // recurses has somewhere to recurse into. `find` is the case that matters: it is clear until `-exec`.
+      if (rule.nestedHere) {
+        expect(fixed.includes('command') || (rule.flags ?? []).some((f) => f.role === 'command'), name).toBe(true)
+      }
+      if (rule.assignmentsFirst) expect(rule.nestedHere, name).toBe(true)
       for (const f of rule.flags ?? []) {
         if (f.role) expect(f.takesValue, `${name} ${f.flags[0]}`).toBe(true)
         if (!Object.keys(f.facts).length) expect(f.takesValue, `${name} ${f.flags[0]}`).toBe(true)

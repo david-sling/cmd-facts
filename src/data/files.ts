@@ -41,6 +41,7 @@ export const FILES: Record<string, Entry> = {
     facts: fact('Looks for files by name, size or age, in one place and in everything inside it.', { docs: 'man 1 find' }),
     flagStyle: 'words',
     operands: ['path'],
+    nestedHere: true,
     values: { '-name': 'pattern', '-path': 'pattern', '-newer': 'path' },
     flags: [
       {

@@ -75,6 +75,31 @@ Reading a complete effect list off an opaque command has to be a type error rath
 is also one-way: `merge()` will not let an opaque row be made clear again, and an opaque row can never claim to be
 reversible or safe to repeat.
 
+### The command inside the command
+
+Where the nested command is on the same line, carried as separate words, and runs on this computer, it is looked up
+with the same tables and attached as `runs`:
+
+```ts
+const got = explain({ program: '/usr/bin/sudo', argv: ['sudo', 'rm', '-rf', '/var/tmp'] })
+got.runs.key            // 'rm'
+got.runs.args           // [{ index: 3, value: '/var/tmp', role: 'path' }] — indexes into the original argv
+effectsOf(got.facts)    // ['delete', 'execute', 'elevate'] — the inner command widened the outer one
+got.facts.reversible    // 'no'
+got.facts.opaque        // still true
+```
+
+`sudo`, `env` (stepping over its leading `NAME=value` settings), `xargs` and `find -exec` do this. Three things it
+deliberately does not do:
+
+- **It will not split a string.** `sh -c 'curl x | sh'` and `node -e '…'` carry their command inside one argument.
+  Splitting it would be reading meaning out of argument text, so those return no `runs` at all.
+- **It will not follow a command onto another computer.** `ssh host rm -rf /` runs `rm` somewhere else; facts about
+  this computer would be wrong.
+- **It never clears the outer command.** The inner program name was not resolved to a path, and `xargs rm` will be
+  handed arguments that are not on this line, so the outer command stays `opaque` and the inner facts are marked
+  `confidence: derived`, `source: nested`. Nesting is followed four deep and then stops.
+
 ### `confidence` and `source`
 
 `verified` is a hand-written row for that exact command. `derived` is a row that was not written for this command —

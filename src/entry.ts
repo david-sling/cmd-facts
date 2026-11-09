@@ -54,6 +54,15 @@ export type Rule = {
   operands?: Role[]
   /** Flags that take a value, where the value's role matters but the flag changes nothing else. */
   values?: Record<string, Role>
+  /**
+   * The command this one hands over to runs on this computer, and is carried as separate words on this same line,
+   * so it can be looked up with the same tables. Off by default, and deliberately so: a nested command held in one
+   * string would have to be split to be read, and splitting a string is reading meaning out of argument text. A
+   * nested command that runs on another computer is not a fact about this one.
+   */
+  nestedHere?: boolean
+  /** `env` carries its own settings as leading `NAME=value` words before the command. Part of its grammar, not a guess. */
+  assignmentsFirst?: boolean
 }
 
 export type Entry = Rule & {
@@ -90,7 +99,7 @@ export const fact = (says: string, over: Over = {}): Facts => ({
 export const opaqueFact = (says: string, handsOverTo: string, over: Over = {}): Facts => ({
   ...COMMON,
   ...over,
-  reversible: 'unknown',
+  reversible: over.reversible === 'no' ? 'no' : 'unknown',
   repeatSafe: false,
   effectAtLeast: sortEffects(over.effect ?? ['execute']),
   opaque: true,
