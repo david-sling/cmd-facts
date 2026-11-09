@@ -1,8 +1,10 @@
 import { createExplainer } from './explain.ts'
 import { BUILTIN } from './data/index.ts'
 
-export { createExplainer, basename, UNKNOWN } from './explain.ts'
-export type { ArgSlot, Attribution, Explainer, Explanation } from './explain.ts'
+export { createExplainer, basename, UNKNOWN, UNREAD_LINE } from './explain.ts'
+export type { ArgSlot, Attribution, Explainer, Explanation, Input } from './explain.ts'
+export { tokenize } from './line.ts'
+export type { Tokens } from './line.ts'
 export { effectsOf, isComplete, merge, sortEffects, EFFECTS, REVERSIBLE, NETWORK, PRIVILEGE, CONFIDENCE, RANK } from './facts.ts'
 export type { Blind, Confidence, Effect, Facts, Network, Overlay, Privilege, Reversible, Source, Transparent } from './facts.ts'
 export { fact, opaqueFact, ROLES } from './entry.ts'
