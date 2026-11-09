@@ -55,8 +55,8 @@ jobs:
       - name: Typecheck
         run: pnpm -r typecheck
 
-      # `files` excludes the tests and `prepack` copies the root README in, so what this
-      # uploads is the tarball `npm pack` shows locally.
+      # `prepack` builds and copies the root README in, and `files` excludes the tests, so
+      # what this uploads is the tarball `npm pack` shows locally.
       - name: Publish
         working-directory: packages/cmd-facts
         run: npm publish --access public

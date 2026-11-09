@@ -20,18 +20,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 22.18 is the floor `engines` claims. This runs the sources under vitest, which
-        # does its own transform, so it says the code works on that Node - not that an
-        # installed copy can be imported there.
+        # The dev tooling, not the published package: vitest and tsc need a newer Node
+        # than anyone installing this does. What a consumer needs is the `consume` job.
         node: ['22.18', '24']
 
-    name: Node ${{ matrix.node }}
+    name: Test on Node ${{ matrix.node }}
 
     steps:
       - uses: actions/checkout@v5
-
       - uses: pnpm/action-setup@v4
-
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
@@ -45,3 +42,64 @@ jobs:
 
       - name: Typecheck
         run: pnpm -r typecheck
+
+  # 0.1.0 shipped TypeScript source and could not be imported by plain Node at all: type
+  # stripping is refused for anything under node_modules, on every version. The tests did
+  # not catch it, because vitest transforms the sources itself. This installs the real
+  # tarball into a project that has nothing else and imports it the way a reader would.
+  consume:
+    runs-on: ubuntu-latest
+    name: Install the tarball and import it
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # `prepack` builds, so this is the tarball a publish would upload.
+      - name: Pack
+        working-directory: packages/cmd-facts
+        run: npm pack --pack-destination "$RUNNER_TEMP"
+
+      - name: Refuse a tarball carrying tests or TypeScript entry points
+        run: |
+          contents="$(tar -tzf "$RUNNER_TEMP"/cmd-facts-*.tgz)"
+          echo "$contents"
+          if echo "$contents" | grep -q '\.test\.ts$'; then
+            echo 'Tarball contains test files' >&2
+            exit 1
+          fi
+          if ! echo "$contents" | grep -q 'package/dist/index\.js$'; then
+            echo 'Tarball has no compiled entry point' >&2
+            exit 1
+          fi
+
+      # The floor `engines` claims, which is about the compiled output and is lower than
+      # anything the dev tooling above will run on.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+
+      - name: Import it on the oldest supported Node
+        run: |
+          mkdir -p "$RUNNER_TEMP/consumer"
+          cd "$RUNNER_TEMP/consumer"
+          npm init -y >/dev/null
+          npm pkg set type=module
+          npm install "$RUNNER_TEMP"/cmd-facts-*.tgz
+          cat > check.mjs <<'JS'
+          import { createExplainer, BUILTIN } from 'cmd-facts'
+          const explain = createExplainer({ packs: [BUILTIN] })
+          const out = explain('curl -sS https://example.com')
+          if (out.facts?.network !== 'arbitrary') {
+            throw new Error(`expected an arbitrary-network fact, got ${JSON.stringify(out.facts)}`)
+          }
+          console.log('imported and answered on', process.version)
+          JS
+          node check.mjs
