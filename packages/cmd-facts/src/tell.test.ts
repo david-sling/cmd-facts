@@ -48,6 +48,32 @@ describe('the sentence carries what the command was pointed at', () => {
   })
 })
 
+// A flag that takes a value and is not declared as doing so hands its value to the operand list, where it is given
+// the operand's role — and a slot then names it in the sentence. This is the line that found it.
+describe('a flag’s value is never mistaken for an operand', () => {
+  it('names the address asked for, not the value of another flag', () => {
+    expect(explain("curl -sS -o /dev/null -w '%{http_code}' https://example.com").sentence).toBe(
+      'Makes a request to example.com and saves what comes back into /dev/null.',
+    )
+  })
+
+  it('labels each value with what that flag makes it', () => {
+    const { args } = explain("curl -w '%{http_code}' -H 'X-A: 1' -x proxy.example.com https://example.com")
+    expect(args).toEqual([
+      { index: 2, value: '%{http_code}', role: 'text', flag: '-w' },
+      { index: 4, value: 'X-A: 1', role: 'text', flag: '-H' },
+      { index: 6, value: 'proxy.example.com', role: 'host', flag: '-x' },
+      { index: 7, value: 'https://example.com', role: 'url' },
+    ])
+  })
+
+  it('reads a file sent to an address as the file, and the address as the address', () => {
+    expect(explain('curl -T ./report.csv https://api.example.com/upload').sentence).toBe(
+      'Sends ./report.csv from this computer to api.example.com.',
+    )
+  })
+})
+
 describe('falling back', () => {
   it('uses the row’s own sentence where a slot has nothing to fill it', () => {
     expect(said('rm')).toBe('Removes files from this computer.')

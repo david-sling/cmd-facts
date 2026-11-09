@@ -17,7 +17,31 @@ export const NET: Record<string, Entry> = {
       docs: 'man 1 curl',
     }),
     operands: ['url'],
-    values: { '--url': 'url' },
+    // Only the address being requested carries the `url` role, because the sentence takes the first of them: a
+    // referer or a proxy given here would otherwise be named as the address this command reaches.
+    values: {
+      '--url': 'url',
+      '-w': 'text',
+      '--write-out': 'text',
+      '-H': 'text',
+      '--header': 'text',
+      '-X': 'text',
+      '--request': 'text',
+      '-A': 'text',
+      '--user-agent': 'text',
+      '-e': 'text',
+      '--referer': 'text',
+      '-m': 'text',
+      '--max-time': 'text',
+      '--connect-timeout': 'text',
+      '--resolve': 'text',
+      '-x': 'host',
+      '--proxy': 'host',
+      '-D': 'path',
+      '--dump-header': 'path',
+      '-K': 'path',
+      '--config': 'path',
+    },
     flags: [
       {
         flags: ['-o', '--output'],
@@ -47,13 +71,38 @@ export const NET: Record<string, Entry> = {
         },
       },
       {
-        flags: ['-d', '--data', '--data-binary', '--data-raw', '-F', '--form', '-T', '--upload-file'],
+        flags: ['-d', '--data', '--data-binary', '--data-raw', '-F', '--form'],
+        takesValue: true,
+        role: 'text',
         facts: {
           effect: ['read', 'transmit'],
           repeatSafe: false,
           says: 'Sends information from this computer to a web address, and shows what comes back.',
           tell: ['Sends information from this computer to ', { role: 'url', show: 'host' }, ', and shows what comes back.'],
         },
+      },
+      {
+        flags: ['-T', '--upload-file'],
+        takesValue: true,
+        role: 'path',
+        facts: {
+          effect: ['read', 'transmit'],
+          repeatSafe: false,
+          says: 'Sends a file from this computer to a web address, and shows what comes back.',
+          tell: ['Sends ', { role: 'path' }, ' from this computer to ', { role: 'url', show: 'host' }, '.'],
+        },
+      },
+      {
+        flags: ['-b', '--cookie'],
+        takesValue: true,
+        role: 'text',
+        facts: { touchesCredentials: true },
+      },
+      {
+        flags: ['-c', '--cookie-jar', '-E', '--cert', '--key'],
+        takesValue: true,
+        role: 'path',
+        facts: { touchesCredentials: true },
       },
       {
         flags: ['-k', '--insecure'],

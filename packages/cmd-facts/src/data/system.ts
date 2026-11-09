@@ -262,6 +262,8 @@ export const SYSTEM: Record<string, Entry> = {
     flags: [
       {
         flags: ['-setdnsservers'],
+        takesValue: true,
+        role: 'service',
         facts: {
           effect: ['configure'],
           reversible: 'unknown',
@@ -272,6 +274,8 @@ export const SYSTEM: Record<string, Entry> = {
       },
       {
         flags: ['-setwebproxy', '-setsecurewebproxy', '-setsocksfirewallproxy'],
+        takesValue: true,
+        role: 'service',
         facts: {
           effect: ['configure'],
           reversible: 'unknown',
@@ -282,6 +286,8 @@ export const SYSTEM: Record<string, Entry> = {
       },
       {
         flags: ['-setairportnetwork'],
+        takesValue: true,
+        role: 'device',
         facts: {
           effect: ['configure'],
           reversible: 'yes',
@@ -292,6 +298,8 @@ export const SYSTEM: Record<string, Entry> = {
       },
       {
         flags: ['-setairportpower', '-setv4off', '-setv4dhcp', '-setv4manual'],
+        takesValue: true,
+        role: 'service',
         facts: { effect: ['configure'], reversible: 'yes', says: 'Changes whether and how this computer connects to a network.' },
       },
     ],
@@ -300,6 +308,8 @@ export const SYSTEM: Record<string, Entry> = {
     facts: fact('Asks Apple which updates are available for macOS.', { network: 'known-host', docs: 'man 8 softwareupdate' }),
     flags: [
       {
+        // Left without `takesValue` on purpose: the name of an update is optional here, and `-i -a` is the common
+        // form, so declaring a value would read that `-a` as the name of an update.
         flags: ['-i', '--install'],
         facts: {
           effect: ['install', 'write'],

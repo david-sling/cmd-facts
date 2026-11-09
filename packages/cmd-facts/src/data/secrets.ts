@@ -112,6 +112,8 @@ export const SECRETS: Record<string, Entry> = {
       },
       {
         flags: ['--add'],
+        takesValue: true,
+        role: 'path',
         facts: {
           effect: ['configure'],
           privilege: 'admin',
