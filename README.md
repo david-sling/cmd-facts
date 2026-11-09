@@ -141,9 +141,17 @@ must never allow. Contributions go through a pull request and the lint below.
 was used that way. No prose was copied or adapted from it, so no CC-BY attribution obligation is incurred. Its writing
 is developer-voiced and would be the wrong register here anyway.
 
+## This repository
+
+```
+packages/cmd-facts/   the library; nothing else is published
+```
+
+A landing page will live alongside it. The library stays free of anything the page needs.
+
 ## Adding a command
 
-Rows live in `src/data/`. `fact()` builds a row for a command the library can account for in full; `opaqueFact()`
+Rows live in `packages/cmd-facts/src/data/`. `fact()` builds a row for a command the library can account for in full; `opaqueFact()`
 builds one for a command that hands over, and requires you to name what it hands over to.
 
 The register is enforced by tests, not by review alone. `pnpm test` checks that every sentence is one sentence, ends

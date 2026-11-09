@@ -1,21 +1,11 @@
 {
-  "name": "cmd-facts",
-  "version": "0.0.0",
-  "description": "Structured facts about what a command does, for people who have to approve it.",
+  "name": "cmd-facts-repo",
   "license": "MIT",
+  "private": true,
   "type": "module",
-  "exports": {
-    ".": "./src/index.ts",
-    "./facts": "./src/facts.ts",
-    "./data": "./src/data/index.ts"
-  },
-  "files": ["src"],
+  "packageManager": "pnpm@10.12.4",
   "scripts": {
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
-  },
-  "devDependencies": {
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.11"
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
   }
 }

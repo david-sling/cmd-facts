@@ -1,2 +1,5 @@
+.DS_Store
+
+# Dependencies and build output, across the workspace
 node_modules
 *.tsbuildinfo
