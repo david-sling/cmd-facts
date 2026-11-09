@@ -1,0 +1,28 @@
+// Emit for publishing. `tsconfig.json` stays the no-emit typecheck, which also covers the
+// tests; this one compiles the library alone.
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
+  ],
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    // The published .js and .d.ts are read by Node's own resolver, not a bundler, so the
+    // emit has to resolve the way a consumer will.
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    // The source imports './explain.ts'. This rewrites those specifiers to './explain.js'
+    // on the way out, so the emitted files point at the emitted files.
+    "rewriteRelativeImportExtensions": true,
+    // src ships alongside dist, so a stack trace or a go-to-definition lands in the real
+    // TypeScript rather than the compiled output.
+    "declarationMap": true,
+    "sourceMap": true
+  }
+}
