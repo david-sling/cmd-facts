@@ -1,4 +1,4 @@
-# cmdfacts
+# cmd-facts
 
 Structured facts about what a command does, for the person who has to approve it and did not write it.
 
@@ -15,7 +15,7 @@ that colours a button, gates a policy or computes its own risk level reads the f
 person reads `says`.
 
 ```ts
-import { explain } from 'cmdfacts'
+import { explain } from 'cmd-facts'
 
 explain({ program: '/bin/rm', argv: ['rm', '-rf', '/Users/sam/Documents'] })
 // {
