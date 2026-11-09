@@ -126,7 +126,6 @@ export const FILES: Record<string, Entry> = {
   tar: {
     facts: fact('Packs files into one single file, or unpacks a file that was made that way.', { docs: 'man 1 tar' }),
     operands: ['path'],
-    values: { '-f': 'path', '--file': 'path' },
     flags: [
       {
         flags: ['-c', '--create'],

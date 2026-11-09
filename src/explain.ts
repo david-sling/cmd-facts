@@ -82,14 +82,17 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
       const inline = eq > 1 ? token.slice(eq + 1) : undefined
       const matched = flagsOf(rule, head)
       for (const m of matched) {
+        if (!Object.keys(m.facts).length) continue
         out = merge(out, { ...m.facts, source: 'curated+flags' })
         escalated.push(m.flags[0]!)
       }
       const taker = matched.findLast((m) => m.takesValue)
       const role = taker?.role ?? rule.values?.[head]
-      if (role && inline !== undefined) args.push({ index: i, value: inline, role, flag: head })
+      // The flag a value belongs to is reported as the table declares it, so a bundled `-xzf` still points at `-f`.
+      const owner = taker?.flags[0] ?? head
+      if (role && inline !== undefined) args.push({ index: i, value: inline, role, flag: owner })
       else if (role && i + 1 < argv.length) {
-        args.push({ index: ++i, value: argv[i]!, role, flag: head })
+        args.push({ index: ++i, value: argv[i]!, role, flag: owner })
         if (role === 'command') nested = true
       }
       continue
