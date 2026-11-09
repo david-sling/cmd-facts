@@ -82,6 +82,115 @@ export const SECRETS: Record<string, Entry> = {
       },
     },
   },
+  csrutil: {
+    facts: fact('Looks at or changes the protection macOS puts around its own files.', {
+      effect: ['read', 'configure'],
+      reversible: 'unknown',
+      privilege: 'admin',
+      repeatSafe: false,
+      docs: 'man 8 csrutil',
+    }),
+    sub: {
+      status: {
+        facts: fact('Shows whether the protection macOS puts around its own files is on.', { docs: 'man 8 csrutil' }),
+      },
+      disable: {
+        facts: fact('Turns off the protection macOS puts around its own files.', {
+          effect: ['configure'],
+          privilege: 'admin',
+          note: 'Until it is turned back on, parts of macOS that are normally kept from being changed can be changed.',
+          docs: 'man 8 csrutil',
+        }),
+      },
+      enable: {
+        facts: fact('Turns on the protection macOS puts around its own files.', { effect: ['configure'], privilege: 'admin', docs: 'man 8 csrutil' }),
+      },
+    },
+  },
+  fdesetup: {
+    facts: fact('Looks at or changes whether the disk on this computer can be read without the password.', {
+      effect: ['read', 'configure'],
+      reversible: 'unknown',
+      privilege: 'admin',
+      touchesCredentials: true,
+      repeatSafe: false,
+      docs: 'man 8 fdesetup',
+    }),
+    sub: {
+      status: {
+        facts: fact('Shows whether the disk on this computer can be read without the password.', {
+          touchesCredentials: true,
+          docs: 'man 8 fdesetup',
+        }),
+      },
+      enable: {
+        facts: fact('Locks the disk on this computer so it cannot be read without the password.', {
+          effect: ['configure'],
+          privilege: 'admin',
+          touchesCredentials: true,
+          note: 'A key that can unlock the disk without the password is shown once while this runs.',
+          docs: 'man 8 fdesetup',
+        }),
+      },
+      disable: {
+        facts: fact('Unlocks the disk on this computer, so it can be read without the password.', {
+          effect: ['configure'],
+          privilege: 'admin',
+          touchesCredentials: true,
+          note: 'Anyone who can reach the disk afterwards can read what is on it.',
+          docs: 'man 8 fdesetup',
+        }),
+      },
+    },
+  },
+  socketfilterfw: {
+    facts: fact('Looks at or changes which programs may accept connections coming in from the network.', {
+      effect: ['read', 'configure'],
+      reversible: 'unknown',
+      repeatSafe: false,
+      docs: 'man 8 socketfilterfw',
+    }),
+    flagStyle: 'words',
+    flags: [
+      {
+        flags: ['--getglobalstate', '--getblockall', '--listapps'],
+        facts: { says: 'Shows which programs may accept connections coming in from the network.' },
+      },
+      {
+        flags: ['--setglobalstate'],
+        takesValue: true,
+        role: 'mode',
+        facts: {
+          effect: ['configure'],
+          privilege: 'admin',
+          says: 'Turns the check on connections coming in from the network on or off.',
+          note: 'With the check off, any program on this computer may accept connections from the network.',
+        },
+      },
+      {
+        flags: ['--add', '--unblockapp'],
+        takesValue: true,
+        role: 'path',
+        facts: {
+          effect: ['configure'],
+          privilege: 'admin',
+          says: 'Lets one program accept connections coming in from the network.',
+          tell: ['Lets ', { role: 'path' }, ' accept connections coming in from the network.'],
+        },
+      },
+      {
+        flags: ['--blockapp'],
+        takesValue: true,
+        role: 'path',
+        facts: {
+          effect: ['configure'],
+          privilege: 'admin',
+          says: 'Stops one program from accepting connections coming in from the network.',
+          tell: ['Stops ', { role: 'path' }, ' from accepting connections coming in from the network.'],
+        },
+      },
+    ],
+  },
   spctl: {
     facts: fact('Looks at or changes the check macOS makes before opening programs downloaded from the internet.', {
       effect: ['read', 'configure'],

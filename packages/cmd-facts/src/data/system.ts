@@ -12,6 +12,9 @@ export const SYSTEM: Record<string, Entry> = {
     facts: fact('Shows text, laid out to a pattern.', { docs: 'man 1 printf' }),
     operands: ['pattern', 'text'],
   },
+  uname: {
+    facts: fact('Shows which kind of computer and system this is.', { docs: 'man 1 uname' }),
+  },
   pwd: {
     facts: fact('Shows which folder this is working in.', { docs: 'man 1 pwd' }),
   },
