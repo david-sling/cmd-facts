@@ -1,6 +1,6 @@
 {
   "name": "cmd-facts",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Structured facts about what a command does, for people who have to approve it.",
   "license": "MIT",
   "repository": {
@@ -10,6 +10,9 @@
   },
   "homepage": "https://github.com/david-sling/cmd-facts",
   "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
   "exports": {
     ".": "./src/index.ts",
     "./facts": "./src/facts.ts",
@@ -18,9 +21,11 @@
   },
   "files": [
     "src",
+    "!src/**/*.test.ts",
     "schema"
   ],
   "scripts": {
+    "prepack": "cp ../../README.md README.md",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
