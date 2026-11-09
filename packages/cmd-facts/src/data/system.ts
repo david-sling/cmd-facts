@@ -12,6 +12,7 @@ export const SYSTEM: Record<string, Entry> = {
     facts: fact('Stops a running program.', {
       effect: ['terminate'],
       reversible: 'no',
+      tell: ['Stops the program running as ', { role: 'pid', which: 'all' }, '.'],
       note: 'Anything the program had not saved is lost.',
       docs: 'man 1 kill',
     }),
@@ -19,7 +20,14 @@ export const SYSTEM: Record<string, Entry> = {
     flags: [
       {
         flags: ['-9', '-KILL'],
-        facts: { says: 'Stops a running program at once, without letting it finish what it was doing.' },
+        facts: {
+          says: 'Stops a running program at once, without letting it finish what it was doing.',
+          tell: [
+            'Stops the program running as ',
+            { role: 'pid', which: 'all' },
+            ' at once, without letting it finish what it was doing.',
+          ],
+        },
       },
     ],
   },

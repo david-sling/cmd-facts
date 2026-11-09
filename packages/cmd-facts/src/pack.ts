@@ -1,5 +1,5 @@
 import { CONFIDENCE, EFFECTS, NETWORK, PRIVILEGE, RANK, REVERSIBLE, effectsOf } from './facts.ts'
-import type { Facts } from './facts.ts'
+import type { Facts, Segment } from './facts.ts'
 import { ROLES } from './entry.ts'
 import type { Entry, Role, Rule } from './entry.ts'
 
@@ -94,8 +94,47 @@ function checkFacts(bad: Bad, where: string, f: Facts) {
   }
 }
 
+const WHICH = ['first', 'last', 'all', 'all-but-last']
+
+/**
+ * A slotted sentence is only worth having if it can be filled. The check that matters is the last one: a slot for a
+ * role this row never gives an argument would fall back to `says` on every line forever, and silently.
+ */
+function checkTell(bad: Bad, where: string, tell: Segment[] | undefined, gives: Set<Role>) {
+  if (tell === undefined) return
+  if (!Array.isArray(tell) || !tell.length) return bad(where, '`tell` is a list of words and slots.')
+  if (typeof tell[0] !== 'string') bad(where, '`tell` opens the sentence with the row\'s own words, never with a value off the command line.')
+  const last = tell[tell.length - 1]
+  if (typeof last !== 'string' || !last.trimEnd().endsWith('.')) bad(where, '`tell` ends the sentence, so it ends in a full stop.')
+
+  const slots = tell.filter((x) => typeof x !== 'string')
+  if (!slots.length) bad(where, 'A `tell` with no slot in it is `says` written twice.')
+  for (const words of tell) {
+    if (typeof words === 'string' && /[{}$%<>]/.test(words)) {
+      bad(where, '`tell` carries its values in slots, not written into the words.')
+    }
+  }
+  for (const slot of slots) {
+    if (!has(ROLES, slot.role)) bad(where, `\`${slot.role}\` is not a known role.`)
+    else if (!gives.has(slot.role)) bad(where, `\`tell\` asks for a \`${slot.role}\`, which this row never gives an argument.`)
+    const which = slot.which
+    if (which !== undefined && !WHICH.includes(which as string) && !(Number.isInteger(which) && (which as number) >= 0)) {
+      bad(where, '`which` is first, last, all, all-but-last, or a number.')
+    }
+    if (slot.show !== undefined && slot.show !== 'host') bad(where, '`show` is `host`, or left out.')
+  }
+}
+
 function checkRule(bad: Bad, where: string, rule: Rule) {
   checkFacts(bad, where, rule.facts)
+
+  const gives = new Set<Role>([
+    ...(rule.operands ?? []),
+    ...Object.values(rule.values ?? {}),
+    ...(rule.flags ?? []).flatMap((f) => (f.role ? [f.role] : [])),
+  ])
+  checkTell(bad, where, rule.facts?.tell, gives)
+  for (const f of rule.flags ?? []) checkTell(bad, `${where} ${f.flags?.[0] ?? '(unnamed flag)'}`, f.facts?.tell, gives)
 
   const named: Array<[string, Role]> = [
     ...(rule.operands ?? []).map((r, i): [string, Role] => [`operand ${i}`, r]),

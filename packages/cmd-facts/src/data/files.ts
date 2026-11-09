@@ -6,34 +6,55 @@ const REPLACED = 'A file already in that place with the same name is replaced by
 
 export const FILES: Record<string, Entry> = {
   ls: {
-    facts: fact('Lists the names of the files and folders kept in one place on this computer.', { docs: 'man 1 ls' }),
+    facts: fact('Lists the names of the files and folders kept in one place on this computer.', {
+      tell: ['Lists the names of the files and folders kept in ', { role: 'path' }, '.'],
+      docs: 'man 1 ls',
+    }),
     operands: ['path'],
   },
   cat: {
-    facts: fact('Shows everything written inside a file.', { docs: 'man 1 cat' }),
+    facts: fact('Shows everything written inside a file.', {
+      tell: ['Shows everything written inside ', { role: 'path', which: 'all' }, '.'],
+      docs: 'man 1 cat',
+    }),
     operands: ['path'],
   },
   head: {
-    facts: fact('Shows the first few lines of a file.', { docs: 'man 1 head' }),
+    facts: fact('Shows the first few lines of a file.', {
+      tell: ['Shows the first few lines of ', { role: 'path' }, '.'],
+      docs: 'man 1 head',
+    }),
     operands: ['path'],
   },
   tail: {
-    facts: fact('Shows the last few lines of a file.', { docs: 'man 1 tail' }),
+    facts: fact('Shows the last few lines of a file.', {
+      tell: ['Shows the last few lines of ', { role: 'path' }, '.'],
+      docs: 'man 1 tail',
+    }),
     operands: ['path'],
     flags: [
       {
         flags: ['-f', '-F', '--follow'],
-        facts: { says: 'Shows the end of a file and keeps showing new lines as they are written, until it is stopped.' },
+        facts: {
+          says: 'Shows the end of a file and keeps showing new lines as they are written, until it is stopped.',
+          tell: ['Shows the end of ', { role: 'path' }, ' and keeps showing new lines as they are written, until it is stopped.'],
+        },
       },
     ],
   },
   grep: {
-    facts: fact('Searches files for the lines that contain a piece of text.', { docs: 'man 1 grep' }),
+    facts: fact('Searches files for the lines that contain a piece of text.', {
+      tell: ['Searches ', { role: 'path', which: 'all' }, ' for the lines that contain ', { role: 'pattern' }, '.'],
+      docs: 'man 1 grep',
+    }),
     operands: ['pattern', 'path'],
     flags: [
       {
         flags: ['-r', '-R', '--recursive'],
-        facts: { says: 'Searches every file kept in one place, and in everything inside it, for a piece of text.' },
+        facts: {
+          says: 'Searches every file kept in one place, and in everything inside it, for a piece of text.',
+          tell: ['Searches everything kept inside ', { role: 'path', which: 'all' }, ' for the lines that contain ', { role: 'pattern' }, '.'],
+        },
       },
     ],
   },
@@ -69,12 +90,21 @@ export const FILES: Record<string, Entry> = {
   df: { facts: fact('Shows how much room is left on each disk.', { docs: 'man 1 df' }) },
   du: { facts: fact('Shows how much room files and folders take up.', { docs: 'man 1 du' }), operands: ['path'] },
   rm: {
-    facts: fact('Removes files from this computer.', { effect: ['delete'], reversible: 'no', note: GONE, docs: 'man 1 rm' }),
+    facts: fact('Removes files from this computer.', {
+      effect: ['delete'],
+      reversible: 'no',
+      tell: ['Removes ', { role: 'path', which: 'all' }, ' from this computer.'],
+      note: GONE,
+      docs: 'man 1 rm',
+    }),
     operands: ['path'],
     flags: [
       {
         flags: ['-r', '-R', '--recursive'],
-        facts: { says: 'Removes a whole folder from this computer, along with everything inside it.' },
+        facts: {
+          says: 'Removes a whole folder from this computer, along with everything inside it.',
+          tell: ['Removes ', { role: 'path', which: 'all' }, ' from this computer, along with everything inside.'],
+        },
       },
     ],
   },
@@ -82,36 +112,60 @@ export const FILES: Record<string, Entry> = {
     facts: fact('Copies files to another place on this computer.', {
       effect: ['read', 'create', 'write'],
       reversible: 'no',
+      tell: ['Copies ', { role: 'path', which: 'all-but-last' }, ' to ', { role: 'path', which: 'last' }, '.'],
       note: REPLACED,
       docs: 'man 1 cp',
     }),
     operands: ['path'],
-    flags: [{ flags: ['-r', '-R', '--recursive'], facts: { says: 'Copies a whole folder, and everything inside it, to another place.' } }],
+    flags: [
+      {
+        flags: ['-r', '-R', '--recursive'],
+        facts: {
+          says: 'Copies a whole folder, and everything inside it, to another place.',
+          tell: [
+            'Copies ',
+            { role: 'path', which: 'all-but-last' },
+            ', and everything inside, to ',
+            { role: 'path', which: 'last' },
+            '.',
+          ],
+        },
+      },
+    ],
   },
   mv: {
     facts: fact('Moves files to another place on this computer, or gives them a new name.', {
       effect: ['create', 'delete'],
       reversible: 'unknown',
+      tell: ['Moves ', { role: 'path', which: 'all-but-last' }, ' to ', { role: 'path', which: 'last' }, '.'],
       note: REPLACED,
       docs: 'man 1 mv',
     }),
     operands: ['path'],
   },
   mkdir: {
-    facts: fact('Makes a new, empty folder.', { effect: ['create'], docs: 'man 1 mkdir' }),
+    facts: fact('Makes a new, empty folder.', {
+      effect: ['create'],
+      tell: ['Makes a new, empty folder at ', { role: 'path', which: 'all' }, '.'],
+      docs: 'man 1 mkdir',
+    }),
     operands: ['path'],
   },
   chmod: {
     facts: fact('Changes who is allowed to open or change a file.', {
       effect: ['configure'],
       reversible: 'unknown',
+      tell: ['Changes who is allowed to open or change ', { role: 'path', which: 'all' }, '.'],
       docs: 'man 1 chmod',
     }),
     operands: ['mode', 'path'],
     flags: [
       {
         flags: ['-R', '--recursive'],
-        facts: { says: 'Changes who is allowed to open or change everything kept inside a folder.' },
+        facts: {
+          says: 'Changes who is allowed to open or change everything kept inside a folder.',
+          tell: ['Changes who is allowed to open or change everything kept inside ', { role: 'path', which: 'all' }, '.'],
+        },
       },
     ],
   },
@@ -119,10 +173,19 @@ export const FILES: Record<string, Entry> = {
     facts: fact('Changes which account on this computer owns a file.', {
       effect: ['configure'],
       reversible: 'unknown',
+      tell: ['Makes ', { role: 'user' }, ' the owner of ', { role: 'path', which: 'all' }, '.'],
       docs: 'man 1 chown',
     }),
     operands: ['user', 'path'],
-    flags: [{ flags: ['-R', '--recursive'], facts: { says: 'Changes which account owns everything kept inside a folder.' } }],
+    flags: [
+      {
+        flags: ['-R', '--recursive'],
+        facts: {
+          says: 'Changes which account owns everything kept inside a folder.',
+          tell: ['Makes ', { role: 'user' }, ' the owner of everything kept inside ', { role: 'path', which: 'all' }, '.'],
+        },
+      },
+    ],
   },
   tar: {
     facts: fact('Packs files into one single file, or unpacks a file that was made that way.', { docs: 'man 1 tar' }),

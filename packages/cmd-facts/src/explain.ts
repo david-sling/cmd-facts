@@ -4,6 +4,8 @@ import { buildRegistry } from './registry.ts'
 import type { Registry, RegistryOptions } from './registry.ts'
 import type { FlagRule, Role, Rule } from './entry.ts'
 import { tokenize } from './line.ts'
+import { flatten, partsOf } from './tell.ts'
+import type { Part } from './tell.ts'
 
 export type ArgSlot = { index: number; value: string; role: Role; flag?: string }
 
@@ -20,6 +22,17 @@ export type Explanation = {
   origin: string | null
   subcommand?: string
   facts: Facts
+  /**
+   * The sentence to show a person: `facts.says` where the row stands alone, and the row's slotted sentence with
+   * this command's own arguments in it where it has one — `Removes a.txt and b.txt from this computer.`
+   */
+  sentence: string
+  /**
+   * The same sentence before it was joined, so a consumer can render the row's words and the command's own text
+   * apart. Prefer it over `sentence` wherever there is somewhere to put the values: argument text is
+   * attacker-controlled, and in `sentence` it is inside the words a person is about to trust.
+   */
+  parts: Part[]
   args: ArgSlot[]
   /** Flags on this command line that widened the fact set, in the form the table declares them. */
   escalated: string[]
@@ -169,12 +182,17 @@ function nestedAt(argv: string[], args: ArgSlot[], rule: Rule): number | undefin
   return at < argv.length ? at : undefined
 }
 
+const told = (facts: Facts, args: ArgSlot[]): { sentence: string; parts: Part[] } => {
+  const parts = partsOf(facts, args)
+  return { sentence: flatten(parts), parts }
+}
+
 function at(registry: Registry, program: string, argv: string[], depth: number): Explanation {
   const name = basename(program)
   const found = registry.lookup(name)
   if (!found) {
     const args: ArgSlot[] = argv.slice(1).map((value, n) => ({ index: n + 1, value, role: 'unknown' as Role }))
-    return { program, name, key: null, origin: null, facts: UNKNOWN, args, escalated: [], attribution: [] }
+    return { program, name, key: null, origin: null, facts: UNKNOWN, ...told(UNKNOWN, args), args, escalated: [], attribution: [] }
   }
 
   const { key, entry, origin, trimmed } = found
@@ -200,15 +218,13 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
   const offset = depth < MAX_DEPTH ? wanted : undefined
   if (offset === undefined) {
     const stopped = wanted !== undefined ? { truncated: true as const } : {}
-    return { ...head, ...parsed, attribution: own, ...stopped }
+    return { ...head, ...parsed, ...told(parsed.facts, parsed.args), attribution: own, ...stopped }
   }
 
   const inner = at(registry, argv[offset]!, argv.slice(offset), depth + 1)
-  const runs: Explanation = {
-    ...inner,
-    facts: merge(inner.facts, { confidence: 'derived', source: 'nested' }),
-    args: inner.args.map((a) => ({ ...a, index: a.index + offset })),
-  }
+  const shifted = inner.args.map((a) => ({ ...a, index: a.index + offset }))
+  const innerFacts = merge(inner.facts, { confidence: 'derived', source: 'nested' })
+  const runs: Explanation = { ...inner, facts: innerFacts, ...told(innerFacts, shifted), args: shifted }
   // The inner command widens the outer one but can never clear it: the name on the line was not resolved to a
   // program, and in `xargs rm` the arguments it will be handed are not on this line at all. Confidence comes up
   // with the rest, so a fact set that absorbed an untrusted or unknown row cannot still read `verified`.
@@ -221,7 +237,7 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
     confidence: runs.facts.confidence,
     repeatSafe: false,
   })
-  return { ...head, ...parsed, facts, runs, attribution: unionByPack(own, runs.attribution) }
+  return { ...head, ...parsed, facts, ...told(facts, parsed.args), runs, attribution: unionByPack(own, runs.attribution) }
 }
 
 export type Explainer = ((input: Input) => Explanation) & { registry: Registry }
@@ -242,7 +258,17 @@ export function createExplainer(opts: RegistryOptions): Explainer {
     }
     const read = tokenize(input)
     if (!read.ok) {
-      return { program: input, name: input, key: null, origin: null, facts: UNREAD_LINE, args: [], escalated: [], attribution: [] }
+      return {
+        program: input,
+        name: input,
+        key: null,
+        origin: null,
+        facts: UNREAD_LINE,
+        ...told(UNREAD_LINE, []),
+        args: [],
+        escalated: [],
+        attribution: [],
+      }
     }
     return at(registry, read.argv[0]!, read.argv, 0)
   }
