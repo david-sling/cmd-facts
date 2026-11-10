@@ -1,6 +1,7 @@
 import { fact, opaqueFact, valuesOf, LOCAL, LOOKS } from '../entry.ts'
 import type { Entry, FlagRule, Rule } from '../entry.ts'
-import { everywhere } from './shared.ts'
+import type { Effect } from '../facts.ts'
+import { everywhere, globalsOf } from './shared.ts'
 
 // Every program here runs code the line does not show: a file, a project's own build steps, or the set-up steps a
 // downloaded package brings. So every row is blind, and what it hands over to is named in the same plain words.
@@ -43,8 +44,10 @@ const installs = (says: string, docs: string): Rule => ({
   operands: ['package'],
 })
 
-const removes = (says: string, docs: string): Rule => ({
-  facts: fact(says, { ...LOCAL, repeatSafe: true, effect: ['delete', 'write'], reversible: 'unknown', docs }),
+// Taking a package out settles the rest of them again, which can download, run their removal and set-up steps, and
+// the project's own.
+const removes = (says: string, docs: string, handsOverTo = 'the steps the project and its packages run as one is taken out', effect: Effect[] = ['read', 'write', 'delete', 'install', 'execute']): Rule => ({
+  facts: opaqueFact(says, handsOverTo, { privilege: 'none', touchesCredentials: false, effect, network: 'arbitrary', docs }),
   operands: ['package'],
 })
 
@@ -74,15 +77,15 @@ const builds = (says: string, docs: string): Rule => ({
   }),
 })
 
+// Sending uses the sign-in the tool keeps for the package service, whether or not a code or token is on the line.
 const publishes = (says: string, docs: string): Rule => ({
   facts: opaqueFact(says, 'the steps the project runs for itself before sending', {
-    privilege: 'none', touchesCredentials: false,
+    privilege: 'none', touchesCredentials: true,
     effect: ['read', 'transmit'],
     network: 'arbitrary',
     reversible: 'no',
     docs,
   }),
-  flags: [{ flags: ['--otp'], takesValue: true, role: 'text', facts: { touchesCredentials: true } } satisfies FlagRule],
 })
 
 const fetchesAndRuns = (docs: string): Entry => ({
@@ -130,7 +133,24 @@ const CONDA_VALUES = {
 }
 const PIPX_VALUES = valuesOf('text', ['--python', '-i', '--index-url', '--pip-args', '--suffix'])
 const BUN_VALUES = { ...valuesOf('path', ['--cwd', '--cache-dir']), ...valuesOf('text', ['--backend', '--link-native-bins']) }
+const COMPOSER_VALUES = { '-d': 'path', '--working-dir': 'path' } as const
+const SWIFTPM_VALUES = {
+  ...valuesOf('path', ['--package-path', '--scratch-path', '--cache-path', '--config-path', '--security-path']),
+  ...valuesOf('text', [
+    '-c', '--configuration', '-j', '--jobs', '--triple', '--sdk', '--swift-sdk', '--toolchain', '-Xcc', '-Xswiftc', '-Xlinker', '-Xcxx',
+  ]),
+}
 
+// From Go 1.21 every go command first reads the project's go.mod, and where it asks for a newer Go, downloads that
+// version and hands the whole line to it (GOTOOLCHAIN=auto, the default).
+const GO_SWITCH = {
+  effect: ['read', 'install', 'execute'] as Effect[],
+  network: 'arbitrary',
+  note: 'Where the project asks for a newer version of Go, it first downloads that version and runs this command with it.',
+} as const
+
+// RubyGems loads the add-ons that installed packages bring each time it runs, whatever the command.
+const GEM_PLUGINS = 'the add-ons other installed Ruby packages bring for this tool'
 const GEM_INSTALL_VALUES = {
   ...valuesOf('path', ['-i', '--install-dir', '-n', '--bindir', '--build-root', '-g', '--file']),
   ...valuesOf('text', ['-v', '--version', '--platform', '--document', '-P', '--trust-policy', '--without', '-s', '--source']),
@@ -145,6 +165,7 @@ const BUNDLE = 'https://bundler.io/man/bundle.1.html'
 const COMPOSER = 'https://getcomposer.org/doc/03-cli.md'
 const POETRY = 'https://python-poetry.org/docs/cli/'
 const CONDA = 'https://docs.conda.io/projects/conda/en/latest/commands/'
+const SWIFTPM = 'https://docs.swift.org/swiftpm/documentation/packagemanagerdocs/'
 
 export const LANG: Record<string, Entry> = {
   npx: {
@@ -179,6 +200,8 @@ export const LANG: Record<string, Entry> = {
       exec: execs('Runs another command with the packages the project uses.', YARN),
       dlx: fetchesAndRuns(YARN),
       publish: publishes('Sends the code in this folder to a public package service, where anyone can download it.', YARN),
+      // Yarn 2 and later spell it as two words.
+      'npm publish': publishes('Sends the code in this folder to a public package service, where anyone can download it.', YARN),
       info: { facts: fact('Shows the details of a ready-made code package.', { effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true, network: 'arbitrary', docs: YARN }), operands: ['package'] },
       why: { facts: fact('Shows why the project needs a given ready-made code package.', { ...LOOKS, docs: YARN }), operands: ['package'] },
     },
@@ -190,6 +213,14 @@ export const LANG: Record<string, Entry> = {
       { privilege: 'none', touchesCredentials: true, effect: ['read', 'write', 'execute'], network: 'arbitrary', repeatSafe: false, docs: BUN },
     ),
     operands: ['path'],
+    flags: [
+      {
+        flags: ['-e', '--eval', '-p', '--print'],
+        takesValue: true,
+        role: 'command',
+        facts: { says: 'Runs the JavaScript or TypeScript instructions written straight into this command.' },
+      },
+    ],
     sub: {
       install: installs('Downloads the ready-made code packages a project lists and puts them into it.', BUN),
       i: installs('Downloads the ready-made code packages a project lists and puts them into it.', BUN),
@@ -222,21 +253,45 @@ export const LANG: Record<string, Entry> = {
           ]),
         },
       },
-      publish: publishes('Sends the code in this folder to a public package service, where anyone can download it.', BUN),
+      publish: { ...publishes('Sends the code in this folder to a public package service, where anyone can download it.', BUN), values: { '--otp': 'text' } },
     },
   }, BUN_VALUES),
   deno: {
     facts: opaqueFact(
       'Runs a program written in JavaScript or TypeScript.',
       'the file it was given, whose contents are not shown here',
-      { privilege: 'none', touchesCredentials: false, effect: ['execute'], network: 'arbitrary', repeatSafe: false, docs: 'https://docs.deno.com/runtime/reference/cli/' },
+      // It stands in for `deno publish`, which signs in to the package service.
+      { privilege: 'none', touchesCredentials: true, effect: ['execute'], network: 'arbitrary', repeatSafe: false, docs: 'https://docs.deno.com/runtime/reference/cli/' },
     ),
     operands: ['path'],
     sub: {
       run: script('Runs a program written in JavaScript or TypeScript.', 'the file it was given, whose contents are not shown here', 'https://docs.deno.com/runtime/reference/cli/run/'),
       task: script('Runs one of the commands the project has saved under a short name.', 'the command the project has saved under that name', 'https://docs.deno.com/runtime/reference/cli/task/'),
       test: script('Runs the checks the project has written for itself.', 'the checks written in the project', 'https://docs.deno.com/runtime/reference/cli/test/'),
-      install: installs('Downloads a ready-made code package and installs it, here or as a program anyone on this computer can run.', 'https://docs.deno.com/runtime/reference/cli/install/'),
+      install: {
+        ...installs('Downloads a ready-made code package into the project, or installs it as a program for this account.', 'https://docs.deno.com/runtime/reference/cli/install/'),
+        values: { '-n': 'text', '--name': 'text', '--root': 'path' },
+        plain: ['-g', '--global', '-f', '--force'],
+      },
+      eval: {
+        ...script('Runs the JavaScript or TypeScript instructions written straight into this command.', 'the instructions written into the command', 'https://docs.deno.com/runtime/reference/cli/eval/'),
+        operands: ['command'],
+        values: { '--ext': 'text' },
+        plain: ['-p', '--print'],
+      },
+      publish: {
+        facts: fact('Sends the code in this folder to a public package service, where anyone can download it.', {
+          effect: ['read', 'transmit'],
+          reversible: 'no',
+          network: 'known-host',
+          privilege: 'none',
+          touchesCredentials: true,
+          repeatSafe: false,
+          docs: 'https://docs.deno.com/runtime/reference/cli/publish/',
+        }),
+        values: { '--token': 'text', '-c': 'path', '--config': 'path', '--set-version': 'text' },
+        plain: ['--allow-slow-types', '--allow-dirty', '--no-provenance'],
+      },
       fmt: {
         facts: fact('Tidies the layout of the code in a project, rewriting the files in place.', {
           ...LOCAL, repeatSafe: true,
@@ -271,17 +326,35 @@ export const LANG: Record<string, Entry> = {
         ...installs('Downloads newer versions of the packages the project uses.', CARGO),
         values: { '--precise': 'text' },
       },
-      remove: removes('Takes a ready-made code package out of the project.', CARGO),
+      // It settles the project's list of packages again, which can reach the package service, and runs no code.
+      remove: {
+        facts: fact('Takes a ready-made code package out of the project.', {
+          effect: ['read', 'write', 'delete'], reversible: 'unknown', network: 'arbitrary', privilege: 'none', touchesCredentials: false, repeatSafe: true, docs: CARGO,
+        }),
+        operands: ['package'],
+      },
+      new: {
+        facts: fact('Makes a new project written in Rust, in a new folder.', { ...LOCAL, effect: ['create', 'write'], reversible: 'yes', repeatSafe: true, docs: CARGO }),
+        operands: ['path'],
+        values: valuesOf('text', ['--edition', '--name', '--registry']),
+        plain: ['--bin', '--lib'],
+      },
+      init: {
+        facts: fact('Makes a folder into a new project written in Rust.', { ...LOCAL, effect: ['create', 'write'], reversible: 'yes', repeatSafe: true, docs: CARGO }),
+        operands: ['path'],
+        values: valuesOf('text', ['--edition', '--name', '--registry']),
+        plain: ['--bin', '--lib'],
+      },
       fmt: {
         facts: fact('Tidies the layout of the code in a project, rewriting the files in place.', { ...LOCAL, repeatSafe: true, effect: ['read', 'write'], reversible: 'no', docs: CARGO }),
       },
       publish: {
         ...publishes('Sends the code in this folder to a public package service, where anyone can download it.', CARGO),
-        values: { '--index': 'url', '--registry': 'text' },
-        flags: [{ flags: ['--token'], takesValue: true, role: 'text', facts: { touchesCredentials: true } }],
+        values: { '--index': 'url', '--registry': 'text', '--token': 'text' },
       },
     },
-  }, CARGO_VALUES),
+    // Here `--bin` picks a kind of project rather than naming one.
+  }, CARGO_VALUES, [], { new: ['--bin'], init: ['--bin'] }),
   go: everywhere({
     facts: manager('Builds, runs or tests a project written in Go, or fetches the code packages it uses.', GO),
     sub: {
@@ -292,35 +365,106 @@ export const LANG: Record<string, Entry> = {
       get: installs('Adds a ready-made code package from the internet to the project.', GO),
       generate: script('Runs the steps a project has written into its code for making more code.', 'the commands written into the project for making code', GO),
       fmt: {
-        facts: fact('Tidies the layout of the code in a project, rewriting the files in place.', { ...LOCAL, repeatSafe: true, effect: ['read', 'write'], reversible: 'no', docs: GO }),
+        facts: fact('Tidies the layout of the code in a project, rewriting the files in place.', {
+          ...GO_SWITCH, privilege: 'none', touchesCredentials: false, repeatSafe: true, effect: [...GO_SWITCH.effect, 'write'], reversible: 'no', docs: GO,
+        }),
         operands: ['path'],
       },
       vet: builds('Checks a project written in Go for likely mistakes.', GO),
-      version: { facts: fact('Shows which version of the Go tools is installed.', { ...LOOKS, docs: GO }) },
-      env: { facts: fact('Shows the settings the Go tools are using.', { ...LOOKS, docs: GO }) },
+      version: {
+        facts: fact('Shows which version of the Go tools is installed.', { ...GO_SWITCH, privilege: 'none', touchesCredentials: false, reversible: 'yes', repeatSafe: true, docs: GO }),
+      },
+      env: {
+        facts: fact('Shows the settings the Go tools are using.', { ...GO_SWITCH, privilege: 'none', touchesCredentials: false, reversible: 'yes', repeatSafe: true, docs: GO }),
+        operands: ['text'],
+        plain: ['-json', '-changed'],
+        flags: [
+          {
+            flags: ['-w', '-u'],
+            facts: {
+              says: 'Changes the settings the Go tools use from now on, for this account.',
+              effect: ['configure', 'write'],
+              reversible: 'unknown',
+              note: 'Later Go commands for this account follow these settings, including where they download code from.',
+            },
+          },
+        ],
+      },
     },
   }, GO_RUNS),
   ruby: runtime('Ruby', 'man 1 ruby', ['-e'], {
-    values: { '-C': 'path', '-I': 'path', '-r': 'package' },
+    values: { '-C': 'path', '-I': 'path', '-r': 'package', '-E': 'text', '--encoding': 'text' },
     // Each of these takes its value only written onto the letter (`-0777`, `-x./dir`), and stands alone otherwise.
     flags: [{ flags: ['-0', '-x', '-K', '-T', '-F'], attached: true, role: 'text', facts: {} }],
   }),
-  perl: runtime('Perl', 'man 1 perl', ['-e', '-E']),
-  php: runtime('PHP', 'https://www.php.net/manual/en/features.commandline.options.php', ['-r'], { values: { '-f': 'path', '-c': 'path', '-d': 'text' } }),
+  // Perl reads `-I` from the next word when nothing is written onto it.
+  perl: runtime('Perl', 'man 1 perl', ['-e', '-E'], { values: { '-I': 'path' } }),
+  php: runtime('PHP', 'https://www.php.net/manual/en/features.commandline.options.php', ['-r', '-B', '-R', '-E'], {
+    values: { '-f': 'path', '-c': 'path', '-d': 'text', '-t': 'path', '-F': 'path' },
+    flags: [
+      {
+        flags: ['-S'],
+        takesValue: true,
+        role: 'host',
+        facts: { says: 'Starts a small web server that answers each request by running the PHP files in a folder.', network: 'listens' },
+      },
+    ],
+  }),
   java: runtime('Java', 'man 1 java', [], {
     values: valuesOf('text', ['-cp', '-classpath', '--class-path', '-p', '--module-path', '-m', '--module']),
     flags: [{ flags: ['-jar'], takesValue: true, role: 'path', facts: { says: 'Runs a program written in Java, packed into one file.' } }],
     flagStyle: 'words',
   }),
-  swift: runtime('Swift', 'https://www.swift.org/documentation/'),
+  swift: runtime('Swift', 'https://www.swift.org/documentation/', [], {
+    sub: {
+      build: {
+        ...builds('Builds a project written in Swift into a program.', SWIFTPM),
+        values: { ...SWIFTPM_VALUES, '--product': 'text', '--target': 'text' },
+      },
+      run: {
+        ...script('Builds a project written in Swift and runs the program it makes.', 'the program the project builds, and the build steps written in it', SWIFTPM),
+        values: SWIFTPM_VALUES,
+      },
+      test: {
+        ...script('Builds a project written in Swift and runs the checks it has written for itself.', 'the checks and build steps written in the project', SWIFTPM),
+        values: { ...SWIFTPM_VALUES, '--filter': 'pattern', '--skip': 'pattern' },
+      },
+      package: {
+        facts: opaqueFact('Works with the ready-made code packages a Swift project uses.', PROJECT_STEPS, {
+          privilege: 'none', touchesCredentials: false, effect: ['read', 'create', 'write', 'delete', 'install', 'execute'], network: 'arbitrary', docs: SWIFTPM,
+        }),
+        operands: ['text'],
+        values: SWIFTPM_VALUES,
+      },
+    },
+  }),
   gem: {
     facts: manager('Works with the ready-made Ruby code packages installed on this computer.', GEM),
     sub: {
       install: { ...installs('Downloads ready-made Ruby code from the internet and installs it.', GEM), values: GEM_INSTALL_VALUES },
       update: { ...installs('Downloads newer versions of the installed Ruby code packages.', GEM), values: GEM_INSTALL_VALUES },
-      uninstall: { ...removes('Removes a ready-made Ruby code package from this computer.', GEM), values: GEM_INSTALL_VALUES },
-      // Here `-i` asks whether a package is installed, so it stands alone.
-      list: { facts: fact('Lists the ready-made Ruby code packages installed here.', { ...LOOKS, docs: GEM }), values: valuesOf('text', ['-v', '--version', '-B', '--bulk-threshold', '-s', '--source']) },
+      uninstall: {
+        ...removes('Removes a ready-made Ruby code package from this computer.', GEM, GEM_PLUGINS, ['read', 'write', 'delete', 'execute']),
+        values: { ...valuesOf('path', ['-i', '--install-dir', '-n', '--bindir']), ...valuesOf('text', ['-v', '--version', '--platform']) },
+      },
+      // Here `-i` asks whether a package is installed, so it stands alone. `-p` takes the next word only when it does
+      // not start with a dash, which no rule here can say, so it is left unread.
+      list: {
+        facts: opaqueFact('Lists the ready-made Ruby code packages installed here.', GEM_PLUGINS, {
+          privilege: 'none', touchesCredentials: false, effect: ['read', 'execute'], network: 'arbitrary', docs: GEM,
+        }),
+        operands: ['pattern'],
+        values: valuesOf('text', ['-v', '--version', '-B', '--bulk-threshold', '-s', '--source']),
+        plain: ['-i', '-I', '-d', '--details', '-a', '--all', '-e', '--exact', '-l', '--local'],
+        flags: [{ flags: ['-r', '--remote', '-b', '--both'], facts: { says: 'Lists the ready-made Ruby code packages on the public package service.' } }],
+      },
+      push: {
+        facts: opaqueFact('Sends a packed Ruby code package to a public package service, where anyone can download it.', GEM_PLUGINS, {
+          privilege: 'none', touchesCredentials: true, effect: ['read', 'transmit'], network: 'arbitrary', reversible: 'no', docs: GEM,
+        }),
+        operands: ['path'],
+        values: { '-k': 'text', '--key': 'text', '--otp': 'text', '--host': 'url' },
+      },
     },
   },
   bundle: {
@@ -341,9 +485,9 @@ export const LANG: Record<string, Entry> = {
       exec: execs('Runs another command with the Ruby code packages the project uses.', BUNDLE),
     },
   },
-  composer: {
+  composer: everywhere({
     facts: manager('Works with the ready-made PHP code packages a project uses.', COMPOSER),
-    values: { '-d': 'path', '--working-dir': 'path' },
+    globals: globalsOf(COMPOSER_VALUES),
     sub: {
       install: installs('Downloads the ready-made PHP code packages a project lists and puts them into it.', COMPOSER),
       update: installs('Downloads newer versions of the PHP code packages the project uses.', COMPOSER),
@@ -352,7 +496,7 @@ export const LANG: Record<string, Entry> = {
       'run-script': script('Runs one of the commands the project has saved under a short name.', 'the command the project has saved under that name', COMPOSER),
       run: script('Runs one of the commands the project has saved under a short name.', 'the command the project has saved under that name', COMPOSER),
     },
-  },
+  }, COMPOSER_VALUES),
   pipx: everywhere({
     facts: opaqueFact(
       'Installs a program written in Python into a space of its own, or runs one without installing it.',
@@ -362,7 +506,12 @@ export const LANG: Record<string, Entry> = {
     sub: {
       install: installs('Downloads a program written in Python and installs it into a space of its own.', 'https://pipx.pypa.io/stable/docs/'),
       run: { ...fetchesAndRuns('https://pipx.pypa.io/stable/docs/'), values: { '--spec': 'package' } },
-      uninstall: removes('Removes a program written in Python that was installed into a space of its own.', 'https://pipx.pypa.io/stable/docs/'),
+      uninstall: {
+        facts: fact('Removes a program written in Python that was installed into a space of its own.', {
+          ...LOCAL, repeatSafe: true, effect: ['delete', 'write'], reversible: 'unknown', docs: 'https://pipx.pypa.io/stable/docs/',
+        }),
+        operands: ['package'],
+      },
       list: { facts: fact('Lists the programs written in Python installed into spaces of their own.', { ...LOOKS, docs: 'https://pipx.pypa.io/stable/docs/' }) },
     },
   }, PIPX_VALUES),
@@ -375,7 +524,16 @@ export const LANG: Record<string, Entry> = {
       remove: removes('Takes a ready-made Python code package out of the project.', POETRY),
       run: execs('Runs another command with the Python code packages the project uses.', POETRY),
       build: builds('Packs a Python project into files that are ready to share.', POETRY),
-      publish: publishes('Sends a Python project to a public package service, where anyone can download it.', POETRY),
+      publish: {
+        ...publishes('Sends a Python project to a public package service, where anyone can download it.', POETRY),
+        values: {
+          ...valuesOf('text', ['-r', '--repository', '-p', '--password']),
+          ...valuesOf('user', ['-u', '--username']),
+          ...valuesOf('path', ['--cert', '--client-cert', '--dist-dir']),
+        },
+        plain: ['--skip-existing'],
+        flags: [{ flags: ['--build'], facts: { effect: ['create', 'write', 'execute'] } }],
+      },
     },
     globals: [{ flags: ['-C', '--directory'], takesValue: true, role: 'path', facts: {} }],
   }, { '-C': 'path', '--directory': 'path' }),
@@ -410,9 +568,21 @@ export const LANG: Record<string, Entry> = {
         '-find-library', '-enableAddressSanitizer', '-enableThreadSanitizer', '-enableUndefinedBehaviorSanitizer',
         '-resultBundleVersion', '-enableCodeCoverage', '-exportLanguage', '-testPlan', '-test-timeouts-enabled',
         '-default-test-execution-time-allowance', '-maximum-test-execution-time-allowance', '-scmProvider',
+        '-authenticationKeyID', '-authenticationKeyIssuerID',
       ]),
     },
     operands: ['text'],
+    flags: [
+      {
+        flags: ['-allowProvisioningUpdates', '-allowProvisioningDeviceRegistration'],
+        facts: {
+          effect: ['transmit', 'configure'],
+          touchesCredentials: true,
+          note: 'It signs in to the Apple developer account and can create or change its certificates, app records and devices.',
+        },
+      },
+      { flags: ['-authenticationKeyPath'], takesValue: true, role: 'path', facts: { touchesCredentials: true } },
+    ],
   },
   xcrun: {
     facts: opaqueFact('Finds one of the developer tools that come with Xcode and runs it.', 'the developer tool it was given, and what that tool is asked to do', {
@@ -422,7 +592,9 @@ export const LANG: Record<string, Entry> = {
       docs: 'man 1 xcrun',
     }),
     operands: ['command'],
-    values: { '--sdk': 'text', '--toolchain': 'text' },
+    // `-sdk` is the single-dash spelling Apple's own build scripts use.
+    values: { '--sdk': 'text', '-sdk': 'text', '--toolchain': 'text' },
+    plain: ['-v', '--verbose', '-l', '--log', '-n', '--no-cache', '-r', '--run'],
     nestedHere: true,
   },
   cmake: {
@@ -433,7 +605,24 @@ export const LANG: Record<string, Entry> = {
       '-U': 'pattern',
       ...valuesOf('text', ['-D', '-G', '-T', '-A', '--preset', '--log-level', '--trace-format']),
     },
-    flags: [{ flags: ['-Werror', '-Wno-error'], attached: true, role: 'text', facts: {} }],
+    flags: [
+      { flags: ['-Werror', '-Wno-error'], attached: true, role: 'text', facts: {} },
+      {
+        flags: ['-E'],
+        takesValue: true,
+        role: 'text',
+        facts: {
+          says: 'Carries out one simple task on files, such as copying, moving or removing them, or runs a command.',
+          effect: ['create', 'write', 'delete'],
+          reversible: 'no',
+        },
+      },
+    ],
   },
-  ninja: builds('Carries out the build steps a project has written down for itself.', 'https://ninja-build.org/manual.html'),
+  ninja: {
+    ...builds('Carries out the build steps a project has written down for itself.', 'https://ninja-build.org/manual.html'),
+    operands: ['text'],
+    values: { '-C': 'path', '-f': 'path', ...valuesOf('text', ['-j', '-k', '-l']) },
+    plain: ['-v', '--verbose', '--quiet'],
+  },
 }
