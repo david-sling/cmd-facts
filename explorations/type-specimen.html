@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cmd-facts type specimens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@400;600&family=Instrument+Serif:opsz@14..72&family=Public+Sans:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=Martian+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #fbfaf7;
+    --card: #ffffff;
+    --ink: #16181c;
+    --ink-2: #4c505a;
+    --ink-3: #777c88;
+    --line: #e3e2dd;
+    --amber: #b06a00;
+    --term: #16181c;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  .page { max-width: 1120px; margin: 0 auto; padding: 56px 28px 96px; }
+
+  .pagehead { font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: 0.04em; color: var(--ink-3); text-transform: uppercase; margin: 0 0 40px; }
+
+  .spec { border-top: 1px solid var(--line); padding: 40px 0 8px; }
+  .spec + .spec { margin-top: 32px; }
+
+  .tag { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 16px; margin: 0 0 28px; }
+  .tag .n { font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 500; color: var(--amber); letter-spacing: 0.04em; }
+  .tag .names { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-3); }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 44px; align-items: start; }
+  @media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); gap: 32px; } }
+
+  h1 { margin: 0 0 18px; text-wrap: balance; }
+  .lead { margin: 0 0 22px; max-width: 44ch; color: var(--ink-2); text-wrap: pretty; }
+  .body { margin: 0; max-width: 52ch; color: var(--ink-2); }
+
+  .term { background: var(--term); border-radius: 10px; padding: 14px 16px; overflow-x: auto; }
+  .term code { color: #f2f1ec; white-space: pre; }
+  .term .dim { color: #8b8f99; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; }
+  .says { margin: 16px 0 0; }
+  .fields { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 18px; margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
+  .k { color: var(--ink-3); }
+  .v { color: var(--ink); }
+  .warn { color: var(--amber); }
+
+  /* ---------- A: IBM Plex superfamily ---------- */
+  .a { --display: "IBM Plex Serif", serif; --sans: "IBM Plex Sans", sans-serif; --mono: "IBM Plex Mono", monospace; }
+  .a h1 { font: 600 clamp(2.1rem, 4.4vw, 3.4rem)/1.08 var(--display); letter-spacing: -0.02em; }
+  .a .lead { font: 400 17px/1.55 var(--sans); }
+  .a .body { font: 400 15px/1.6 var(--sans); }
+  .a .term code, .a .fields, .a .k, .a .v { font-family: var(--mono); font-size: 13px; line-height: 1.6; }
+  .a .says { font: 500 16px/1.5 var(--sans); }
+
+  /* ---------- B: Instrument Serif + Public Sans ---------- */
+  .b { --display: "Instrument Serif", serif; --sans: "Public Sans", sans-serif; --mono: "IBM Plex Mono", monospace; }
+  .b h1 { font: 400 clamp(2.6rem, 6vw, 4.6rem)/1.0 var(--display); letter-spacing: -0.025em; }
+  .b .lead { font: 400 17px/1.55 var(--sans); }
+  .b .body { font: 400 15px/1.6 var(--sans); }
+  .b .term code { font: 400 13px/1.6 var(--mono); }
+  .b .fields, .b .k, .b .v { font: 500 13px/1.6 var(--sans); }
+  .b .says { font: 600 16px/1.5 var(--sans); }
+
+  /* ---------- C: Bricolage + Hanken + Martian ---------- */
+  .c { --display: "Bricolage Grotesque", sans-serif; --sans: "Hanken Grotesk", sans-serif; --mono: "Martian Mono", monospace; }
+  .c h1 { font: 800 clamp(2.1rem, 4.6vw, 3.5rem)/1.04 var(--display); letter-spacing: -0.03em; }
+  .c .lead { font: 400 17px/1.55 var(--sans); }
+  .c .body { font: 400 15px/1.6 var(--sans); }
+  .c .term code { font: 400 12px/1.7 var(--mono); }
+  .c .fields, .c .k, .c .v { font: 400 12px/1.6 var(--mono); }
+  .c .says { font: 600 16px/1.5 var(--sans); }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="pagehead">cmd-facts — type specimens — pick one</p>
+
+  <section class="spec a">
+    <p class="tag"><span class="n">Option A</span><span class="names">IBM Plex Serif · IBM Plex Sans · IBM Plex Mono</span></p>
+    <div class="grid">
+      <div>
+        <h1>What happens if this runs?</h1>
+        <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+        <p class="body">The reader is assumed never to have opened a terminal. It is not a man-page browser and not a linter. Everything here answers one question: if this runs, what happens to this computer?</p>
+      </div>
+      <div>
+        <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+        <div class="card" style="margin-top:14px">
+          <p class="says">Fetches whatever is at a web address and saves it into a file on this computer.</p>
+          <div class="fields">
+            <span class="k">effect</span><span class="v">read · write · create</span>
+            <span class="k">reversible</span><span class="v warn">no</span>
+            <span class="k">network</span><span class="v warn">arbitrary</span>
+            <span class="k">privilege</span><span class="v">none</span>
+            <span class="k">confidence</span><span class="v">verified</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="spec b">
+    <p class="tag"><span class="n">Option B</span><span class="names">Instrument Serif · Public Sans · IBM Plex Mono</span></p>
+    <div class="grid">
+      <div>
+        <h1>What happens if this runs?</h1>
+        <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+        <p class="body">The reader is assumed never to have opened a terminal. It is not a man-page browser and not a linter. Everything here answers one question: if this runs, what happens to this computer?</p>
+      </div>
+      <div>
+        <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+        <div class="card" style="margin-top:14px">
+          <p class="says">Fetches whatever is at a web address and saves it into a file on this computer.</p>
+          <div class="fields">
+            <span class="k">effect</span><span class="v">read · write · create</span>
+            <span class="k">reversible</span><span class="v warn">no</span>
+            <span class="k">network</span><span class="v warn">arbitrary</span>
+            <span class="k">privilege</span><span class="v">none</span>
+            <span class="k">confidence</span><span class="v">verified</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="spec c">
+    <p class="tag"><span class="n">Option C</span><span class="names">Bricolage Grotesque · Hanken Grotesk · Martian Mono</span></p>
+    <div class="grid">
+      <div>
+        <h1>What happens if this runs?</h1>
+        <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+        <p class="body">The reader is assumed never to have opened a terminal. It is not a man-page browser and not a linter. Everything here answers one question: if this runs, what happens to this computer?</p>
+      </div>
+      <div>
+        <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+        <div class="card" style="margin-top:14px">
+          <p class="says">Fetches whatever is at a web address and saves it into a file on this computer.</p>
+          <div class="fields">
+            <span class="k">effect</span><span class="v">read · write · create</span>
+            <span class="k">reversible</span><span class="v warn">no</span>
+            <span class="k">network</span><span class="v warn">arbitrary</span>
+            <span class="k">privilege</span><span class="v">none</span>
+            <span class="k">confidence</span><span class="v">verified</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

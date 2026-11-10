@@ -67,6 +67,9 @@ export const NET: Record<string, Entry> = {
           effect: ['read', 'create', 'write'],
           reversible: 'no',
           says: 'Fetches whatever is at a web address and saves it into a file on this computer.',
+          // `-O` takes the name from the address rather than from the line, so the slot is the host
+          // it reaches; `note` carries the naming, which no slot can.
+          tell: ['Makes a request to ', { role: 'url', show: 'host' }, ' and saves what comes back into a file in this folder.'],
           note: 'The web address decides what the saved file is called.',
         },
       },

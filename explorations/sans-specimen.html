@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cmd-facts sans specimens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,800&family=Hanken+Grotesk:wght@400;500&family=Archivo:wdth,wght@62..125,400..800&family=Schibsted+Grotesk:wght@400;500;800&family=Familjen+Grotesk:wght@400;500;700&family=Host+Grotesk:wght@400;500;800&family=Onest:wght@400;500&family=Wix+Madefor+Display:wght@400;500;800&family=Wix+Madefor+Text:wght@400;500&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #fbfaf7;
+    --card: #ffffff;
+    --ink: #16181c;
+    --ink-2: #4c505a;
+    --ink-3: #777c88;
+    --line: #e3e2dd;
+    --amber: #b06a00;
+    --term: #16181c;
+    --mono: "Spline Sans Mono", monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: "Hanken Grotesk", sans-serif; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 780px; margin: 0 auto; padding: 44px 24px 96px; }
+
+  .pagehead { font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 8px; }
+  .pagesub { margin: 0 0 36px; color: var(--ink-2); font-size: 15px; max-width: 56ch; }
+
+  .spec { border-top: 1px solid var(--line); padding: 26px 0 0; }
+  .spec + .spec { margin-top: 26px; }
+  .tag { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin: 0 0 16px; font-family: var(--mono); }
+  .tag .n { font-size: 12px; font-weight: 500; color: var(--amber); letter-spacing: 0.04em; }
+  .tag .names { font-size: 12px; color: var(--ink-3); }
+
+  h2 { margin: 0 0 12px; text-wrap: balance; font-family: var(--display); }
+  .lead { margin: 0 0 14px; max-width: 46ch; color: var(--ink-2); font-family: var(--sans); font-size: 16px; line-height: 1.55; text-wrap: pretty; }
+
+  .term { background: var(--term); border-radius: 9px; padding: 11px 14px; overflow-x: auto; }
+  .term code { color: #f2f1ec; white-space: pre; font: 400 12.5px/1.6 var(--mono); }
+  .term .dim { color: #8b8f99; }
+
+  .fields { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 12px 0 0; font-family: var(--mono); font-size: 12px; }
+  .chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 3px 11px; color: var(--ink-2); }
+  .chip.warn { color: var(--amber); border-color: #e8d7b8; }
+
+  /* 0 — current pick */
+  .s0 { --display: "Bricolage Grotesque", sans-serif; --sans: "Hanken Grotesk", sans-serif; }
+  .s0 h2 { font-weight: 800; font-size: clamp(2rem, 4.6vw, 2.9rem); line-height: 1.04; letter-spacing: -0.03em; }
+
+  /* 1 — Archivo */
+  .s1 { --display: "Archivo", sans-serif; --sans: "Archivo", sans-serif; }
+  .s1 h2 { font-weight: 700; font-variation-settings: "wdth" 115; font-size: clamp(1.9rem, 4.2vw, 2.7rem); line-height: 1.06; letter-spacing: -0.02em; }
+  .s1 .lead { font-variation-settings: "wdth" 100; }
+
+  /* 2 — Schibsted Grotesk */
+  .s2 { --display: "Schibsted Grotesk", sans-serif; --sans: "Schibsted Grotesk", sans-serif; }
+  .s2 h2 { font-weight: 800; font-size: clamp(2rem, 4.5vw, 2.85rem); line-height: 1.04; letter-spacing: -0.03em; }
+
+  /* 3 — Familjen Grotesk */
+  .s3 { --display: "Familjen Grotesk", sans-serif; --sans: "Hanken Grotesk", sans-serif; }
+  .s3 h2 { font-weight: 700; font-size: clamp(2rem, 4.6vw, 2.9rem); line-height: 1.04; letter-spacing: -0.025em; }
+
+  /* 4 — Host Grotesk */
+  .s4 { --display: "Host Grotesk", sans-serif; --sans: "Onest", sans-serif; }
+  .s4 h2 { font-weight: 800; font-size: clamp(2rem, 4.5vw, 2.85rem); line-height: 1.04; letter-spacing: -0.03em; }
+
+  /* 5 — Wix Madefor */
+  .s5 { --display: "Wix Madefor Display", sans-serif; --sans: "Wix Madefor Text", sans-serif; }
+  .s5 h2 { font-weight: 800; font-size: clamp(2rem, 4.5vw, 2.85rem); line-height: 1.04; letter-spacing: -0.03em; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="pagehead">cmd-facts — sans options — mono fixed at Spline Sans Mono</p>
+  <p class="pagesub">Same headline, same lead, same command. Only the display and body faces change.</p>
+
+  <section class="spec s0">
+    <p class="tag"><span class="n">0 · current pick</span><span class="names">Bricolage Grotesque · Hanken Grotesk</span></p>
+    <h2>What happens if this runs?</h2>
+    <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+    <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+    <div class="fields"><span class="chip">read · write · create</span><span class="chip warn">reversible: no</span><span class="chip warn">network: arbitrary</span><span class="chip">privilege: none</span></div>
+  </section>
+
+  <section class="spec s1">
+    <p class="tag"><span class="n">1</span><span class="names">Archivo Expanded · Archivo</span></p>
+    <h2>What happens if this runs?</h2>
+    <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+    <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+    <div class="fields"><span class="chip">read · write · create</span><span class="chip warn">reversible: no</span><span class="chip warn">network: arbitrary</span><span class="chip">privilege: none</span></div>
+  </section>
+
+  <section class="spec s2">
+    <p class="tag"><span class="n">2</span><span class="names">Schibsted Grotesk (one family)</span></p>
+    <h2>What happens if this runs?</h2>
+    <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+    <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+    <div class="fields"><span class="chip">read · write · create</span><span class="chip warn">reversible: no</span><span class="chip warn">network: arbitrary</span><span class="chip">privilege: none</span></div>
+  </section>
+
+  <section class="spec s3">
+    <p class="tag"><span class="n">3</span><span class="names">Familjen Grotesk · Hanken Grotesk</span></p>
+    <h2>What happens if this runs?</h2>
+    <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+    <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+    <div class="fields"><span class="chip">read · write · create</span><span class="chip warn">reversible: no</span><span class="chip warn">network: arbitrary</span><span class="chip">privilege: none</span></div>
+  </section>
+
+  <section class="spec s4">
+    <p class="tag"><span class="n">4</span><span class="names">Host Grotesk · Onest</span></p>
+    <h2>What happens if this runs?</h2>
+    <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+    <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+    <div class="fields"><span class="chip">read · write · create</span><span class="chip warn">reversible: no</span><span class="chip warn">network: arbitrary</span><span class="chip">privilege: none</span></div>
+  </section>
+
+  <section class="spec s5">
+    <p class="tag"><span class="n">5</span><span class="names">Wix Madefor Display · Wix Madefor Text</span></p>
+    <h2>What happens if this runs?</h2>
+    <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+    <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+    <div class="fields"><span class="chip">read · write · create</span><span class="chip warn">reversible: no</span><span class="chip warn">network: arbitrary</span><span class="chip">privilege: none</span></div>
+  </section>
+</div>
+</body>
+</html>

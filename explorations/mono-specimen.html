@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cmd-facts mono specimens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=Martian+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500&family=Spline+Sans+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #fbfaf7;
+    --card: #ffffff;
+    --ink: #16181c;
+    --ink-2: #4c505a;
+    --ink-3: #777c88;
+    --line: #e3e2dd;
+    --amber: #b06a00;
+    --term: #16181c;
+    --display: "Bricolage Grotesque", sans-serif;
+    --sans: "Hanken Grotesk", sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+  .page { max-width: 760px; margin: 0 auto; padding: 48px 24px 96px; }
+
+  .pagehead { font-family: var(--display); font-weight: 800; font-size: 28px; letter-spacing: -0.03em; margin: 0 0 6px; }
+  .pagesub { margin: 0 0 40px; color: var(--ink-2); font-size: 15px; }
+
+  .spec { border-top: 1px solid var(--line); padding: 28px 0 0; }
+  .spec + .spec { margin-top: 28px; }
+  .tag { display: flex; align-items: baseline; gap: 12px; margin: 0 0 18px; }
+  .tag .n { font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+  .tag .note { font-size: 13px; color: var(--ink-3); }
+
+  .term { background: var(--term); border-radius: 10px; padding: 13px 15px; overflow-x: auto; }
+  .term + .term { margin-top: 8px; }
+  .term code { color: #f2f1ec; white-space: pre; }
+  .term .dim { color: #8b8f99; }
+
+  .card { margin-top: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+  .says { margin: 0; font-size: 15.5px; font-weight: 600; line-height: 1.45; }
+  .fields { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 7px 18px; margin: 16px 0 0; padding-top: 14px; border-top: 1px solid var(--line); }
+  .k { color: var(--ink-3); }
+  .warn { color: var(--amber); }
+  .inline { margin: 12px 0 0; font-size: 14.5px; color: var(--ink-2); }
+
+  .m1 { --mono: "Martian Mono", monospace; --msize: 12px; }
+  .m2 { --mono: "IBM Plex Mono", monospace; --msize: 13px; }
+  .m3 { --mono: "Spline Sans Mono", monospace; --msize: 13px; }
+  .m4 { --mono: "JetBrains Mono", monospace; --msize: 13px; }
+  .spec code, .spec .fields, .spec .k, .spec .v { font-family: var(--mono); font-size: var(--msize); line-height: 1.65; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1 class="pagehead">Which mono?</h1>
+  <p class="pagesub">Bricolage Grotesque and Hanken Grotesk stay fixed. Only the monospace changes. Watch where each command runs out of room.</p>
+
+  <section class="spec m1">
+    <p class="tag"><span class="n">1 — Martian Mono</span><span class="note">widest; most distinctive</span></p>
+    <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+    <div class="term"><code>$ <span class="dim">docker run --rm -v "$PWD":/work -w /work node:22 npm ci --omit=dev</span></code></div>
+    <div class="card">
+      <p class="says">Fetches whatever is at a web address and saves it into a file on this computer.</p>
+      <div class="fields">
+        <span class="k">effect</span><span class="v">read · write · create</span>
+        <span class="k">reversible</span><span class="v warn">no</span>
+        <span class="k">network</span><span class="v warn">arbitrary</span>
+        <span class="k">privilege</span><span class="v">none</span>
+      </div>
+    </div>
+    <p class="inline">Inline, a flag like <code>--no-preserve-root</code> sits inside a sentence.</p>
+  </section>
+
+  <section class="spec m2">
+    <p class="tag"><span class="n">2 — IBM Plex Mono</span><span class="note">narrow; neutral, slightly warm</span></p>
+    <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+    <div class="term"><code>$ <span class="dim">docker run --rm -v "$PWD":/work -w /work node:22 npm ci --omit=dev</span></code></div>
+    <div class="card">
+      <p class="says">Fetches whatever is at a web address and saves it into a file on this computer.</p>
+      <div class="fields">
+        <span class="k">effect</span><span class="v">read · write · create</span>
+        <span class="k">reversible</span><span class="v warn">no</span>
+        <span class="k">network</span><span class="v warn">arbitrary</span>
+        <span class="k">privilege</span><span class="v">none</span>
+      </div>
+    </div>
+    <p class="inline">Inline, a flag like <code>--no-preserve-root</code> sits inside a sentence.</p>
+  </section>
+
+  <section class="spec m3">
+    <p class="tag"><span class="n">3 — Spline Sans Mono</span><span class="note">narrow; grotesque-flavoured, closest cousin to Bricolage</span></p>
+    <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+    <div class="term"><code>$ <span class="dim">docker run --rm -v "$PWD":/work -w /work node:22 npm ci --omit=dev</span></code></div>
+    <div class="card">
+      <p class="says">Fetches whatever is at a web address and saves it into a file on this computer.</p>
+      <div class="fields">
+        <span class="k">effect</span><span class="v">read · write · create</span>
+        <span class="k">reversible</span><span class="v warn">no</span>
+        <span class="k">network</span><span class="v warn">arbitrary</span>
+        <span class="k">privilege</span><span class="v">none</span>
+      </div>
+    </div>
+    <p class="inline">Inline, a flag like <code>--no-preserve-root</code> sits inside a sentence.</p>
+  </section>
+
+  <section class="spec m4">
+    <p class="tag"><span class="n">4 — JetBrains Mono</span><span class="note">narrow, tall x-height; reads as "developer tool"</span></p>
+    <div class="term"><code>$ <span class="dim">curl -fsSL https://get.example.com/install.sh -o install.sh</span></code></div>
+    <div class="term"><code>$ <span class="dim">docker run --rm -v "$PWD":/work -w /work node:22 npm ci --omit=dev</span></code></div>
+    <div class="card">
+      <p class="says">Fetches whatever is at a web address and saves it into a file on this computer.</p>
+      <div class="fields">
+        <span class="k">effect</span><span class="v">read · write · create</span>
+        <span class="k">reversible</span><span class="v warn">no</span>
+        <span class="k">network</span><span class="v warn">arbitrary</span>
+        <span class="k">privilege</span><span class="v">none</span>
+      </div>
+    </div>
+    <p class="inline">Inline, a flag like <code>--no-preserve-root</code> sits inside a sentence.</p>
+  </section>
+</div>
+</body>
+</html>
