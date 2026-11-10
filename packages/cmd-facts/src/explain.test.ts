@@ -387,7 +387,8 @@ describe('tools that act on another service', () => {
 describe('credentials on a publishing line', () => {
   it('marks the token or one-time code a publish carries', () => {
     expect(run('cargo publish --token abc').facts.touchesCredentials).toBe(true)
-    expect(run('cargo publish').facts.touchesCredentials).toBe(false)
+    // Without one on the line it sends with the sign-in it keeps.
+    expect(run('cargo publish').facts.touchesCredentials).toBe(true)
     // Even where the subcommand has no row of its own, the option is read wherever it is.
     expect(run('yarn npm publish --otp 123456').facts.touchesCredentials).toBe(true)
   })

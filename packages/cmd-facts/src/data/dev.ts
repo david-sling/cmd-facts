@@ -1,5 +1,6 @@
 import { fact, opaqueFact, valuesOf, LOCAL, LOOKS } from '../entry.ts'
 import type { Entry, FlagRule, Role, Rule } from '../entry.ts'
+import type { Effect } from '../facts.ts'
 import { globalsOf } from './shared.ts'
 
 const GIT = 'man 1 git'
@@ -320,12 +321,12 @@ const packagerRows = (docs: string): Entry => ({
       ),
     },
     publish: {
+      // It signs in to the package service with the access key saved on this computer, whether or not a code is given.
       facts: opaqueFact(
         'Sends the code in this folder to a public package service, where anyone can download it.',
         'the steps the project runs for itself before sending',
-        { privilege: 'none', touchesCredentials: false, effect: ['read', 'transmit'], network: 'arbitrary', docs },
+        { privilege: 'none', touchesCredentials: true, effect: ['read', 'transmit'], network: 'arbitrary', docs },
       ),
-      flags: [{ flags: ['--otp'], takesValue: true, role: 'text', facts: { touchesCredentials: true } }],
     },
     list: { facts: fact('Lists the ready-made code packages the project uses.', { ...LOOKS, docs }) },
     ls: { facts: fact('Lists the ready-made code packages the project uses.', { ...LOOKS, docs }) },
@@ -339,6 +340,9 @@ const packagerRows = (docs: string): Entry => ({
   },
 })
 
+// A one-time code from a second-step sign-in, handed over on the line.
+const OTP: FlagRule = { flags: ['--otp'], takesValue: true, role: 'text', facts: { touchesCredentials: true } }
+
 /**
  * npm and pnpm share their rows but not their flags: `-w` names a workspace in npm and is a bare switch in pnpm.
  * Both read their flags anywhere on the line, so every subcommand takes them, and the ones written before the
@@ -346,12 +350,16 @@ const packagerRows = (docs: string): Entry => ({
  */
 const nodePackager = (docs: string, values: Record<string, Role>, bare: string[]): Entry => {
   const rows = packagerRows(docs)
+  const flags = [OTP]
   const globals: FlagRule[] = [
     ...Object.entries(values).map(([flag, role]) => ({ flags: [flag], takesValue: true, role, facts: {} })),
     { flags: bare, facts: {} },
+    ...flags,
   ]
-  const sub = Object.fromEntries(Object.entries(rows.sub!).map(([word, rule]) => [word, { ...rule, values: { ...values, ...rule.values } }]))
-  return { ...rows, values, globals, sub }
+  const sub = Object.fromEntries(
+    Object.entries(rows.sub!).map(([word, rule]) => [word, { ...rule, values: { ...values, ...rule.values }, flags: [...(rule.flags ?? []), ...flags] }]),
+  )
+  return { ...rows, values, globals, flags, sub }
 }
 
 const NPM_VALUES: Record<string, Role> = {
@@ -376,38 +384,46 @@ const BREW_INSTALL_VALUES: Record<string, Role> = {
   ]),
 }
 
-// The paths `-v` and `--mount` name are inside the packaged program as well as on this computer, so they stay text.
-const DOCKER_RUN_VALUES: Record<string, Role> = {
+// What `docker create` takes, which is everything `docker run` does but waiting on it and passing signals to it.
+const DOCKER_CREATE_VALUES: Record<string, Role> = {
   ...valuesOf('path', ['--cidfile', '--label-file']),
   ...valuesOf('text', [
     '--add-host', '-a', '--attach', '--blkio-weight', '--blkio-weight-device', '--cap-drop', '--cgroup-parent',
-    '--cgroupns', '--cpu-period', '--cpu-quota', '--cpu-rt-period', '--cpu-rt-runtime', '-c', '--cpu-shares', '--cpus',
-    '--cpuset-cpus', '--cpuset-mems', '--detach-keys', '--device-cgroup-rule', '--device-read-bps',
+    '--cpu-period', '--cpu-quota', '--cpu-rt-period', '--cpu-rt-runtime', '-c', '--cpu-shares', '--cpus',
+    '--cpuset-cpus', '--cpuset-mems', '--device-read-bps',
     '--device-read-iops', '--device-write-bps', '--device-write-iops', '--dns', '--dns-option', '--dns-search',
     '--domainname', '--entrypoint', '-e', '--env', '--expose', '--gpus', '--group-add', '--health-cmd',
     '--health-interval', '--health-retries', '--health-start-period', '--health-timeout', '-h', '--hostname', '--ip',
-    '--ip6', '--ipc', '--isolation', '--kernel-memory', '-l', '--label', '--link', '--link-local-ip', '--log-driver',
+    '--ip6', '--isolation', '--kernel-memory', '-l', '--label', '--link', '--link-local-ip', '--log-driver',
     '--log-opt', '--mac-address', '-m', '--memory', '--memory-reservation', '--memory-swap', '--memory-swappiness',
-    '--mount', '--name', '--network', '--network-alias', '--oom-score-adj', '--pid', '--pids-limit', '--platform', '-p',
-    '--publish', '--pull', '--restart', '--runtime', '--security-opt', '--shm-size', '--stop-signal', '--stop-timeout',
-    '--storage-opt', '--sysctl', '--tmpfs', '--ulimit', '-u', '--user', '--userns', '--uts', '--volume-driver',
-    '--volumes-from', '-w', '--workdir',
+    '--name', '--network-alias', '--oom-score-adj', '--pids-limit', '--platform', '-p',
+    '--publish', '--pull', '--restart', '--runtime', '--shm-size', '--stop-signal', '--stop-timeout',
+    '--storage-opt', '--sysctl', '--tmpfs', '--ulimit', '-u', '--user', '--volume-driver', '-w', '--workdir',
   ]),
 }
+const DOCKER_RUN_VALUES: Record<string, Role> = { ...DOCKER_CREATE_VALUES, '--detach-keys': 'text' }
 
 // A file of hidden settings, the kind that usually holds passwords and access keys for other services.
 const ENV_FILE: FlagRule = { flags: ['--env-file'], takesValue: true, role: 'path', facts: { touchesCredentials: true } }
 
 // The text cannot say whether a folder of this computer or a store of the packaged program's own is meant, so both are
-// read as the wider one.
+// read as the wider one. A packaged program usually runs as the system's administrator inside its copy, so a folder of
+// this computer it is given, `/` or the one that controls Docker itself among them, is in its full control.
 const VOLUME: FlagRule = {
-  flags: ['-v', '--volume', '--mount'],
+  flags: ['-v', '--volume'],
   takesValue: true,
   role: 'text',
   facts: {
-    effect: ['read', 'write'],
-    note: 'Folders on this computer that it is pointed at can be read and changed from inside it.',
+    effect: ['read', 'write', 'elevate'],
+    privilege: 'root',
+    note: 'Folders on this computer that it is pointed at can be read and changed from inside it, with full control.',
   },
+}
+const MOUNT: FlagRule = { ...VOLUME, flags: ['--mount'] }
+const VOLUMES_FROM: FlagRule = {
+  ...VOLUME,
+  flags: ['--volumes-from'],
+  facts: { ...VOLUME.facts, note: 'It is given the folders another packaged program was given, which can be folders of this computer.' },
 }
 
 const PRIVILEGED: FlagRule = {
@@ -418,6 +434,34 @@ const PRIVILEGED: FlagRule = {
     note: 'It is given full control of the system it runs on, so it is no longer sealed off from this computer.',
   },
 }
+const PRIVILEGED_EXEC: FlagRule = {
+  ...PRIVILEGED,
+  facts: { ...PRIVILEGED.facts, note: 'The command is given full control of the system the packaged program runs on.' },
+}
+
+// Each of these can name `host`, so the packaged program shares that part of this computer instead of having its own,
+// and does so as the administrator it usually runs as inside.
+const SHARES_HOST = (flags: string[], effect: Effect[], note: string): FlagRule => ({
+  flags,
+  takesValue: true,
+  role: 'text',
+  facts: { effect: [...effect, 'elevate'], privilege: 'root', note },
+})
+const HOST_PARTS: FlagRule[] = [
+  SHARES_HOST(['--pid'], ['read', 'terminate'], 'Set to share them, it can see and stop the programs running on this computer.'),
+  SHARES_HOST(['--ipc'], ['read', 'write'], "Set to share it, it can read and change the memory this computer's programs pass data through."),
+  SHARES_HOST(['--uts'], ['configure'], 'Set to share it, it can change the name this computer goes by.'),
+  SHARES_HOST(['--userns'], [], 'Set to share it, the administrator inside it is the administrator of this computer.'),
+  SHARES_HOST(['--network'], ['read'], "Set to share them, it uses this computer's own network connections and can listen in on them."),
+  {
+    flags: ['--cgroupns'],
+    takesValue: true,
+    role: 'text',
+    facts: { effect: ['read'], note: "Set to share it, it can see how this computer's programs are grouped and held to limits." },
+  },
+  // `seccomp=unconfined`, `apparmor=unconfined` and `label=disable` each take one of them away.
+  SHARES_HOST(['--security-opt'], [], 'Some settings take down the walls that keep it sealed off from this computer.'),
+]
 // The powers are named in the value, and one name (`ALL`, `SYS_ADMIN`) is as wide as `--privileged`, so the flag is
 // read as the widest of them.
 const CAP_ADD: FlagRule = {
@@ -435,10 +479,64 @@ const DEVICE: FlagRule = {
   takesValue: true,
   role: 'text',
   facts: {
-    effect: ['read', 'write'],
-    note: 'A device of this computer, such as a disk, can be read and written from inside it.',
+    effect: ['read', 'write', 'elevate'],
+    privilege: 'root',
+    note: 'A device of this computer, such as a disk, can be read and written from inside it, with full control.',
   },
 }
+const DEVICE_RULE: FlagRule = {
+  ...DEVICE,
+  flags: ['--device-cgroup-rule'],
+  facts: { ...DEVICE.facts, note: 'A rule can let it read and write devices of this computer, such as disks, with full control.' },
+}
+
+// What `docker run` and `docker create` give the packaged program they set up.
+const DOCKER_RUN_FLAGS: FlagRule[] = [ENV_FILE, PRIVILEGED, CAP_ADD, DEVICE, DEVICE_RULE, VOLUME, MOUNT, VOLUMES_FROM, ...HOST_PARTS]
+
+const DOCKER = 'https://docs.docker.com/reference/cli/docker/'
+const DOCKER_RUN: Rule = {
+  facts: opaqueFact(
+    'Starts a packaged program in its own sealed-off copy of a system.',
+    'the packaged program, whose contents were decided by whoever built it',
+    { privilege: 'none', touchesCredentials: false, effect: ['create', 'execute'], network: 'arbitrary', docs: DOCKER },
+  ),
+  operands: ['package', 'command'],
+  values: DOCKER_RUN_VALUES,
+  flags: DOCKER_RUN_FLAGS,
+}
+// It downloads the packaged program if it is not here yet, and sets it up without starting it.
+const DOCKER_CREATE: Rule = {
+  facts: fact('Sets up a packaged program in its own sealed-off copy of a system, ready to start later.', {
+    reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: false,
+    effect: ['read', 'create', 'install'],
+    network: 'arbitrary',
+    docs: DOCKER,
+  }),
+  // The command it is set up with does not run here, so it is not looked up.
+  operands: ['package', 'text'],
+  values: DOCKER_CREATE_VALUES,
+  flags: DOCKER_RUN_FLAGS,
+}
+const DOCKER_EXEC: Rule = {
+  facts: opaqueFact(
+    'Runs another command inside a packaged program that is already running.',
+    'the command it was given, which runs inside the packaged program',
+    { privilege: 'none', touchesCredentials: false, effect: ['execute'], network: 'arbitrary', docs: DOCKER },
+  ),
+  operands: ['text', 'command'],
+  values: valuesOf('text', ['--detach-keys', '-e', '--env', '-u', '--user', '-w', '--workdir']),
+  flags: [ENV_FILE, PRIVILEGED_EXEC],
+}
+
+// Options Docker reads before the command, for where it finds the service that runs the packaged programs. That
+// service can be on another computer, reached over the network with keys kept on this one.
+const DOCKER_GLOBALS: FlagRule[] = [
+  ...globalsOf({ ...valuesOf('path', ['--config', '--tlscacert', '--tlscert']), ...valuesOf('text', ['-l', '--log-level']) }),
+  { flags: ['-H', '--host'], takesValue: true, role: 'url', facts: { network: 'arbitrary', touchesCredentials: true } },
+  { flags: ['-c', '--context'], takesValue: true, role: 'text', facts: { network: 'arbitrary', touchesCredentials: true } },
+  { flags: ['--tlskey'], takesValue: true, role: 'path', facts: { touchesCredentials: true } },
+  { flags: ['-D', '--debug', '--tls', '--tlsverify'], facts: {} },
+]
 
 const COMPOSE = 'https://docs.docker.com/reference/cli/docker/compose/'
 const COMPOSED = 'the packaged programs the file names, whose contents were decided by whoever built them'
@@ -518,6 +616,7 @@ const COMPOSE_SUBS: Record<string, Rule> = {
     }),
     operands: ['text', 'command'],
     values: COMPOSE_INSIDE,
+    flags: [PRIVILEGED_EXEC],
   },
   run: {
     facts: opaqueFact('Starts one of the packaged programs from one file to run a single command.', COMPOSED, {
@@ -528,7 +627,7 @@ const COMPOSE_SUBS: Record<string, Rule> = {
     }),
     operands: ['text', 'command'],
     values: { ...COMPOSE_INSIDE, ...valuesOf('text', ['-p', '--publish', '--name', '--entrypoint', '-l', '--label', '--cap-drop']) },
-    flags: [VOLUME, ENV_FILE, CAP_ADD],
+    flags: [VOLUME, ENV_FILE, { ...ENV_FILE, flags: ['--env-from-file'] }, CAP_ADD],
   },
   start: {
     facts: opaqueFact('Starts the stopped packaged programs from one file again.', COMPOSED, { privilege: 'none', touchesCredentials: false, effect: ['execute'], network: 'arbitrary', docs: COMPOSE }),
@@ -769,7 +868,8 @@ export const DEV: Record<string, Entry> = {
       },
     ),
     operands: ['command'],
-    // `-h` is left out: on its own it asks for help, and only `--host=` gives it a value.
+    // `-h` and `--host` are left out. `-h` asks for help on its own and takes the next word as the computer to run on
+    // when that word is not an option, which a value cannot say; that command would run on that other computer.
     values: {
       ...valuesOf('user', ['-u', '--user', '-U', '--other-user']),
       ...valuesOf('path', ['-D', '--chdir', '-R', '--chroot']),
@@ -784,7 +884,9 @@ export const DEV: Record<string, Entry> = {
       { privilege: 'none', touchesCredentials: false, effect: ['execute'], network: 'arbitrary', docs: 'man 1 xargs' },
     ),
     operands: ['command'],
-    values: valuesOf('text', ['-E', '-I', '-J', '-L', '-n', '-P', '-R', '-S', '-s']),
+    // `-d` and `-a` are GNU's; the macOS one has neither and stops at them.
+    values: valuesOf('text', ['-E', '-I', '-J', '-L', '-n', '-P', '-R', '-S', '-s', '-d', '--delimiter']),
+    flags: [{ flags: ['-a', '--arg-file'], takesValue: true, role: 'path', facts: { effect: ['read'] } }],
     nestedHere: true,
   },
   make: {
@@ -815,7 +917,8 @@ export const DEV: Record<string, Entry> = {
     operands: ['path', 'command'],
     values: {
       '-init': 'path',
-      ...valuesOf('text', ['-cmd', '-separator', '-nullvalue', '-newline', '-vfs', '-lookaside', '-mmap', '-pagecache']),
+      // `-lookaside` and `-pagecache` are left out: each takes two words, a size and a count, and a value is one.
+      ...valuesOf('text', ['-cmd', '-separator', '-nullvalue', '-newline', '-vfs', '-mmap']),
     },
   },
   docker: {
@@ -824,6 +927,7 @@ export const DEV: Record<string, Entry> = {
       'the packaged program, whose contents were decided by whoever built it',
       { privilege: 'root', effect: ['read', 'write', 'execute', 'elevate'], network: 'arbitrary', repeatSafe: false, touchesCredentials: true, docs: 'https://docs.docker.com/reference/cli/docker/' },
     ),
+    globals: DOCKER_GLOBALS,
     sub: {
       ps: {
         facts: fact('Lists the packaged programs running right now.', { ...LOOKS, docs: 'https://docs.docker.com/reference/cli/docker/' }),
@@ -839,32 +943,12 @@ export const DEV: Record<string, Entry> = {
         plain: ['-f', '--follow', '-t', '--timestamps', '--details'],
         values: valuesOf('text', ['--since', '-n', '--tail', '--until']),
       },
-      run: {
-        facts: opaqueFact(
-          'Starts a packaged program in its own sealed-off copy of a system.',
-          'the packaged program, whose contents were decided by whoever built it',
-          { privilege: 'none', touchesCredentials: false, effect: ['create', 'execute'], network: 'arbitrary', docs: 'https://docs.docker.com/reference/cli/docker/' },
-        ),
-        operands: ['package', 'command'],
-        values: DOCKER_RUN_VALUES,
-        flags: [
-          ENV_FILE,
-          PRIVILEGED,
-          CAP_ADD,
-          DEVICE,
-          VOLUME,
-        ],
-      },
-      exec: {
-        facts: opaqueFact(
-          'Runs another command inside a packaged program that is already running.',
-          'the command it was given, which runs inside the packaged program',
-          { privilege: 'none', touchesCredentials: false, effect: ['execute'], network: 'arbitrary', docs: 'https://docs.docker.com/reference/cli/docker/' },
-        ),
-        operands: ['text', 'command'],
-        values: valuesOf('text', ['--detach-keys', '-e', '--env', '-u', '--user', '-w', '--workdir']),
-        flags: [ENV_FILE, { ...PRIVILEGED, facts: { ...PRIVILEGED.facts, note: 'The command is given full control of the system the packaged program runs on.' } }],
-      },
+      run: DOCKER_RUN,
+      'container run': DOCKER_RUN,
+      create: DOCKER_CREATE,
+      'container create': DOCKER_CREATE,
+      exec: DOCKER_EXEC,
+      'container exec': DOCKER_EXEC,
       build: {
         facts: opaqueFact(
           'Builds a packaged program from the steps written in a folder.',
