@@ -18,11 +18,11 @@
 import { pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
 import allSpecNames from '@withfig/autocomplete'
-import { DEV, FILES, LANG, NET, SECRETS, SYSTEM } from '../src/data/index.ts'
+import { CLOUD, DEV, FILES, LANG, NET, SECRETS, SYSTEM } from '../src/data/index.ts'
 import type { Entry, FlagRule, Rule } from '../src/entry.ts'
 
 // The rows written by hand, without the same-program aliases: an alias's grammar belongs to the row it points at.
-const CURATED: Record<string, Entry> = { ...FILES, ...SYSTEM, ...NET, ...SECRETS, ...DEV, ...LANG }
+const CURATED: Record<string, Entry> = { ...FILES, ...SYSTEM, ...NET, ...SECRETS, ...DEV, ...LANG, ...CLOUD }
 
 // The slice of a Fig spec this check reads. Everything else a spec carries is completion UI.
 type FigOption = { name: string | string[]; args?: FigArg | FigArg[] }
@@ -126,6 +126,12 @@ const FIG_WRONG = new Set([
   'cargo remove --manifest-path',
   ...['-Werror', '-Wno-error'].map((f) => `cmake ${f}`), // Take a value only after `=`.
   ...['-0', '-F', '-K', '-T', '-x'].map((f) => `ruby ${f}`), // Take a value only attached: `ruby -F :` loads a file named `:`.
+  // gh: each takes a value in gh's own `--help`; Fig declares no args.
+  ...['-l', '--language', '-q', '--jq', '--json', '-t', '--template'].map((f) => `gh repo list ${f}`),
+  'gh gist view -f',
+  'gh ssh-key add -t',
+  'kubectl --dry-run', // `--dry-run` alone means `--dry-run=client`; a value only counts after `=`.
+  'kubectl --cascade', // The same: `--cascade` alone means `--cascade=background`.
 ])
 
 /** A bundle Fig spells out as its own option (`git commit -am`) is covered when its last letter takes a value. */

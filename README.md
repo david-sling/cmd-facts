@@ -344,13 +344,13 @@ resolved by exactly the same path, so a row added by a consumer behaves like a r
 
 ```ts
 import { createExplainer, BUILTIN } from 'cmd-facts'
-import kubectl from './cmd-facts/packs/acme-kubectl.json' with { type: 'json' }
+import kube from './cmd-facts/packs/acme-kube.json' with { type: 'json' }
 
 const explain = createExplainer({
-  packs:    [BUILTIN, kubectl],
+  packs:    [BUILTIN, kube],
   trust:    [BUILTIN.name],
   exclude:  ['docker'],
-  override: { curl: '@acme/net' },
+  override: { kubectl: '@acme/kube' },
 })
 ```
 
@@ -359,7 +359,7 @@ const explain = createExplainer({
 | `packs` | The packs to answer from, in order. No default and no discovery; pass `BUILTIN` to get the curated table. |
 | `trust` | Pack names whose rows keep the confidence they were written with. Everything else arrives `derived`. |
 | `exclude` | Command names nobody answers for. They resolve to `UNKNOWN`, the widest floor, not to a substitute. |
-| `override` | Command name to the pack that wins it. Required before any pack can shadow a row another pack holds. |
+| `override` | Command name to the pack that wins it. Required before any pack can shadow a row another pack holds, as `@acme/kube` does the built-in `kubectl` row here. |
 
 Everything a pack can influence is settled when `createExplainer` is called: packs are validated, conflicts resolved,
 excluded names dropped, untrusted rows lowered. A misconfigured registry throws at startup rather than at the moment
