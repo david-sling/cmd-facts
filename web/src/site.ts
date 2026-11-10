@@ -1,9 +1,9 @@
 /**
- * Where this page lives, which the tags a crawler reads cannot be relative about. Vercel hands
- * the production host to the build, so a preview or a domain of its own needs nothing changed
- * here; the fallback is the name the project deploys under.
+ * Where this page lives, which the tags a crawler reads cannot be relative about. Vite hands the
+ * build only what is named `VITE_…`, so a domain of its own is one environment variable rather
+ * than an edit here; the fallback is where the project deploys today.
  */
-const host = import.meta.env.VITE_SITE_URL ?? import.meta.env.VERCEL_PROJECT_PRODUCTION_URL
+const host = import.meta.env.VITE_SITE_URL
 
 export const SITE = host
   ? host.startsWith('http')
