@@ -699,6 +699,14 @@ export const SYSTEM: Record<string, Entry> = {
           tell: ['Signs ', { role: 'path', which: 'all', from: 'operands' }, ' with a signing key kept on this computer.'],
         },
       },
+      // Each takes its value only after `=`, and on its own falls back to a default.
+      { flags: ['--preserve-metadata'], attached: true, role: 'text', facts: {} },
+      {
+        flags: ['--extract-certificates'],
+        attached: true,
+        role: 'path',
+        facts: { effect: ['create', 'write'], note: 'It also saves the certificates behind the signature into files in this folder.' },
+      },
       {
         flags: ['--remove-signature'],
         facts: { effect: ['write'], reversible: 'unknown', says: 'Removes the signature from an app.' },

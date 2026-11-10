@@ -444,6 +444,7 @@ export const DEV: Record<string, Entry> = {
           reversible: 'no',
           docs: 'man 1 brew',
         }),
+        values: { '--prune': 'text' },
       },
       services: {
         facts: opaqueFact(

