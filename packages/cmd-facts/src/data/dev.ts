@@ -356,9 +356,9 @@ const BREW_INSTALL_VALUES: Record<string, Role> = {
 const DOCKER_RUN_VALUES: Record<string, Role> = {
   ...valuesOf('path', ['--cidfile', '--label-file']),
   ...valuesOf('text', [
-    '--add-host', '-a', '--attach', '--blkio-weight', '--blkio-weight-device', '--cap-add', '--cap-drop', '--cgroup-parent',
+    '--add-host', '-a', '--attach', '--blkio-weight', '--blkio-weight-device', '--cap-drop', '--cgroup-parent',
     '--cgroupns', '--cpu-period', '--cpu-quota', '--cpu-rt-period', '--cpu-rt-runtime', '-c', '--cpu-shares', '--cpus',
-    '--cpuset-cpus', '--cpuset-mems', '--detach-keys', '--device', '--device-cgroup-rule', '--device-read-bps',
+    '--cpuset-cpus', '--cpuset-mems', '--detach-keys', '--device-cgroup-rule', '--device-read-bps',
     '--device-read-iops', '--device-write-bps', '--device-write-iops', '--dns', '--dns-option', '--dns-search',
     '--domainname', '--entrypoint', '-e', '--env', '--expose', '--gpus', '--group-add', '--health-cmd',
     '--health-interval', '--health-retries', '--health-start-period', '--health-timeout', '-h', '--hostname', '--ip',
@@ -383,6 +383,36 @@ const VOLUME: FlagRule = {
   facts: {
     effect: ['read', 'write'],
     note: 'Folders on this computer that it is pointed at can be read and changed from inside it.',
+  },
+}
+
+const PRIVILEGED: FlagRule = {
+  flags: ['--privileged'],
+  facts: {
+    effect: ['elevate'],
+    privilege: 'root',
+    note: 'It is given full control of the system it runs on, so it is no longer sealed off from this computer.',
+  },
+}
+// The powers are named in the value, and one name (`ALL`, `SYS_ADMIN`) is as wide as `--privileged`, so the flag is
+// read as the widest of them.
+const CAP_ADD: FlagRule = {
+  flags: ['--cap-add'],
+  takesValue: true,
+  role: 'text',
+  facts: {
+    effect: ['elevate'],
+    privilege: 'root',
+    note: 'It is given extra powers over the system it runs on, and some of them reach past its sealed-off copy.',
+  },
+}
+const DEVICE: FlagRule = {
+  flags: ['--device'],
+  takesValue: true,
+  role: 'text',
+  facts: {
+    effect: ['read', 'write'],
+    note: 'A device of this computer, such as a disk, can be read and written from inside it.',
   },
 }
 
@@ -466,8 +496,8 @@ const COMPOSE_SUBS: Record<string, Rule> = {
       docs: COMPOSE,
     }),
     operands: ['text', 'command'],
-    values: { ...COMPOSE_INSIDE, ...valuesOf('text', ['-p', '--publish', '--name', '--entrypoint', '-l', '--label', '--cap-add', '--cap-drop']) },
-    flags: [VOLUME, ENV_FILE],
+    values: { ...COMPOSE_INSIDE, ...valuesOf('text', ['-p', '--publish', '--name', '--entrypoint', '-l', '--label', '--cap-drop']) },
+    flags: [VOLUME, ENV_FILE, CAP_ADD],
   },
   start: {
     facts: opaqueFact('Starts the stopped packaged programs from one file again.', COMPOSED, { effect: ['execute'], network: 'arbitrary', docs: COMPOSE }),
@@ -779,14 +809,9 @@ export const DEV: Record<string, Entry> = {
         values: DOCKER_RUN_VALUES,
         flags: [
           ENV_FILE,
-          {
-            flags: ['--privileged'],
-            facts: {
-              effect: ['elevate'],
-              privilege: 'root',
-              note: 'It is given full control of the system it runs on, so it is no longer sealed off from this computer.',
-            },
-          },
+          PRIVILEGED,
+          CAP_ADD,
+          DEVICE,
           VOLUME,
         ],
       },
@@ -798,7 +823,7 @@ export const DEV: Record<string, Entry> = {
         ),
         operands: ['text', 'command'],
         values: valuesOf('text', ['--detach-keys', '-e', '--env', '-u', '--user', '-w', '--workdir']),
-        flags: [ENV_FILE],
+        flags: [ENV_FILE, { ...PRIVILEGED, facts: { ...PRIVILEGED.facts, note: 'The command is given full control of the system the packaged program runs on.' } }],
       },
       build: {
         facts: opaqueFact(

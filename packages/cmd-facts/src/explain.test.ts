@@ -545,6 +545,18 @@ describe('flags that reach past what the row describes', () => {
     expect(effectsOf(mounted.facts)).toEqual(expect.arrayContaining(['read', 'write']))
     expect(mounted.args[0]).toEqual({ index: 3, value: '/:/host', role: 'text', flag: '-v' })
   })
+
+  it('reads extra powers and devices of this computer as reaching past the sealed-off copy', () => {
+    // The power is named in the value, and `ALL` is as wide as `--privileged`, so every one is read that wide.
+    for (const line of ['docker run --cap-add NET_ADMIN ubuntu', 'docker compose run --cap-add ALL web']) {
+      expect(explain(line).facts.privilege, line).toBe('root')
+    }
+    expect(explain('docker run --cap-drop ALL ubuntu').facts.privilege).toBe('none')
+    const device = explain('docker run --device /dev/sda ubuntu')
+    expect(effectsOf(device.facts)).toEqual(expect.arrayContaining(['read', 'write']))
+    expect(device.args[0]).toEqual({ index: 3, value: '/dev/sda', role: 'text', flag: '--device' })
+    expect(explain('docker exec --privileged web sh').facts.privilege).toBe('root')
+  })
 })
 
 describe('the command inside the command', () => {
