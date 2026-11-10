@@ -19,7 +19,7 @@ description: Every field on a fact set, the values it can take, and what a consu
 | `touchesCredentials` | Reaches secrets by nature of the program, whatever paths it was given. |
 | `repeatSafe` | Running it twice leaves the same result as running it once. |
 | `confidence` | `verified` `derived` `unknown`. |
-| `source` | `curated` `curated+flags` `name-fallback` `subcommand-miss` `nested` `plugin` `unknown`. |
+| `source` | `curated` `curated+flags` `name-fallback` `subcommand-miss` `unread` `nested` `plugin` `unknown`. |
 | `says` | One sentence, plain register, standing alone with nothing templated into it. |
 | `tell` | The same claim with slots for the command's own arguments, where a row has one. |
 | `note` | A consequence the fields cannot carry, such as that deleted files do not go to the Bin. |
@@ -56,7 +56,7 @@ An opaque fact set can never claim to be reversible or safe to repeat.
 
 `verified` is a row written for that exact command, from a pack the consumer vouched for.
 
-`derived` is a row that was not written for this command, or was not vouched for: a subcommand the table does not hold, falling back to the deliberately cautious base row; a fact set that absorbed a nested command's reach; a row from a pack that was not named in `trust`.
+`derived` is a row that was not written for this command, or was not vouched for: a subcommand the table does not hold, falling back to the deliberately cautious base row; a line carrying a flag or a word the row does not account for, named in `unread` and answered from that same base row; a fact set that absorbed a nested command's reach; a row from a pack that was not named in `trust`.
 
 `unknown` means there is no entry at all. The fields are then the widest ones — a floor rather than a measurement — and `says` admits it.
 

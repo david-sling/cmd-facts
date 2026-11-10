@@ -6,7 +6,7 @@ description: The envelope, the rows, the grammar a row may declare, and what val
 A pack is a `Pack`: an envelope whose field names are borrowed from schema.org's `SoftwareSourceCode`, and `commands`, which holds the rows. Rows are built with the same `fact()` and `opaqueFact()` the built-in table uses.
 
 ```ts
-import { fact, opaqueFact } from 'cmd-facts'
+import { fact } from 'cmd-facts'
 import type { Pack } from 'cmd-facts'
 
 export const pack: Pack = {
@@ -16,14 +16,26 @@ export const pack: Pack = {
   codeRepository: 'https://github.com/acme/cmd-facts-kube',
   commands: {
     kubectl: {
-      facts: fact('Asks a cluster what is running on it.', { reversible: 'unknown', network: 'known-host' }),
+      facts: fact('Asks a cluster what is running on it, or removes things from it.', {
+        effect: ['read', 'delete'],
+        reversible: 'no',
+        network: 'known-host',
+        privilege: 'none',
+        touchesCredentials: true,
+        repeatSafe: true,
+      }),
       sub: {
         delete: {
           facts: fact('Removes something from a cluster.', {
             effect: ['delete'],
             reversible: 'no',
             network: 'known-host',
+            privilege: 'none',
+            touchesCredentials: true,
+            repeatSafe: true,
           }),
+          operands: ['text'],
+          plain: ['--ignore-not-found'],
         },
       },
     },
@@ -36,9 +48,11 @@ export const pack: Pack = {
 ## Two ways to write a row
 
 ```ts
-fact(says, over?)
-opaqueFact(says, handsOverTo, over?)
+fact(says, over)
+opaqueFact(says, handsOverTo, over)
 ```
+
+`over` has no defaults. `fact()` needs `effect`, `reversible`, `network`, `privilege`, `touchesCredentials` and `repeatSafe`; `opaqueFact()` needs `network`, `privilege` and `touchesCredentials`, since an opaque row is never reversible or safe to repeat. A field left out would quietly read as the narrowest answer, so it is a type error instead. `LOCAL` (no network, no privilege, no secrets) and `LOOKS` (`LOCAL`, read only, nothing to undo) can be spread where those values were checked; they are claims about the command, not defaults.
 
 `fact()` builds a row for a command the library can account for in full. `opaqueFact()` builds one for a command that hands over to something it cannot see, and makes you name what that is, in the same plain register as `says`. Such a row can never claim to be reversible or safe to repeat.
 
@@ -53,11 +67,14 @@ Beyond `facts`, a row describes just enough grammar for the line to be read.
 | `operands` | Roles for the positional arguments; the last entry repeats for the rest. |
 | `flags` | Flags that change the fact set rather than the detail. Each is `{ flags, facts, takesValue?, attached?, role?, operands? }`. `attached` is a value that only counts written onto the flag, as in `sed -i.bak` or `make -j4`; `operands` replaces the row's operand roles wherever the flag appears, as `grep -e` turns every operand into a file. |
 | `values` | Flags that take a value whose role matters, where the flag changes nothing else. |
+| `plain` | Flags that were looked at and change nothing the fields carry, and take no value: `rm -v`, `curl -s`. |
 | `flagStyle` | `posix` by default; `words` turns off single-dash bundling for programs whose flags are whole words, such as `find -exec`. |
 | `sub` | Subcommands, each a row of its own. A key may run to several words, as `'pr create'` does, and the longest key the words after the program spell out answers. |
 | `versioned` | The program answers to a version-suffixed name too: `python3` reaches the `python` row. |
 | `nestedHere` | This command hands over to another one carried as separate words on the same line. |
 | `assignmentsFirst` | The command carries leading `NAME=value` settings before the command, as `env` does. |
+
+The table is closed. A flag in none of `flags`, `values` or `plain` is one the row has not read, and so is a word on a row with no `operands`. A line carrying either is answered from the program's widest row at `derived`, and `unread` on the answer names what was not read. Listing a flag in `plain` is a claim about it, so list only the ones you checked.
 
 A flag rule may only widen the claim:
 
@@ -86,7 +103,8 @@ const problems = validate(pack)   // Problem[] — each { where, says }
 
 - A row that deletes cannot say it can be put back.
 - A row that transmits cannot claim it touches no network.
-- A base row may not promise what one of its subcommands breaks, and a subcommand may not promise what a longer one under it breaks: `pr` answers for `pr lock` when the table holds `pr create` but not `pr lock`.
+- A base row has to reach as far as each of its subcommands does with its flags, since it is what a line the table cannot read falls back to, and a subcommand has to reach as far as each longer one under it: `pr` answers for `pr lock` when the table holds `pr create` but not `pr lock`. An opaque row keeps its effects as a floor.
+- A flag cannot be both `plain` and something that changes the facts or takes a value.
 - An opaque row has to name what it hands over to.
 
 It does not check register or jargon. Those are editorial, and a pack should not fail to load over a sentence that reads badly.

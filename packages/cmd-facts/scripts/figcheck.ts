@@ -11,6 +11,11 @@
  *   unlisted — the table declares a flag spelling Fig does not list. Usually Fig being incomplete; occasionally
  *              a typo in the table.
  *
+ * And one count that is not a finding about grammar: the flags Fig lists that a row has not reviewed, in none of
+ * `flags`, `values` or `plain`. A line carrying one is answered from the program's widest row at `derived`, which is
+ * honest, so each is a place where the table could say more rather than a place where it says something wrong.
+ * `--unreviewed` lists them.
+ *
  * Exits non-zero on conflicts, so it can gate CI. Missing flags and coverage gaps are reported, not failed on:
  * they are the milestone, not a regression.
  */
@@ -67,6 +72,7 @@ function declaredOf(rule: Rule, globals: FlagRule[] = []): Declared {
   for (const r of [...(rule.flags ?? []), ...globals]) {
     for (const f of r.flags) (r.takesValue ? takesValue : r.attached ? attached : bare).add(f)
   }
+  for (const f of rule.plain ?? []) bare.add(f)
   return { takesValue, bare, attached, bundles: rule.flagStyle !== 'words' }
 }
 
@@ -146,12 +152,14 @@ const FIG_WRONG = new Set([
 const bundled = (declared: Declared, s: string): boolean =>
   declared.bundles && /^-[A-Za-z0-9]{2,}$/.test(s) && declared.takesValue.has(`-${s.at(-1)}`)
 
-type Findings = { conflicts: string[]; missing: string[]; unlisted: string[] }
+type Findings = { conflicts: string[]; missing: string[]; unlisted: string[]; unreviewed: string[]; options: number }
 
 function compare(declared: Declared, options: FigOption[], where: string): Findings {
   const conflicts: string[] = []
   const missing: string[] = []
+  const unreviewed: string[] = []
   const listed = new Set<string>()
+  let seen = 0
 
   for (const o of options) {
     // `parse()` reads only a word starting with `-` as an option; `dd`'s `if=` and `lsof`'s `+d` are operands to it.
@@ -159,6 +167,9 @@ function compare(declared: Declared, options: FigOption[], where: string): Findi
     for (const s of spellings) listed.add(s)
     // `--` ends the flags; `parse()` reads it as grammar, never as an option, whatever a spec lists it as.
     if (!spellings.length || spellings.includes('--')) continue
+    seen++
+    const known = spellings.some((s) => declared.takesValue.has(s) || declared.bare.has(s) || declared.attached.has(s) || bundled(declared, s))
+    if (!known) unreviewed.push(spellings.join('/'))
     const command = where.split(' ')[0]
     if (spellings.some((s) => FIG_WRONG.has(`${where} ${s}`) || FIG_WRONG.has(`${command} ${s}`))) continue
     const label = spellings.join('/')
@@ -176,7 +187,7 @@ function compare(declared: Declared, options: FigOption[], where: string): Findi
   }
 
   const unlisted = [...declared.takesValue, ...declared.bare].filter((s) => !listed.has(s)).sort()
-  return { conflicts, missing, unlisted }
+  return { conflicts, missing, unlisted, unreviewed, options: seen }
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
@@ -184,6 +195,9 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 async function main() {
   let conflictCount = 0
   let missingCount = 0
+  let unreviewedCount = 0
+  let optionCount = 0
+  const listing = process.argv.includes('--unreviewed')
   const unmatched: string[] = []
 
   for (const [name, entry] of Object.entries(CURATED).sort(([a], [b]) => a.localeCompare(b))) {
@@ -198,8 +212,14 @@ async function main() {
       if (f.conflicts.length) lines.push(`  ${where} CONFLICT: ${f.conflicts.join('; ')}`)
       if (f.missing.length) lines.push(`  ${where} missing value flags (${f.missing.length}): ${f.missing.join(', ')}`)
       if (f.unlisted.length) lines.push(`  ${where} declared but not in fig: ${f.unlisted.join(', ')}`)
+      if (f.unreviewed.length) {
+        const which = listing ? `: ${f.unreviewed.join(', ')}` : ''
+        lines.push(`  ${where} unreviewed: ${f.unreviewed.length} of ${f.options} fig lists${which}`)
+      }
       conflictCount += f.conflicts.length
       missingCount += f.missing.length
+      unreviewedCount += f.unreviewed.length
+      optionCount += f.options
     }
 
     report('[top]', compare(declaredOf(entry, entry.globals), spec.options ?? [], name))
@@ -230,6 +250,7 @@ async function main() {
   console.log(`fig completes ${names.length} commands; the table answers for ${coveredInFig.length} of them (${Math.round((coveredInFig.length / names.length) * 100)}%)`)
   if (unmatched.length) console.log(`curated here, no fig spec: ${unmatched.join(', ')}`)
   console.log(`\n${plural(conflictCount, 'conflict')}, ${plural(missingCount, 'missing value flag')}`)
+  console.log(`${unreviewedCount} of the ${optionCount} flags fig lists for these rows are unreviewed, and answer derived`)
 
   if (conflictCount) process.exit(1)
 }
