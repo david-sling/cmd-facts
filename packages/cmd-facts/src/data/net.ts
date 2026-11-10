@@ -11,6 +11,14 @@ const WGET_SENDS: Overlay = {
   says: 'Sends information from this computer to a web address, and saves what comes back.',
 }
 
+const WGET_SETTINGS: Overlay = {
+  effect: ['write', 'transmit', 'execute'],
+  reversible: 'no',
+  touchesCredentials: true,
+  opaque: true,
+  handsOverTo: SETTINGS_RUN_HERE,
+}
+
 const SSH_SETTINGS_RUN =
   'whatever it is asked to run on the other computer, and any program its settings tell it to run on this one'
 
@@ -24,8 +32,9 @@ export const NET: Record<string, Entry> = {
     }),
     operands: ['host'],
     // The source address (`-S`) stays text: the sentence names the first host on the line, the one being checked.
+    // `-b` and `-h` take a value on macOS but are switches on Linux (broadcast, help), so they are left unread.
     values: valuesOf('text', [
-      '-b', '-c', '-G', '-g', '-h', '-I', '-i', '-k', '-K', '-l', '-M', '-m', '-P', '-p', '-S', '-s', '-T', '-t', '-W', '-z',
+      '-c', '-G', '-g', '-I', '-i', '-k', '-K', '-l', '-M', '-m', '-P', '-p', '-S', '-s', '-T', '-t', '-W', '-z',
     ]),
   },
   curl: {
@@ -57,8 +66,6 @@ export const NET: Record<string, Entry> = {
       '--resolve': 'text',
       '-x': 'host',
       '--proxy': 'host',
-      '-D': 'path',
-      '--dump-header': 'path',
       '--socks4': 'host',
       '--socks4a': 'host',
       '--socks5': 'host',
@@ -74,11 +81,6 @@ export const NET: Record<string, Entry> = {
       '--egd-file': 'path',
       '--random-file': 'path',
       '--etag-compare': 'path',
-      '--etag-save': 'path',
-      '--alt-svc': 'path',
-      '--libcurl': 'path',
-      '--trace': 'path',
-      '--trace-ascii': 'path',
       '--unix-socket': 'path',
       ...valuesOf('text', [
           '-C', '--continue-at', '-P', '--ftp-port', '-r', '--range', '-Y', '--speed-limit', '-y', '--speed-time',
@@ -157,10 +159,38 @@ export const NET: Record<string, Entry> = {
         facts: { touchesCredentials: true },
       },
       {
-        flags: ['-c', '--cookie-jar', '-E', '--cert', '--key', '--proxy-cert', '--proxy-key', '--netrc-file'],
+        flags: ['-E', '--cert', '--key', '--proxy-cert', '--proxy-key', '--netrc-file'],
         takesValue: true,
         role: 'path',
         facts: { touchesCredentials: true },
+      },
+      {
+        flags: ['-c', '--cookie-jar'],
+        takesValue: true,
+        role: 'path',
+        facts: {
+          effect: ['create', 'write'],
+          reversible: 'no',
+          touchesCredentials: true,
+          note: 'The sign-in details the site hands back are saved into the named file.',
+        },
+      },
+      {
+        flags: ['-D', '--dump-header', '--etag-save', '--alt-svc', '--libcurl'],
+        takesValue: true,
+        role: 'path',
+        facts: { effect: ['create', 'write'], reversible: 'no', note: 'It also writes into the named file, in place of what it held.' },
+      },
+      {
+        flags: ['--trace', '--trace-ascii'],
+        takesValue: true,
+        role: 'path',
+        facts: {
+          effect: ['create', 'write'],
+          reversible: 'no',
+          touchesCredentials: true,
+          note: 'Everything sent and received, sign-in details included, is also written into the named file.',
+        },
       },
       {
         // A settings file can carry any option this line could, including ones that send or save files.
@@ -198,13 +228,22 @@ export const NET: Record<string, Entry> = {
     // A jump host (`-J`) and a bind address are left as text: the sentence names the first host on the line, and
     // that has to be the computer being connected to.
     values: {
-      '-E': 'path',
       '-S': 'path',
       '-l': 'user',
-      ...valuesOf('text', ['-B', '-b', '-c', '-e', '-I', '-J', '-m', '-O', '-P', '-p', '-Q', '-R', '-W', '-w']),
+      ...valuesOf('text', ['-B', '-b', '-c', '-e', '-I', '-J', '-m', '-O', '-P', '-p', '-Q', '-W', '-w']),
     },
     flags: [
       { flags: ['-i'], takesValue: true, role: 'path', facts: { touchesCredentials: true } },
+      {
+        flags: ['-A'],
+        facts: { touchesCredentials: true, note: 'The other computer can use the sign-in keys held on this one for as long as it stays connected.' },
+      },
+      {
+        flags: ['-E'],
+        takesValue: true,
+        role: 'path',
+        facts: { effect: ['create', 'write'], note: 'It also adds a record of the connection to the named file.' },
+      },
       {
         // A setting such as ProxyCommand or LocalCommand names a program that runs here, not on the other computer.
         flags: ['-o'],
@@ -220,6 +259,16 @@ export const NET: Record<string, Entry> = {
         facts: {
           network: 'listens',
           note: 'It also opens a door on this computer: anything that connects to it is passed through to the other side.',
+        },
+      },
+      {
+        // Given only a port, this computer connects onward to wherever the other side asks.
+        flags: ['-R'],
+        takesValue: true,
+        role: 'text',
+        facts: {
+          network: 'arbitrary',
+          note: 'It also opens a door on the other computer, and what connects to it there is passed on from this one.',
         },
       },
     ],
@@ -269,7 +318,7 @@ export const NET: Record<string, Entry> = {
       ...valuesOf('pattern', ['--exclude', '--include', '-f', '--filter']),
       ...valuesOf('path', [
         '--exclude-from', '--include-from', '--files-from', '--log-file', '--backup-dir', '-T', '--temp-dir', '--partial-dir',
-        '--compare-dest', '--copy-dest', '--link-dest', '--read-batch',
+        '--compare-dest', '--copy-dest', '--link-dest', '--read-batch', '--config',
       ]),
       ...valuesOf('text', [
         '--chmod', '--chown', '--usermap', '--groupmap', '--bwlimit', '--timeout', '--max-size', '--min-size', '--suffix',
@@ -299,6 +348,17 @@ export const NET: Record<string, Entry> = {
       },
       { flags: ['--password-file'], takesValue: true, role: 'path', facts: { touchesCredentials: true } },
       {
+        // Its settings file can name programs to run before and after each copy.
+        flags: ['--daemon'],
+        facts: {
+          effect: ['execute'],
+          opaque: true,
+          handsOverTo: SETTINGS_RUN_HERE,
+          network: 'listens',
+          says: 'Waits for other computers to connect and copy files to or from this one.',
+        },
+      },
+      {
         flags: ['--write-batch', '--only-write-batch'],
         takesValue: true,
         role: 'path',
@@ -308,11 +368,13 @@ export const NET: Record<string, Entry> = {
   },
   wget: {
     facts: fact('Fetches whatever is at a web address and saves it into a file in this folder.', {
-      privilege: 'none', touchesCredentials: false, repeatSafe: true,
+      privilege: 'none', touchesCredentials: false,
       effect: ['read', 'create'],
       network: 'arbitrary',
       reversible: 'unknown',
+      repeatSafe: false,
       tell: ['Makes a request to ', { role: 'url', show: 'host', from: 'operands' }, ' and saves what comes back into this folder.'],
+      note: 'Fetching the same address again saves another copy under a new name.',
       docs: 'man 1 wget',
     }),
     operands: ['url'],
@@ -358,17 +420,40 @@ export const NET: Record<string, Entry> = {
       { flags: ['--load-cookies', '--certificate', '--private-key'], takesValue: true, role: 'path', facts: { touchesCredentials: true } },
       { flags: ['--ask-password'], facts: { touchesCredentials: true } },
       {
+        flags: ['--use-askpass'],
+        takesValue: true,
+        role: 'text',
+        facts: {
+          effect: ['execute'],
+          touchesCredentials: true,
+          opaque: true,
+          handsOverTo: 'the program named to ask for a name and password, run on this computer',
+        },
+      },
+      {
+        flags: ['--warc-file'],
+        takesValue: true,
+        role: 'path',
+        facts: {
+          effect: ['create', 'write'],
+          reversible: 'no',
+          touchesCredentials: true,
+          note: 'Every request and reply, sign-in details included, is also saved into a file with the given name.',
+        },
+      },
+      {
         flags: ['-r', '--recursive', '-m', '--mirror'],
         facts: { says: 'Fetches a web page and everything it links to on the same site, saving it all into this folder.' },
       },
       {
-        // An instruction given this way can change where files are saved, or anything else a settings file could.
+        // An instruction given this way can do anything a settings file could: change where files are saved, send a
+        // body, or name a program to ask for a password (`use_askpass`).
         flags: ['-e', '--execute'],
         takesValue: true,
         role: 'text',
-        facts: { effect: ['write'], reversible: 'no' },
+        facts: WGET_SETTINGS,
       },
-      { flags: ['--config'], takesValue: true, role: 'path', facts: { effect: ['write'], reversible: 'no' } },
+      { flags: ['--config'], takesValue: true, role: 'path', facts: WGET_SETTINGS },
       {
         flags: ['--save-cookies'],
         takesValue: true,
@@ -434,7 +519,8 @@ export const NET: Record<string, Entry> = {
   },
   netstat: {
     facts: fact("Shows this computer's network connections, and how its traffic is sent on.", { ...LOOKS, docs: 'man 1 netstat' }),
-    values: valuesOf('text', ['-f', '-I', '-p', '-w']),
+    // `-p` and `-w` take a value on macOS but are switches on Linux, and `-I` takes it only after `=` there.
+    values: valuesOf('text', ['-f']),
   },
   ifconfig: {
     facts: fact('Shows or changes the settings of the network connections on this computer.', {
@@ -470,6 +556,17 @@ export const NET: Record<string, Entry> = {
       {
         flags: ['-s', '-S'],
         facts: { effect: ['configure'], reversible: 'unknown', privilege: 'admin', says: 'Adds an entry to the list that matches network addresses to nearby devices.' },
+      },
+      {
+        flags: ['-f'],
+        takesValue: true,
+        role: 'path',
+        facts: {
+          effect: ['configure'],
+          reversible: 'unknown',
+          privilege: 'admin',
+          says: 'Adds the entries listed in a file to the list that matches network addresses to nearby devices.',
+        },
       },
     ],
   },
