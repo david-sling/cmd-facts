@@ -1,5 +1,5 @@
 import { fact, opaqueFact, valuesOf, LOCAL, LOOKS } from '../entry.ts'
-import type { Entry } from '../entry.ts'
+import type { Entry, FlagRule } from '../entry.ts'
 import type { Overlay } from '../facts.ts'
 
 const GONE = 'Files removed this way do not go to the Bin and cannot be put back.'
@@ -13,6 +13,18 @@ const FINGERPRINT = (docs: string): Entry => ({
   }),
   operands: ['path'],
 })
+
+const LOG: FlagRule = {
+  flags: ['-o', '--log-file', '-O', '--LOG-FILE'],
+  takesValue: true,
+  role: 'path',
+  facts: {
+    effect: ['create', 'write'],
+    reversible: 'no',
+    says: 'Shows what is written inside a file, a screenful at a time, and saves a copy into another file.',
+    tell: ['Shows what is written inside ', { role: 'path', from: 'operands' }, ' and saves a copy into ', { role: 'path', from: '-o' }, '.'],
+  },
+}
 
 const XATTR_REMOVES: Overlay = {
   effect: ['configure', 'delete'],
@@ -160,7 +172,8 @@ export const FILES: Record<string, Entry> = {
       },
     ],
   },
-  df: { facts: fact('Shows how much room is left on each disk.', { ...LOOKS, docs: 'man 1 df' }), values: { '-T': 'text' } },
+  // `-T` is left out: it takes a kind of disk on macOS, and takes nothing on Linux, where it shows each disk's kind.
+  df: { facts: fact('Shows how much room is left on each disk.', { ...LOOKS, docs: 'man 1 df' }) },
   du: {
     facts: fact('Shows how much room files and folders take up.', { ...LOOKS, docs: 'man 1 du' }),
     operands: ['path'],
@@ -380,10 +393,26 @@ export const FILES: Record<string, Entry> = {
     }),
     plain: ['-s', '--symbolic', '-v', '--verbose', '-i', '--interactive', '-n', '-h', '--no-dereference', '-w', '-L', '-P'],
     operands: ['path'],
+    values: { '-S': 'text', '--suffix': 'text' },
     flags: [
       {
         flags: ['-f', '--force'],
         facts: { effect: ['delete'], reversible: 'no', note: 'A file already at the new name is replaced, and is not kept.' },
+      },
+      {
+        // On macOS this also removes a folder in the way; on Linux it asks to join folders, which reaches no further.
+        flags: ['-F'],
+        facts: { effect: ['delete'], reversible: 'no', note: 'A file or folder already at the new name is removed, and is not kept.' },
+      },
+      {
+        // Linux only: the folder the new names go into comes first, and every operand is something they lead to.
+        flags: ['-t', '--target-directory'],
+        takesValue: true,
+        role: 'path',
+        facts: {
+          says: 'Puts a second name for a file or folder inside another folder.',
+          tell: ['Puts a second name for ', { role: 'path', which: 'all', from: 'operands' }, ' inside ', { role: 'path', from: '-t' }, '.'],
+        },
       },
     ],
   },
@@ -447,7 +476,7 @@ export const FILES: Record<string, Entry> = {
     operands: ['path'],
     values: {
       ...valuesOf('path', ['-T', '--temporary-directory', '--random-source', '--files0-from']),
-      ...valuesOf('text', ['-k', '--key', '-t', '--field-separator', '-S', '--buffer-size', '--batch-size', '--sort']),
+      ...valuesOf('text', ['-k', '--key', '-t', '--field-separator', '-S', '--buffer-size', '--batch-size', '--sort', '--parallel']),
     },
     flags: [
       {
@@ -472,7 +501,7 @@ export const FILES: Record<string, Entry> = {
   cut: {
     facts: fact('Shows only some columns or letters from each line of text.', { ...LOOKS, docs: 'man 1 cut' }),
     operands: ['path'],
-    values: valuesOf('text', ['-b', '-c', '-d', '-f', '--bytes', '--characters', '--delimiter', '--fields']),
+    values: valuesOf('text', ['-b', '-c', '-d', '-f', '--bytes', '--characters', '--delimiter', '--fields', '--output-delimiter']),
   },
   tr: {
     facts: fact('Swaps or removes letters in text as it passes through.', { ...LOOKS, docs: 'man 1 tr' }),
@@ -490,6 +519,7 @@ export const FILES: Record<string, Entry> = {
       ...valuesOf('path', ['-X', '--exclude-from', '--from-file', '--to-file']),
       ...valuesOf('text', [
         '-U', '-C', '-L', '--label', '-F', '--show-function-line', '-W', '--width', '-D', '--ifdef', '-S', '--starting-file',
+        '-A', '--algorithm', '--tabsize',
         '--horizon-lines', '--old-group-format', '--new-group-format', '--unchanged-group-format', '--changed-group-format',
         '--line-format', '--old-line-format', '--new-line-format', '--unchanged-line-format',
       ]),
@@ -509,31 +539,21 @@ export const FILES: Record<string, Entry> = {
       ...valuesOf('path', ['-k', '--lesskey-file', '-T', '--tag-file']),
       ...valuesOf('text', [
         '-b', '--buffers', '-D', '--color', '-h', '--max-back-scroll', '-j', '--jump-target', '-P', '--prompt', '-t', '--tag',
-        '-x', '--tabs', '-y', '--max-forw-scroll', '-z', '--window', '--wheel-lines',
+        '-x', '--tabs', '-y', '--max-forw-scroll', '-z', '--window', '--wheel-lines', '-#', '--shift',
       ]),
     },
-    flags: [
-      {
-        flags: ['-o', '--log-file', '-O', '--LOG-FILE'],
-        takesValue: true,
-        role: 'path',
-        facts: {
-          effect: ['create', 'write'],
-          reversible: 'no',
-          says: 'Shows what is written inside a file, a screenful at a time, and saves a copy into another file.',
-          tell: ['Shows what is written inside ', { role: 'path', from: 'operands' }, ' and saves a copy into ', { role: 'path', from: '-o' }, '.'],
-        },
-      },
-    ],
+    flags: [LOG],
   },
   more: {
     facts: opaqueFact(
       'Shows what is written inside a file, a screenful at a time.',
       'whatever is typed into it while it is open, since it can start other commands',
-      { ...LOCAL, effect: ['read'], tell: ['Shows what is written inside ', { role: 'path' }, ', a screenful at a time.'], docs: 'man 1 more' },
+      { ...LOCAL, effect: ['read'], tell: ['Shows what is written inside ', { role: 'path', from: 'operands' }, ', a screenful at a time.'], docs: 'man 1 more' },
     ),
     operands: ['path'],
     values: { '-n': 'text', '--lines': 'text' },
+    // On macOS this is the same program as less, and takes the same log file.
+    flags: [LOG],
   },
   file: {
     facts: fact('Shows what kind of contents something on this computer holds, such as a picture or plain text.', {
@@ -543,6 +563,17 @@ export const FILES: Record<string, Entry> = {
     }),
     operands: ['path'],
     values: { ...valuesOf('path', ['-m', '-M', '-f']), ...valuesOf('text', ['-e', '--exclude', '-F', '--separator', '-P', '--parameter']) },
+    flags: [
+      {
+        flags: ['-C', '--compile'],
+        facts: {
+          effect: ['create', 'write'],
+          reversible: 'no',
+          says: 'Turns its list of known kinds of contents into a ready-to-use copy, saved in the current folder.',
+          note: 'A copy already there with the same name is replaced.',
+        },
+      },
+    ],
   },
   stat: {
     facts: fact('Shows the details of a file, such as its size, its owner and when it last changed.', {
@@ -551,11 +582,13 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 stat',
     }),
     operands: ['path'],
-    values: valuesOf('text', ['-f', '-t', '-c', '--format', '--printf']),
+    // `-f` and `-t` are left out: on macOS each takes a format, on Linux each takes nothing and changes what is shown.
+    values: valuesOf('text', ['-c', '--format', '--printf']),
   },
   realpath: {
     facts: fact('Shows the full location of a file on this computer.', { ...LOOKS, docs: 'man 1 realpath' }),
     operands: ['path'],
+    values: { '--relative-to': 'path', '--relative-base': 'path' },
   },
   readlink: {
     facts: fact('Shows where a second name for a file leads.', { ...LOOKS, docs: 'man 1 readlink' }),
@@ -576,7 +609,8 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 base64',
     }),
     operands: ['path'],
-    values: { '-i': 'path', '--input': 'path', '-b': 'text', '--break': 'text', '-w': 'text', '--wrap': 'text' },
+    // `-i` is left out: it takes the file to read on macOS, and takes nothing on Linux, where it skips stray letters.
+    values: { '--input': 'path', '-b': 'text', '--break': 'text', '-w': 'text', '--wrap': 'text' },
     flags: [
       {
         flags: ['-o', '--output'],
@@ -587,7 +621,18 @@ export const FILES: Record<string, Entry> = {
     ],
   },
   shasum: { ...FINGERPRINT('man 1 shasum'), values: { '-a': 'text', '--algorithm': 'text' } },
-  md5: FINGERPRINT('man 1 md5'),
+  md5: {
+    ...FINGERPRINT('man 1 md5'),
+    values: valuesOf('text', ['-c', '--check']),
+    flags: [
+      {
+        flags: ['-s', '--string'],
+        takesValue: true,
+        role: 'text',
+        facts: { says: 'Works out a short fingerprint of a piece of text, which comes out different if anything in it changes.' },
+      },
+    ],
+  },
   md5sum: FINGERPRINT('man 1 md5sum'),
   sha256sum: FINGERPRINT('man 1 sha256sum'),
   sha1sum: FINGERPRINT('man 1 sha1sum'),
@@ -601,7 +646,13 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 zip',
     }),
     operands: ['path'],
-    values: { '-b': 'path', '-O': 'path', '--output-file': 'path', '-n': 'text', '--suffixes': 'text', '-s': 'text', '--split-size': 'text' },
+    values: {
+      ...valuesOf('path', ['-b', '-O', '--output-file']),
+      ...valuesOf('text', [
+        '-n', '--suffixes', '-s', '--split-size', '-t', '--from-date', '-tt', '--before-date', '-Z', '--compression-method',
+        '-ds', '--dot-size',
+      ]),
+    },
     flags: [
       {
         flags: ['-d', '--delete'],
@@ -622,6 +673,8 @@ export const FILES: Record<string, Entry> = {
         },
       },
       { flags: ['-P', '--password'], takesValue: true, role: 'text', facts: { touchesCredentials: true } },
+      { flags: ['-e', '--encrypt'], facts: { touchesCredentials: true } },
+      { flags: ['-lf', '--logfile-path'], takesValue: true, role: 'path', facts: { reversible: 'no' } },
       {
         flags: ['-TT', '--unzip-command'],
         takesValue: true,
@@ -685,19 +738,32 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 xattr',
     }),
     operands: ['path'],
-    values: { '-p': 'text' },
+    plain: ['-l', '-s', '-v', '-x'],
+    // `-p`, `-d` and `-w` choose what to do, and take nothing: the label's name is the first operand, so other
+    // options can sit between them and it, as in `-dr name folder`.
     flags: [
-      { flags: ['-d'], takesValue: true, role: 'text', facts: XATTR_REMOVES },
+      {
+        flags: ['-p'],
+        operands: ['text', 'path'],
+        facts: {
+          says: 'Shows what one of the hidden labels macOS keeps on a file holds.',
+          tell: ['Shows what the hidden label ', { role: 'text', from: 'operands' }, ' holds on ', { role: 'path', which: 'all' }, '.'],
+        },
+      },
+      { flags: ['-d'], operands: ['text', 'path'], facts: XATTR_REMOVES },
       { flags: ['-c'], facts: XATTR_REMOVES },
       {
-        // `-w name value file`: the value written is the first operand, and the files come after it.
         flags: ['-w'],
-        takesValue: true,
-        role: 'text',
-        operands: ['text', 'path'],
-        facts: { effect: ['configure', 'write'], reversible: 'unknown', says: 'Puts a hidden label on a file, or changes one already there.' },
+        operands: ['text', 'text', 'path'],
+        facts: {
+          effect: ['configure', 'write'],
+          reversible: 'unknown',
+          says: 'Puts a hidden label on a file, or changes one already there.',
+          tell: ['Puts a hidden label on ', { role: 'path', which: 'all' }, ', or changes one already there.'],
+        },
       },
-      { flags: ['-r'], facts: { says: 'Works on the hidden labels of everything kept inside a folder.' } },
+      // A note rather than a sentence, so the sentence still says what is done to the labels.
+      { flags: ['-r'], facts: { note: 'Given a folder, it does the same to every file kept inside it.' } },
     ],
   },
   chflags: {

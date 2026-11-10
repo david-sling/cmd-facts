@@ -278,19 +278,25 @@ export const SECRETS: Record<string, Entry> = {
     values: {
       ...valuesOf('path', ['-f', '-s']),
       '-F': 'host',
-      ...valuesOf('text', ['-t', '-b', '-C', '-E', '-I', '-n', '-O', '-V', '-z', '-Y', '-m', '-a', '-D', '-M', '-r', '-w', '-Z']),
+      ...valuesOf('text', ['-t', '-b', '-C', '-E', '-I', '-n', '-O', '-V', '-z', '-Y', '-m', '-a', '-M', '-r', '-Z']),
     },
     flags: [
       { flags: ['-N', '-P'], takesValue: true, role: 'text', facts: { touchesCredentials: true } },
+      {
+        flags: ['-D', '-w'],
+        takesValue: true,
+        role: 'path',
+        facts: { effect: ['execute'], opaque: true, handsOverTo: 'the library it was told to load, whose code runs as part of it' },
+      },
       {
         flags: ['-R'],
         takesValue: true,
         role: 'host',
         facts: {
           effect: ['write'],
-          reversible: 'no',
+          reversible: 'with-backup',
           says: 'Removes a computer from the list of computers this one has connected to before.',
-          note: 'The next connection to that computer is not checked against what it showed last time.',
+          note: 'The next connection to that computer is not checked against what it showed last time; the old list is kept, ending in .old.',
         },
       },
     ],
@@ -308,8 +314,17 @@ export const SECRETS: Record<string, Entry> = {
     flags: [
       { flags: ['-D'], facts: { says: 'Takes every key out of the program that keeps keys ready for signing in.' } },
       {
-        flags: ['-K', '--apple-use-keychain'],
+        flags: ['--apple-use-keychain'],
         facts: { effect: ['write'], reversible: 'unknown', note: 'The password for the key is also saved in the macOS password store.' },
+      },
+      {
+        // Apple's own copy still reads `-K` the old way; elsewhere it fetches keys from a plugged-in device.
+        flags: ['-K'],
+        facts: {
+          effect: ['write'],
+          reversible: 'unknown',
+          note: 'On a Mac this also saves the password for the key in the macOS password store; elsewhere it loads keys kept on a hardware key.',
+        },
       },
     ],
   },
