@@ -10,7 +10,8 @@ const NAV = ['Fields', 'Packs', 'Schema']
 
 function Home() {
   return (
-    <main className="min-h-screen bg-bg pb-32">
+    // past this the hero's line length and the demo's two columns stop reading as one page
+    <main className="mx-auto min-h-screen max-w-[1600px] bg-bg pb-32">
       <header className="flex items-center justify-between px-6 py-5 sm:px-10 lg:px-14">
         <a href="/" className="font-mono text-[15px] tracking-[0.04em] text-ink">
           cmd-facts
