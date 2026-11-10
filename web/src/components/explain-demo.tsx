@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import {
   ArrowUpRight,
   BadgeCheck,
@@ -18,7 +18,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { effectsOf, explain } from 'cmd-facts'
-import type { Effect, Facts } from 'cmd-facts'
+import type { ArgSlot, Effect, Facts, Part } from 'cmd-facts'
 import { SlideUpText } from '#/components/slide-up-text'
 
 const EXAMPLES = [
@@ -51,6 +51,13 @@ const TONE_RING: Record<Tone, string> = {
 }
 
 const SPRING = { type: 'spring', stiffness: 380, damping: 32, mass: 0.85 } as const
+
+/** How long one example is left up while the demo is playing itself, in seconds. */
+const DWELL = 7
+
+/** The words and the values they surround ride in on one movement, so they read as one line. */
+const SLIDE = { type: 'tween', ease: [0.625, 0.05, 0, 1], duration: 0.5 } as const
+const STAGGER = 0.022
 
 /** Collapsed, the body hides inside the circle; open, it is the card under the pill. */
 const BODY = {
@@ -94,6 +101,8 @@ type Pill = {
   field: string
   text: string
   tone: Tone
+  /** The schema keys this one reads, so opening it can point at them in the object beside it. */
+  keys: readonly string[]
 }
 
 const EFFECT_WORD: Record<Effect, string> = {
@@ -128,12 +137,14 @@ function pillsFor(facts: Facts) {
     {
       icon: Zap,
       field: 'effect',
+      keys: ['effect', 'effectAtLeast'],
       text: facts.opaque ? `at least ${effectText}` : effectText,
       tone: effectTone(effects),
     },
     {
       icon: RotateCcw,
       field: 'reversibility',
+      keys: ['reversible'],
       ...(facts.reversible === 'yes'
         ? { text: 'reversible', tone: 'good' as Tone }
         : facts.reversible === 'no'
@@ -145,6 +156,7 @@ function pillsFor(facts: Facts) {
     {
       icon: Globe,
       field: 'network',
+      keys: ['network'],
       ...(facts.network === 'none'
         ? { text: 'no network', tone: 'good' as Tone }
         : facts.network === 'known-host'
@@ -156,6 +168,7 @@ function pillsFor(facts: Facts) {
     {
       icon: KeyRound,
       field: 'privilege',
+      keys: ['privilege'],
       ...(facts.privilege === 'none'
         ? { text: 'unprivileged', tone: 'good' as Tone }
         : facts.privilege === 'admin'
@@ -165,6 +178,7 @@ function pillsFor(facts: Facts) {
     {
       icon: Fingerprint,
       field: 'credentials',
+      keys: ['touchesCredentials'],
       ...(facts.touchesCredentials
         ? { text: 'touches credentials', tone: 'bad' as Tone }
         : { text: 'no credentials', tone: 'good' as Tone }),
@@ -172,6 +186,7 @@ function pillsFor(facts: Facts) {
     {
       icon: Repeat,
       field: 'repeats',
+      keys: ['repeatSafe'],
       ...(facts.repeatSafe
         ? { text: 'repeat-safe', tone: 'good' as Tone }
         : { text: 'not repeat-safe', tone: 'bad' as Tone }),
@@ -179,6 +194,7 @@ function pillsFor(facts: Facts) {
     {
       icon: facts.opaque ? EyeOff : Eye,
       field: 'visibility',
+      keys: ['opaque', 'handsOverTo'],
       ...(facts.opaque
         ? { text: 'hands over to something unseen', tone: 'bad' as Tone }
         : { text: 'nothing hidden', tone: 'good' as Tone }),
@@ -186,6 +202,7 @@ function pillsFor(facts: Facts) {
     {
       icon: BadgeCheck,
       field: 'confidence',
+      keys: ['confidence'],
       ...(facts.confidence === 'verified'
         ? { text: 'verified', tone: 'good' as Tone }
         : facts.confidence === 'derived'
@@ -514,11 +531,322 @@ function IslandField({
   )
 }
 
+/** Several values read as a list, the way the library joins them for `sentence`. */
+const listed = (values: string[]) =>
+  values.length <= 1
+    ? (values[0] ?? '')
+    : `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`
+
+/**
+ * One value off the command line, shown as a value rather than as prose: a file named
+ * `approved by admin` has to be visibly the command's own text and not the row's words. What is
+ * printed can be shorter than what was written — `show: 'host'` keeps the host and drops the rest —
+ * so hovering it gives back the argument as it was typed, and the role it was read as.
+ */
+function Value({
+  part,
+  args,
+  delay,
+  spaceAfter,
+}: {
+  part: Extract<Part, { kind: 'values' }>
+  args: ArgSlot[]
+  delay: number
+  spaceAfter: boolean
+}) {
+  // the parts carry the shortened text; the line's own arguments are where the whole of it still is
+  const of = args.filter((arg) => arg.role === part.role)
+  const written = of.length === part.values.length ? of.map((arg) => arg.value) : part.values
+  const shortened = written.join(' ') !== part.values.join(' ')
+
+  return (
+    <span className={`group relative inline-flex ${spaceAfter ? 'pr-[0.26em]' : ''}`}>
+      <span className="inline-flex overflow-hidden">
+        <motion.span
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          transition={{ ...SLIDE, delay }}
+          className="inline-block"
+        >
+          <button
+            type="button"
+            aria-label={`${part.role}: ${written.join(', ')}`}
+            className="cursor-help rounded-[0.15em] bg-pink/[0.07] px-[0.14em] font-mono text-[0.78em] text-pink underline decoration-pink/30 decoration-dotted underline-offset-[0.3em] transition-colors group-hover:bg-pink/15 group-hover:decoration-pink"
+          >
+            {listed(part.values)}
+          </button>
+        </motion.span>
+      </span>
+
+      {/* the clip above would cut this off, so it hangs off the wrapper instead */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute bottom-full left-0 z-20 mb-2 block w-max max-w-[min(26rem,60vw)] rounded-lg border border-line-2 bg-panel-2 px-3 py-2 text-left opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+      >
+        {written.map((value) => (
+          <span key={value} className="block break-all font-mono text-[12.5px] leading-snug text-ink">
+            {value}
+          </span>
+        ))}
+        <span className="mt-1.5 block font-mono text-[10.5px] tracking-[0.08em] text-ink-3 uppercase">
+          {part.role}
+          {part.flag ? ` · ${part.flag}` : ''}
+          {shortened ? ' · as written' : ''}
+        </span>
+      </span>
+    </span>
+  )
+}
+
+/**
+ * The sentence from `parts`, not from `sentence`: the row's words and the command's own text are
+ * rendered apart, which is what the library asks a consumer to do wherever it has somewhere to put
+ * the values. A row with no `tell` has one text part, and this is the line it always was.
+ */
+function Spoken({ parts, args }: { parts: Part[]; args: ArgSlot[] }) {
+  // every word already spoken, so a value slides in on the beat its words would have had
+  let spoken = 0
+
+  return (
+    <>
+      {parts.map((part, index) => {
+        const delay = spoken * STAGGER
+
+        if (part.kind === 'text') {
+          // the space that followed a value belongs to the value, so a line that wraps here
+          // starts on the margin instead of a space in
+          const text = parts[index - 1]?.kind === 'values' ? part.text.replace(/^ +/, '') : part.text
+          spoken += text.split(' ').length
+          return (
+            <SlideUpText
+              key={index}
+              delay={delay}
+              stagger={STAGGER}
+              transition={SLIDE}
+              className="font-light"
+            >
+              {text}
+            </SlideUpText>
+          )
+        }
+
+        spoken += 1
+        const next = parts[index + 1]
+        return (
+          <Value
+            key={index}
+            part={part}
+            args={args}
+            delay={delay}
+            spaceAfter={next?.kind === 'text' && next.text.startsWith(' ')}
+          />
+        )
+      })}
+    </>
+  )
+}
+
+/**
+ * The schema's own order, not the order a row happened to be written in: the object answers the
+ * same questions in the same places for every command, the way the circles do.
+ */
+const FIELD_ORDER = [
+  'opaque',
+  'effect',
+  'effectAtLeast',
+  'handsOverTo',
+  'reversible',
+  'network',
+  'privilege',
+  'touchesCredentials',
+  'repeatSafe',
+  'confidence',
+  'source',
+  'says',
+  'tell',
+  'note',
+  'docs',
+] as const
+
+/** Braces, quotes and commas are the furniture; only the values are meant to be read. */
+const PUNCT = 'text-ink-3/60'
+
+/** One printed line, hanging-indented so a wrapped sentence stays clear of its own key. */
+function Line({ depth, children }: { depth: number; children: React.ReactNode }) {
+  return (
+    <div
+      className="-mx-2 rounded pr-2"
+      style={{ paddingLeft: `calc(0.5rem + ${depth * 1.6 + 1.6}ch)`, textIndent: '-1.6ch' }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function JsonValue({ value }: { value: unknown }) {
+  if (typeof value === 'string')
+    return (
+      <span className={PUNCT}>
+        &apos;<span className="text-ink">{value}</span>&apos;
+      </span>
+    )
+
+  if (typeof value === 'boolean') return <span className="text-pink">{String(value)}</span>
+
+  if (Array.isArray(value))
+    // a list of plain values reads at a glance; one with a slot in it is folded, because a
+    // sentence cut into pieces costs four lines to say what the line beside it already says
+    return value.some((item) => item && typeof item === 'object') ? (
+      <FoldedArray key={JSON.stringify(value)} value={value} />
+    ) : (
+      <span className={PUNCT}>
+        [
+        {value.map((item, index) => (
+          <span key={index}>
+            {index > 0 ? ', ' : ''}
+            <JsonValue value={item} />
+          </span>
+        ))}
+        ]
+      </span>
+    )
+
+  // a slot stays on one line: it is a value in a sentence, not a block of its own
+  if (value && typeof value === 'object')
+    return (
+      <span className={PUNCT}>
+        {'{ '}
+        {Object.entries(value).map(([key, inner], index) => (
+          <span key={key}>
+            {index > 0 ? ', ' : ''}
+            <span className="text-ink-2">{key}</span>: <JsonValue value={inner} />
+          </span>
+        ))}
+        {' }'}
+      </span>
+    )
+
+  return <span className="text-ink-2">{String(value)}</span>
+}
+
+/** Folded, it is the one word `[…]`; open, it is the list, and clicking it anywhere folds it back. */
+function FoldedArray({ value }: { value: unknown[] }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-label={open ? 'fold this list' : `unfold this list of ${value.length}`}
+      onClick={() => setOpen((current) => !current)}
+      className={`inline cursor-pointer text-left transition-colors hover:text-ink-2 ${PUNCT}`}
+    >
+      [
+      {open
+        ? value.map((item, index) => (
+            <span key={index}>
+              {index > 0 ? ', ' : ''}
+              <JsonValue value={item} />
+            </span>
+          ))
+        : '\u2026'}
+      ]
+    </button>
+  )
+}
+
+function Field({
+  name,
+  value,
+  depth,
+  lit,
+  comma,
+}: {
+  name: string
+  value: unknown
+  depth: number
+  lit: boolean
+  comma: boolean
+}) {
+  return (
+    <div
+      className={`-mx-2 rounded pr-2 transition-colors duration-200 ${lit ? 'bg-white/[0.05]' : ''}`}
+      style={{ paddingLeft: `calc(0.5rem + ${depth * 1.6 + 1.6}ch)`, textIndent: '-1.6ch' }}
+    >
+      <span className={`transition-colors duration-200 ${lit ? 'text-pink' : 'text-ink-2'}`}>
+        {name}
+      </span>
+      <span className={PUNCT}>: </span>
+      <JsonValue value={value} />
+      {comma ? <span className={PUNCT}>,</span> : null}
+    </div>
+  )
+}
+
+/**
+ * What `explain()` actually handed back. The line beside this is `sentence`, and `sentence` is
+ * `says` with this command's own arguments in it wherever the row carries a `tell` — so the two
+ * are shown together, with the fields underneath them that a consumer really builds on.
+ * Opening a circle lights the keys it was read from: the halves are one object.
+ */
+function ReturnedObject({
+  sentence,
+  facts,
+  highlight,
+}: {
+  sentence: string
+  facts: Facts
+  highlight: readonly string[]
+}) {
+  // a row that carries no `tell` or `note` has the key with nothing under it; an absent field is
+  // absent from the object too, rather than printing as `undefined`
+  const rows = FIELD_ORDER.filter(
+    (key) => key in facts && (facts as unknown as Record<string, unknown>)[key] !== undefined,
+  ).map((key) => [key, (facts as unknown as Record<string, unknown>)[key]] as const)
+
+  return (
+    <div className="font-mono text-[11.5px] leading-[1.75] sm:text-[12px]">
+      <span className={PUNCT}>{'{'}</span>
+
+      <Field name="sentence" value={sentence} depth={0} lit={false} comma />
+
+      <Line depth={0}>
+        <span className="text-ink-2">facts</span>
+        <span className={PUNCT}>: {'{'}</span>
+      </Line>
+      {rows.map(([key, value], index) => (
+        <Field
+          key={key}
+          name={key}
+          value={value}
+          depth={1}
+          lit={highlight.includes(key)}
+          comma={index < rows.length - 1}
+        />
+      ))}
+      <Line depth={0}>
+        <span className={PUNCT}>{'},'}</span>
+      </Line>
+
+      {/* the rest of the explanation is real and is not hidden, only not printed here */}
+      <Line depth={0}>
+        <span className="text-ink-3/50">// parts, args, program, escalated, attribution</span>
+      </Line>
+
+      <span className={PUNCT}>{'}'}</span>
+    </div>
+  )
+}
+
 export function ExplainDemo() {
   const [command, setCommand] = useState(EXAMPLES[0])
+  // the demo plays itself until someone takes the dropdown; after that it stays where it was put
+  const [picked, setPicked] = useState(false)
+  const reduced = useReducedMotion()
+  const playing = !picked && !reduced
   // hover opens a card; focus and tap open the same one, so the fields are reachable without a pointer
   const [open, setOpen] = useState<number | null>(null)
-  const { sentence, facts, attribution } = explain(command)
+  const { sentence, parts, args, facts, attribution } = explain(command)
   const pack = attribution[0]?.pack
   const pills = pillsFor(facts)
 
@@ -528,7 +856,7 @@ export function ExplainDemo() {
   return (
     // one console: the two lines you would type, a rule, and what came back, sharing a
     // gutter of prompt marks the way a devtools scrollback does
-    <div className="max-w-[820px] rounded-2xl border border-line bg-panel">
+    <div className="rounded-2xl border border-line bg-panel">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 rounded-t-2xl bg-white/[0.015] px-5 pb-4 pt-5 sm:px-7">
         <div className="min-w-0 font-mono text-[12.5px] leading-relaxed sm:text-[14px]">
           <div className="flex gap-3.5">
@@ -559,10 +887,30 @@ export function ExplainDemo() {
                   aria-hidden
                   className="pointer-events-none absolute right-1 size-3.5 text-ink-3"
                 />
+                {/* the dashed rule under the command is also the clock: it fills left to right,
+                    and the example changes where it runs out */}
+                {playing ? (
+                  <motion.span
+                    key={command}
+                    aria-hidden
+                    className="absolute inset-x-0 -bottom-px block h-px origin-left bg-pink"
+                    initial={{ scaleX: 0 }}
+                    animate={{ scaleX: 1 }}
+                    transition={{ duration: DWELL, ease: 'linear' }}
+                    onAnimationComplete={() =>
+                      setCommand(
+                        (current) => EXAMPLES[(EXAMPLES.indexOf(current) + 1) % EXAMPLES.length],
+                      )
+                    }
+                  />
+                ) : null}
                 <select
                   aria-label="Command to explain"
                   value={command}
-                  onChange={(event) => setCommand(event.target.value)}
+                  onChange={(event) => {
+                    setPicked(true)
+                    setCommand(event.target.value)
+                  }}
                   className="absolute inset-0 w-full cursor-pointer opacity-0 outline-none focus:outline-none focus-visible:outline-none"
                 >
                   {EXAMPLES.map((example) => (
@@ -590,79 +938,82 @@ export function ExplainDemo() {
         </a>
       </div>
 
-      <div className="flex gap-3.5 border-t border-line px-5 pb-[50px] pt-6 sm:px-7">
-        {/* what the line above returned */}
-        <CornerDownRight
-          aria-hidden
-          className="mt-[14px] size-4 shrink-0 text-pink/70"
-        />
+      <div className="border-t border-line lg:flex lg:items-stretch">
+        <div className="flex min-w-0 flex-1 gap-3.5 px-5 pb-[50px] pt-6 sm:px-7">
+          {/* what the line above returned */}
+          <CornerDownRight
+            aria-hidden
+            className="mt-[14px] size-4 shrink-0 text-pink/70"
+          />
 
-        <div className="min-w-0 flex-1">
-          <p className="text-[clamp(1.75rem,2.9vw,2.75rem)] leading-[1.18] tracking-[-0.025em] text-ink">
-            {/* the key replays the slide on every new sentence; the stagger is per word, so a
-                long sentence needs a short one or the last word arrives seconds after the first */}
-            <SlideUpText
-              key={sentence}
-              stagger={0.022}
-              transition={{ type: 'tween', ease: [0.625, 0.05, 0, 1], duration: 0.5 }}
-              className="font-light"
+          <div className="min-w-0 flex-1">
+            <p className="flex max-w-[640px] flex-wrap items-baseline text-[clamp(1.75rem,2.9vw,2.75rem)] leading-[1.18] tracking-[-0.025em] text-ink">
+              {/* the key replays the slide on every new sentence; the stagger is per word, so a
+                  long sentence needs a short one or the last word arrives seconds after the first */}
+              <Spoken key={sentence} parts={parts} args={args} />
+            </p>
+
+            {/* `note` is a consequence the fields cannot carry; not every row has one */}
+            <p className="mt-5 max-w-[52ch] text-[15px] leading-relaxed text-ink-3">
+              {facts.note}
+            </p>
+
+        {/* one circle per field. Opening one grows the circle itself into a card, the way a
+            notification unfolds: the icon never moves, so the card reads as the same object. */}
+        <svg aria-hidden className="pointer-events-none absolute size-0">
+          <defs>
+            <filter
+              id="island-goo"
+              x="-12%"
+              y="-12%"
+              width="124%"
+              height="124%"
+              colorInterpolationFilters="sRGB"
             >
-              {sentence}
-            </SlideUpText>
-          </p>
-
-          {/* `note` is a consequence the fields cannot carry; not every row has one */}
-          <p className="mt-5 max-w-[52ch] text-[15px] leading-relaxed text-ink-3">
-            {facts.note}
-          </p>
-
-      {/* one circle per field. Opening one grows the circle itself into a card, the way a
-          notification unfolds: the icon never moves, so the card reads as the same object. */}
-      <svg aria-hidden className="pointer-events-none absolute size-0">
-        <defs>
-          <filter
-            id="island-goo"
-            x="-12%"
-            y="-12%"
-            width="124%"
-            height="124%"
-            colorInterpolationFilters="sRGB"
-          >
-            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
-            <feColorMatrix
-              in="blur"
-              type="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -12"
-            />
-          </filter>
-        </defs>
-      </svg>
-
-          <ul className="mt-10 flex flex-wrap gap-2.5">
-            {pills.map((pill, index) => (
-              <IslandField
-                key={pill.field}
-                pill={pill}
-                index={index}
-                count={pills.length}
-                isOpen={open === index}
-                onOpen={() => setOpen(index)}
-                onClose={() => close(index)}
-                onToggle={() =>
-                  setOpen((current) => (current === index ? null : index))
-                }
+              <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+              <feColorMatrix
+                in="blur"
+                type="matrix"
+                values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -12"
               />
-            ))}
-          </ul>
+            </filter>
+          </defs>
+        </svg>
+
+            <ul className="mt-10 flex flex-wrap gap-2.5">
+              {pills.map((pill, index) => (
+                <IslandField
+                  key={pill.field}
+                  pill={pill}
+                  index={index}
+                  count={pills.length}
+                  isOpen={open === index}
+                  onOpen={() => setOpen(index)}
+                  onClose={() => close(index)}
+                  onToggle={() =>
+                    setOpen((current) => (current === index ? null : index))
+                  }
+                />
+              ))}
+            </ul>
+          </div>
+
         </div>
 
-        {/* a console names the source of the line it printed; here that is the pack the
-            facts came from */}
-        {pack ? (
-          <span className="hidden shrink-0 self-start pt-2 font-mono text-[11px] text-ink-3/70 sm:block">
-            {pack}
-          </span>
-        ) : null}
+        {/* the same answer unrendered: the sentence and the fields it was written from */}
+        <aside className="border-t border-line px-5 pb-8 pt-6 sm:px-7 lg:w-[380px] lg:shrink-0 lg:border-l lg:border-t-0 lg:pb-[50px] xl:w-[420px]">
+          {/* a console names the source of what it printed; here that is the pack the facts came from */}
+          <div className="mb-4 flex items-baseline justify-between gap-4 font-mono text-[11px] text-ink-3/70">
+            <span>the object it returned</span>
+            {pack ? <span className="shrink-0">{pack}</span> : null}
+          </div>
+
+          <ReturnedObject
+            sentence={sentence}
+            facts={facts}
+            highlight={open === null ? [] : pills[open].keys}
+          />
+        </aside>
       </div>
     </div>
   )
