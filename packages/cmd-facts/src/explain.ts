@@ -2,6 +2,7 @@ import { effectsOf, merge } from './facts.ts'
 import type { Facts } from './facts.ts'
 import { buildRegistry } from './registry.ts'
 import type { Registry, RegistryOptions } from './registry.ts'
+import { reach } from './entry.ts'
 import type { FlagRule, Role, Rule } from './entry.ts'
 import { tokenize } from './line.ts'
 import type { Op, Step } from './line.ts'
@@ -44,6 +45,12 @@ export type Explanation = {
   args: ArgSlot[]
   /** Flags on this command line that widened the fact set, in the form the table declares them. */
   escalated: string[]
+  /**
+   * Words on this command line the row does not account for: a flag nobody has looked at for this command, or an
+   * argument where the row expects none. What they do is not known, so `facts` is the program's widest row at
+   * `derived` rather than the row for this command, and the arguments after an unread flag carry no role.
+   */
+  unread?: string[]
   /**
    * The command this one hands over to, where that command is on this same line and runs on this computer:
    * `sudo rm -rf x`, `xargs rm`, `env FOO=1 node app.js`, `find . -exec rm {} +`. Its `args` indexes point into the
@@ -156,8 +163,13 @@ function unionByPack(outer: Attribution[], inner: Attribution[]): Attribution[] 
 const BUNDLE = /^-[A-Za-z0-9]./
 const LETTER = /[A-Za-z0-9]/
 
-/** `role` set means a value is owed; `attachedOnly` means it may only come from the word itself. */
-type FlagRead = { matched: FlagRule[]; role?: Role; owner: string; inline?: string; attachedOnly?: true }
+/**
+ * `role` set means a value is owed; `attachedOnly` means it may only come from the word itself. `read` is false where
+ * the table has not looked at the flag, or at one letter of the bundle, for this row.
+ */
+type FlagRead = { matched: FlagRule[]; role?: Role; owner: string; inline?: string; attachedOnly?: true; read: boolean }
+
+const isPlain = (rule: Rule, flag: string) => (rule.plain ?? []).includes(flag)
 
 /**
  * One flag word, read the way getopt reads it. A word the table declares whole is that one flag. Otherwise a bundle
@@ -165,7 +177,7 @@ type FlagRead = { matched: FlagRule[]; role?: Role; owner: string; inline?: stri
  * word is that value, or the next word is when nothing is left. `-sX POST` and `-sXPOST` both hand POST to `-X`,
  * and none of the letters after `-X` is read as a flag of its own. A letter whose value may only be attached takes
  * what is left of the word, and nothing when nothing is left. A word that reaches anything but a letter before a
- * value starts is not a bundle at all, so `-1.5` stays one word.
+ * value starts is not a bundle at all, so `-1.5` stays one word. A bundle is read only if every letter in it is.
  */
 function readFlag(rule: Rule, spelled: string): FlagRead {
   const eq = spelled.indexOf('=')
@@ -173,26 +185,29 @@ function readFlag(rule: Rule, spelled: string): FlagRead {
   const inline = eq > 1 ? spelled.slice(eq + 1) : undefined
   const rules = rule.flags ?? []
   const exact = rules.filter((r) => r.flags.includes(head))
-  if (exact.length || rule.values?.[head] || rule.flagStyle === 'words' || !BUNDLE.test(spelled)) {
+  const whole = exact.length > 0 || rule.values?.[head] !== undefined || isPlain(rule, head)
+  if (whole || rule.flagStyle === 'words' || !BUNDLE.test(spelled)) {
     const taker = exact.findLast((m) => m.takesValue || (m.attached && inline !== undefined))
     // The flag a value belongs to is reported as the table declares it.
     const role = taker?.role ?? rule.values?.[head]
-    return { matched: exact, role, owner: taker?.flags[0] ?? head, inline, ...(taker?.attached ? { attachedOnly: true } : {}) }
+    const only = taker?.attached ? { attachedOnly: true as const } : {}
+    return { matched: exact, role, owner: taker?.flags[0] ?? head, inline, ...only, read: whole }
   }
   const matched: FlagRule[] = []
   for (let k = 1; k < spelled.length; k++) {
-    if (!LETTER.test(spelled[k]!)) return { matched: [], owner: head }
+    if (!LETTER.test(spelled[k]!)) return { matched: [], owner: head, read: false }
     const letter = `-${spelled[k]}`
     const here = rules.filter((r) => r.flags.includes(letter))
+    if (!here.length && rule.values?.[letter] === undefined && !isPlain(rule, letter)) return { matched, owner: head, read: false }
     matched.push(...here)
     const rest = spelled.slice(k + 1) || undefined
     const attached = here.findLast((m) => m.attached)
-    if (attached) return { matched, role: attached.role, owner: attached.flags[0]!, inline: rest, attachedOnly: true }
+    if (attached) return { matched, role: attached.role, owner: attached.flags[0]!, inline: rest, attachedOnly: true, read: true }
     const taker = here.findLast((m) => m.takesValue)
     const role = taker?.role ?? rule.values?.[letter]
-    if (role) return { matched, role, owner: taker?.flags[0] ?? letter, inline: rest }
+    if (role) return { matched, role, owner: taker?.flags[0] ?? letter, inline: rest, read: true }
   }
-  return { matched, owner: head }
+  return { matched, owner: head, read: true }
 }
 
 type Spoken = { word: string; at: number }
@@ -217,6 +232,7 @@ function roleAt(operands: Role[] | undefined, n: number): Role {
 function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
   const args: ArgSlot[] = []
   const escalated: string[] = []
+  const unread: string[] = []
   let out = facts
   let operand = 0
   let literal = false
@@ -238,7 +254,11 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
     // `tar xf a.tar` carries its flags as a bare first word (the old option style), read as if it were `-xf`.
     const bare = rule.bareFlagsFirst === true && i === start && !literal && !isFlag(token) && /^[A-Za-z]+$/.test(token)
     if (!literal && (isFlag(token) || bare)) {
-      const { matched, role, owner, inline, attachedOnly } = readFlag(rule, bare ? `-${token}` : token)
+      const { matched, role, owner, inline, attachedOnly, read } = readFlag(rule, bare ? `-${token}` : token)
+      if (!read) {
+        unread.push(token)
+        continue
+      }
       for (const m of matched) {
         if (m.operands) moved = m.operands
         if (!Object.keys(m.facts).length) continue
@@ -252,6 +272,14 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
       }
       continue
     }
+    // A row that declares no operands, and has no flag that gives it some, was not written to be pointed at anything,
+    // so a word here is one it has not read.
+    if (!rule.operands?.length && !(rule.flags ?? []).some((f) => f.operands?.length)) unread.push(token)
+    // After a flag nobody has read, the word that follows may be that flag's value, so no position is certain.
+    if (unread.length) {
+      args.push({ index: i, value: token, role: 'unknown' })
+      continue
+    }
     const role = roleAt(rule.operands, operand++)
     positional.push(args.length)
     args.push({ index: i, value: token, role })
@@ -259,7 +287,7 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
   }
   // The flag can come after the operands it changes (`grep foo -e bar notes.txt`), so they are settled last.
   if (moved) for (const [n, at] of positional.entries()) args[at] = { ...args[at]!, role: roleAt(moved, n) }
-  return { facts: out, args, escalated: [...new Set(escalated)] }
+  return { facts: out, args, escalated: [...new Set(escalated)], unread }
 }
 
 const MAX_DEPTH = 4
@@ -321,7 +349,7 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
   // subcommand the table does not hold.
   const steps: Spoken[] = []
   const between: { at: number; args: ArgSlot[]; rules: FlagRule[] }[] = []
-  let unread = false
+  let stuck = false
   if (wantsSub) {
     let i = cursor
     while (i < argv.length) {
@@ -333,8 +361,8 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
       const sofar = longestRow(entry.sub!, steps)
       if (!sofar) break
       const read = readFlag(entry.sub![sofar.key]!, token)
-      if (!read.matched.length && !read.role) {
-        unread = true
+      if (!read.read) {
+        stuck = true
         break
       }
       const rules = read.matched.filter((m) => Object.keys(m.facts).length)
@@ -356,7 +384,7 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
   const longer = subKey !== undefined && Object.keys(entry.sub!).some((k) => k.startsWith(`${subKey} `))
   const deeper = longer && next !== undefined
   // An option the subcommand does not declare may be hiding the rest of it, as one before the subcommand can.
-  const hidden = longer && !deeper && unread
+  const hidden = longer && !deeper && stuck
   const after = next?.word
   // The last word of the subcommand: what the line says after it is read as usual, options stepped over included.
   const end = deeper ? next!.at : subKey !== undefined ? steps[spoken - 1]!.at : wantsSub ? cursor : cursor - 1
@@ -368,32 +396,39 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
   // A word the table holds no row for, and a leading option it does not declare, both leave the exact subcommand
   // unresolved, so the base row (or the shorter subcommand) answers at `derived` either way.
   const missed = entry.sub !== undefined && word !== undefined && !sub
-  const derived = { confidence: 'derived', source: 'subcommand-miss' } as const
-  const base: Facts = sub
-    ? deeper || hidden
-      ? merge(sub.facts, derived)
-      : sub.facts
-    : missed
-      ? merge(entry.facts, derived)
-      : entry.facts
-  const seeded = preRules.reduce(
-    (acc, g) => merge(acc, { ...g.facts, source: 'curated+flags' as const }),
-    trimmed ? merge(base, { source: 'name-fallback' }) : base,
-  )
+  const seed = (base: Facts) =>
+    preRules.reduce(
+      (acc, g) => merge(acc, { ...g.facts, source: 'curated+flags' as const }),
+      trimmed ? merge(base, { source: 'name-fallback' }) : base,
+    )
+  // What stands in for this subcommand where the line is not read in full: the subcommand itself where a word or an
+  // option may be hiding a longer one under it, else the longest shorter subcommand the table holds (`s3` for `s3 cp`),
+  // else the program's own row. `validate()` holds each to everything the ones under it reach.
+  const partial = deeper || hidden
+  const shorter = subKey?.split(' ').map((_, k, all) => all.slice(0, all.length - 1 - k).join(' ')).find((w) => w && Object.hasOwn(entry.sub!, w))
+  const standIn = partial ? { key: subKey!, rule: sub! } : shorter ? { key: shorter, rule: entry.sub![shorter]! } : { key: undefined, rule: entry as Rule }
+  const widest = (source: 'subcommand-miss' | 'unread') => merge(reach(standIn.rule), { confidence: 'derived', source })
 
-  const stepped = parse(argv, start, rule, seeded)
-  const parsed =
-    preArgs.length || preRules.length
-      ? {
-          facts: stepped.facts,
-          args: [...preArgs, ...stepped.args],
-          escalated: [...new Set([...preRules.map((g) => g.flags[0]!), ...stepped.escalated])],
-        }
-      : stepped
+  // The row answers for the line only where the table has read every word of it. A flag it has not looked at, or a
+  // word where it expects none, could be doing anything the program can do, so the line is answered from the row
+  // that stands in for this one instead, the same as an unrecognised subcommand.
+  const fell = missed || partial ? 'subcommand-miss' : 'unread'
+  const first = parse(argv, start, rule, seed(sub && !partial ? sub.facts : sub || missed ? widest('subcommand-miss') : entry.facts))
+  const stepped = first.unread.length ? parse(argv, start, rule, seed(widest(fell))) : first
+  const unread = stepped.unread.length ? { unread: stepped.unread } : {}
+  const parsed = {
+    // A flag that widened the answer on the way does not make it a row written for this line.
+    facts: stepped.unread.length ? merge(stepped.facts, { source: fell }) : stepped.facts,
+    args: [...preArgs, ...stepped.args],
+    escalated: [...new Set([...preRules.map((g) => g.flags[0]!), ...stepped.escalated])],
+    ...unread,
+  }
   const head = { program, name, key, origin: origin.pack, ...(wantsSub ? { subcommand: deeper ? `${subKey} ${after}` : (subKey ?? word) } : {}) }
-  // The row that answered, not the words on the line: an unrecognised subcommand was answered by the base row.
+  // The row that answered, not the words on the line: an unrecognised subcommand was answered by the base row, and a
+  // line read only in part by the row standing in for its subcommand.
+  const answered = stepped.unread.length && !partial ? standIn.key : subKey
   const own: Attribution[] = [
-    { pack: origin.pack, version: origin.version, trusted: origin.trusted, commands: [sub ? `${key} ${subKey}` : key] },
+    { pack: origin.pack, version: origin.version, trusted: origin.trusted, commands: [answered !== undefined ? `${key} ${answered}` : key] },
   ]
 
   const wanted = nestedAt(argv, parsed.args, rule)
