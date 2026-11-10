@@ -10,7 +10,7 @@ Everything here answers one question: if this runs, what happens to this compute
 
 ## Early stage
 
-The command table is hand-written and still small, so an explanation can be incomplete or wrong: a sentence that
+cmd-facts is early and the table is still small, so an explanation can be incomplete or wrong: a sentence that
 misses what a flag does, a fact set narrower than what the command can actually reach, an argument read as the wrong
 kind of thing. A command with no row at all comes back as the widest floor, with a `says` that admits it.
 
@@ -21,8 +21,8 @@ Report anything that reads wrong — the command you ran, what came back, and wh
 
 Both are labelled [`inaccurate-explanation`](https://github.com/david-sling/cmd-facts/issues?q=is%3Aissue+label%3Ainaccurate-explanation).
 
-Gate on `confidence` until coverage settles. `verified` is a row written by hand for that exact command, from a pack
-you trust, and it is the only tier that should feed an automatic decision.
+Gate on `confidence` until coverage settles. `verified` means a row exists for that exact command, from a pack you
+trust, and it is the only tier that should feed an automatic decision.
 
 ## The schema is the deliverable
 

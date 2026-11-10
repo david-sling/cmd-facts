@@ -6,8 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        The command table is hand-written and still small, so explanations can be wrong. Thanks for
-        reporting one.
+        Coverage is still small, so explanations can be wrong. Thanks for reporting one.
 
         For a command with no row at all, use the **Command with no row** form instead.
   - type: input

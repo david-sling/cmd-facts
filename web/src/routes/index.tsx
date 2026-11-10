@@ -71,8 +71,7 @@ function Home() {
         <ExplainDemo />
         {/* the demo answers any line typed into it, so the page has to say how complete the table is */}
         <p className="mt-5 max-w-[78ch] text-[14px] leading-relaxed text-ink-3">
-          The command table is hand-written and still small, so an answer here can be incomplete or
-          wrong.{' '}
+          The table is still small, so an answer here can be incomplete or wrong.{' '}
           <a
             href={REPORT_URL}
             target="_blank"
@@ -106,8 +105,8 @@ function Home() {
       <footer className="mx-4 mt-24 border-t border-line pt-8 sm:mx-8 lg:mx-14">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <p className="max-w-[46ch] text-[14px] leading-relaxed text-ink-3">
-            Early stage. The command table is hand-written and still small, so an explanation can
-            be incomplete or wrong. Reports are what fix a row.
+            Early stage. The table is still small, so an explanation can be incomplete or wrong.
+            Reports are what fix a row.
           </p>
           <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[14px] text-ink-2">
             <a href="/docs" className="transition-colors hover:text-ink">
