@@ -104,6 +104,10 @@ const FIG_WRONG = new Set([
   'sed -i',
   'sed -I',
   'zip -d', // A switch: the entries to remove are the operands after the packed file.
+  'crontab -u', // Takes the account whose schedule it works on; Fig declares no args.
+  ...['-a', '-b', '-c', '-u'].map((f) => `pmset ${f}`), // Switches choosing which power source a setting applies to.
+  'sysctl -e', // A switch.
+  'pkill -q', // A switch on macOS; only GNU's `--queue` takes a value.
   'ps -a', // A switch on macOS.
   'top -b', // Not a macOS option; a switch where it exists.
   'unzip -l', // Switches.

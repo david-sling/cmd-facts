@@ -327,6 +327,21 @@ describe('flags that reach past what the row describes', () => {
     expect(explain('zip out.zip notes.txt').facts.opaque).toBe(false)
   })
 
+  it('reads the account and scheduling tools as reaching past one command', () => {
+    // Listing the schedule and replacing it read the same: the line cannot say which it is.
+    for (const line of ['crontab -l', 'crontab jobs.txt']) expect(explain(line).facts.opaque, line).toBe(true)
+    expect(explain('dscl . -read /Users/alex').facts.touchesCredentials).toBe(false)
+    expect(explain('dscl . -passwd /Users/alex').facts.touchesCredentials).toBe(true)
+    expect(explain('dscl -u admin -P hunter2 . -read /Users/alex').facts.touchesCredentials).toBe(true)
+    expect(explain('sysadminctl -deleteUser alex').facts.reversible).toBe('no')
+    expect(explain('pbpaste').facts.touchesCredentials).toBe(true)
+  })
+
+  it('reads a signal named as a word as a signal, not as a bundle', () => {
+    expect(roles('pkill -HUP nginx')).toEqual(['nginx:pattern'])
+    expect(roles('pgrep -u root sshd')).toEqual(['root:user', 'sshd:pattern'])
+  })
+
   it('reads a curl settings file as able to send and save', () => {
     const got = explain('curl -K ./opts https://example.com')
     expect(effectsOf(got.facts)).toEqual(expect.arrayContaining(['transmit', 'write', 'create']))
