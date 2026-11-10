@@ -599,7 +599,8 @@ export const DEV: Record<string, Entry> = {
       { effect: ['read', 'create', 'write', 'execute'], network: 'arbitrary', docs: 'man 1 make' },
     ),
     operands: ['text'],
-    // `-j` is left out: the number of jobs is optional, and `make -j build` names a target, not a count.
+    // The number of jobs is optional, so it counts only written onto the flag: `make -j build` names a target.
+    flags: [{ flags: ['-j', '--jobs'], attached: true, role: 'text', facts: {} }],
     values: valuesOf('path', [
       '-C', '--directory', '-f', '--file', '--makefile', '-I', '--include-dir', '-o', '--old-file', '--assume-old',
       '-W', '--what-if', '--new-file', '--assume-new',

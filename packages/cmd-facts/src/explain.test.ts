@@ -88,6 +88,16 @@ describe('escalating flags', () => {
     expect(roles('curl -sX POST https://example.com')).toEqual(['POST:text', 'https://example.com:url'])
   })
 
+  it('takes an optional value only when it is written onto the flag', () => {
+    expect(roles('make -j4 install')).toEqual(['4:text', 'install:text'])
+    expect(run('make -j4 install').args[0]).toEqual({ index: 1, value: '4', role: 'text', flag: '-j' })
+    // On its own the flag takes nothing, so the next word is still the target.
+    expect(roles('make -j install')).toEqual(['install:text'])
+    expect(explain('make --jobs=4 install').args[0]).toEqual({ index: 1, value: '4', role: 'text', flag: '-j' })
+    // A word that reaches anything but a letter before any value starts is not a bundle.
+    expect(roles('make -1.5 install')).toEqual(['install:text'])
+  })
+
   it('reads the rest of a bundle as the value once a letter takes one', () => {
     expect(run('curl -XPOST https://example.com').args[0]).toEqual({ index: 1, value: 'POST', role: 'text', flag: '-X' })
     // The letters after `-X` are its value, so the `-T` and `-E` in `DELETE` do not widen anything.

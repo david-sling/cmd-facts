@@ -186,7 +186,8 @@ function checkRule(bad: Bad, where: string, rule: Rule) {
     }
     for (const flag of f.flags) if (!flag.startsWith('-')) bad(at, `\`${flag}\` has to be declared with its dash.`)
     if (f.role && !has(ROLES, f.role)) bad(at, `\`${f.role}\` is not a known role.`)
-    if (f.role && !f.takesValue) bad(at, 'A flag that gives its value a role has to take a value.')
+    if (f.role && !f.takesValue && !f.attached) bad(at, 'A flag that gives its value a role has to take a value.')
+    if (f.attached && f.takesValue) bad(at, 'A flag takes its value from the next word or only attached to itself, not both.')
     if (f.operands !== undefined) {
       if (!Array.isArray(f.operands) || !f.operands.length) bad(at, '`operands` on a flag lists at least one role.')
       else for (const role of f.operands) if (!has(ROLES, role)) bad(at, `\`${role}\` in \`operands\` is not a known role.`)
@@ -194,7 +195,7 @@ function checkRule(bad: Bad, where: string, rule: Rule) {
       if (Array.isArray(f.operands) && f.operands.includes('command')) bad(at, 'A flag cannot move another command into a position.')
       if (rule.operands?.includes('command')) bad(at, 'A flag cannot change the operands of a row whose operands hold a command.')
     }
-    if (!Object.keys(f.facts ?? {}).length && !f.takesValue) bad(at, 'A flag that changes nothing and takes no value does not belong in the table.')
+    if (!Object.keys(f.facts ?? {}).length && !f.takesValue && !f.attached) bad(at, 'A flag that changes nothing and takes no value does not belong in the table.')
     if (f.role === 'command' && !(rule.facts?.opaque || f.facts?.opaque === true)) {
       bad(at, 'A flag that holds another command has to leave the row opaque.')
     }

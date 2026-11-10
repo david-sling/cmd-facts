@@ -44,6 +44,12 @@ export type FlagRule = {
   takesValue?: boolean
   role?: Role
   /**
+   * The flag takes a value only when it is written onto the flag itself, never from the next word: `sed -i.bak`,
+   * `make -j4`, `--in-place=.bak`. Written on its own, as `sed -i` or `make -j build`, it takes nothing, and the word
+   * after it is read on its own. An optional value, in getopt's terms. Not together with `takesValue`.
+   */
+  attached?: boolean
+  /**
    * Roles for the positional arguments wherever this flag is on the line, in place of the row's own: `grep -e foo
    * notes.txt` takes its pattern from the flag, so every operand is a file. Never a `command`, and never on a row
    * whose operands hold one, because the handover is found while the line is still being read.
