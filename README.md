@@ -8,6 +8,28 @@ assumed never to have opened a terminal. **It is not a man-page browser and not 
 `-a` does not ignore entries starting with a dot, and it will not tell you that your command could be written better.
 Everything here answers one question: if this runs, what happens to this computer?
 
+## This is early, and the explanations can be wrong
+
+The rows are hand-written, one command at a time, and there are not many of them yet. Expect both kinds of gap: a
+command nothing answers for, which comes back as the widest floor with a `says` that admits it, and — the one that
+matters — a command that is answered confidently and answered wrong. A sentence that misses what a flag does, a
+fact set narrower than what the command can actually reach, an argument read as the wrong kind of thing.
+
+A wrong answer above a command someone is about to approve is the worst failure this project has. Reports are the
+only way the table gets correct, so they are worth more here than almost anywhere else.
+
+**[Report an inaccurate explanation →](https://github.com/david-sling/cmd-facts/issues/new?template=inaccurate-explanation.yml)**
+&nbsp;·&nbsp;
+[Report a command nothing answers for →](https://github.com/david-sling/cmd-facts/issues/new?template=missing-command.yml)
+
+Both land on the
+[`inaccurate-explanation`](https://github.com/david-sling/cmd-facts/issues?q=is%3Aissue+label%3Ainaccurate-explanation)
+label, which is where the accuracy backlog lives. Say what you ran, what came back, and what it should have said.
+
+Until the table settles, gate on `confidence`: `verified` is a row hand-written for that exact command from a pack
+you vouched for, and it is the only tier that should ever feed an automatic decision. Everything else is a floor,
+and the point of showing it is that a person gets to look at it.
+
 ## The schema is the deliverable
 
 `explain()` returns fields. The plain-English sentence is one rendering of those fields, not the product. A consumer

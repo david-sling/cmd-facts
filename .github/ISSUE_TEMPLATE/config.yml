@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: What this library deliberately does not do
+    url: https://cmd-facts.vercel.app/docs/reference/limits
+    about: No risk score, no footgun notes, no model at run time. Check here before filing those.

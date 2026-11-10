@@ -1,0 +1,29 @@
+name: Missing command
+description: A command nothing in the table answers for.
+title: '[missing] '
+labels: ['inaccurate-explanation', 'coverage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Coverage is early and grows a row at a time. An unknown command returns the widest floor and
+        a `says` that admits it — that is working as intended, but the row is still worth writing.
+  - type: input
+    id: command
+    attributes:
+      label: The command line
+      placeholder: kubectl delete pod web-7f9
+    validations:
+      required: true
+  - type: textarea
+    id: does
+    attributes:
+      label: What it does to the computer
+      description: In plain terms, for someone who has never opened a terminal. A link to the official docs helps.
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where it comes up
+      description: The approval surface or workflow this showed up in, if you can say.
