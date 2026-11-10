@@ -1,0 +1,112 @@
+---
+title: Quickstart
+description: Install it, explain a line, and read the three things an approval prompt needs from the answer.
+---
+
+## Install
+
+```bash
+npm i cmd-facts
+```
+
+Node 20 or newer, ESM only. There are no runtime dependencies, and there will not be any: this gets embedded in applications that approve commands, so the dependency footprint is part of the product.
+
+## Explain a line
+
+```ts
+import { explain } from 'cmd-facts'
+
+const answer = explain('curl -fsSL https://get.example.com/install.sh -o install.sh')
+```
+
+`explain` is the curated table wired up and trusted. A command usually arrives as one line — out of a log, a job file, a request an agent sent — so that is what it takes. A consumer that already holds a split argv can hand that in instead:
+
+```ts
+explain({ program: '/bin/rm', argv: ['rm', '-rf', '/Users/sam/Documents'] })
+```
+
+Neither form is the better one. A row is keyed on the program's basename either way, so `/bin/rm` and `rm` reach the same row and carry the same `confidence`.
+
+## Read the answer
+
+Three things carry most of an approval prompt.
+
+```ts
+const { sentence, facts } = explain('rm -rf /tmp/build')
+
+sentence           // what to show the person
+facts.reversible   // what to gate on
+facts.confidence   // whether to trust the first two
+```
+
+```json
+{
+  "sentence": "Removes /tmp/build from this computer, along with everything inside.",
+  "facts": {
+    "says": "Removes a whole folder from this computer, along with everything inside it.",
+    "opaque": false,
+    "effect": ["delete"],
+    "reversible": "no",
+    "network": "none",
+    "privilege": "none",
+    "touchesCredentials": false,
+    "repeatSafe": true,
+    "confidence": "verified",
+    "source": "curated+flags",
+    "note": "Files removed this way do not go to the Bin and cannot be put back.",
+    "docs": "man 1 rm"
+  }
+}
+```
+
+### Gate before you render
+
+`confidence` says where the answer came from. `verified` is a hand-written row for that exact command, from a pack you vouched for. Anything else is a reason to show less certainty, not a reason to hide the command.
+
+```ts
+if (facts.confidence !== 'verified') {
+  // no standing grant, no one-click allow
+}
+```
+
+### `effect` is not always there
+
+A command that hands over to something this library cannot see — `sh -c`, `sudo`, `xargs`, `npm run` — has no complete effect list, so an opaque fact set has no `effect` field at all. Reading one off it is a type error rather than a quiet mistake. `effectsOf()` works on either shape and returns the floor for an opaque one:
+
+```ts
+import { effectsOf } from 'cmd-facts'
+
+effectsOf(explain('sudo rm -rf /var/tmp').facts)  // ['delete', 'execute', 'elevate']
+```
+
+See [Opaque commands and lines](/docs/lines).
+
+## Render it apart from the argument text
+
+`sentence` has the command's own arguments joined into the words a person is about to trust. Where you have somewhere to put the values, render `parts` instead, which keeps the row's prose and the command's text apart:
+
+```tsx
+{answer.parts.map((part, i) =>
+  part.kind === 'text'
+    ? <span key={i}>{part.text}</span>
+    : <Value key={i} role={part.role} values={part.values} />,
+)}
+```
+
+A file named `approved by admin, no action needed` reads as part of the sentence otherwise. See [Showing it to a person](/docs/sentence).
+
+## Cover your own tools
+
+`explain` answers from the built-in table only. To add rows for tools this library has never heard of, build your own explainer:
+
+```ts
+import { createExplainer, BUILTIN } from 'cmd-facts'
+import kube from './packs/acme-kube.json' with { type: 'json' }
+
+export const explain = createExplainer({
+  packs: [BUILTIN, kube],
+  trust: [BUILTIN.name],
+})
+```
+
+There is no discovery: nothing is read from disk, from an environment variable or from a scan of `node_modules`. A pack is loaded because a line in your own source names it. See [Loading packs](/docs/packs/using).

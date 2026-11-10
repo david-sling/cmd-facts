@@ -15,13 +15,18 @@ function Home() {
         <a href="/" className="font-mono text-[15px] tracking-[0.04em] text-ink">
           cmd-facts
         </a>
-        <a
-          href="https://github.com/david-sling/cmd-facts"
-          aria-label="cmd-facts on GitHub"
-          className="text-ink-2 transition-colors hover:text-ink"
-        >
-          <Github aria-hidden className="size-[19px]" />
-        </a>
+        <nav className="flex items-center gap-6">
+          <a href="/docs" className="text-[15px] text-ink-2 transition-colors hover:text-ink">
+            Docs
+          </a>
+          <a
+            href="https://github.com/david-sling/cmd-facts"
+            aria-label="cmd-facts on GitHub"
+            className="text-ink-2 transition-colors hover:text-ink"
+          >
+            <Github aria-hidden className="size-[19px]" />
+          </a>
+        </nav>
       </header>
 
       {/* the hero card: mist is its surface, and the only light on the page */}

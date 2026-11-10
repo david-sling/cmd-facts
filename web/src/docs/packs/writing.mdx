@@ -1,0 +1,125 @@
+---
+title: Writing a pack
+description: The envelope, the rows, the grammar a row may declare, and what validate() refuses to load.
+---
+
+A pack is a `Pack`: an envelope whose field names are borrowed from schema.org's `SoftwareSourceCode`, and `commands`, which holds the rows. Rows are built with the same `fact()` and `opaqueFact()` the built-in table uses.
+
+```ts
+import { fact, opaqueFact } from 'cmd-facts'
+import type { Pack } from 'cmd-facts'
+
+export const pack: Pack = {
+  name: '@acme/kube',
+  version: '2.4.0',
+  license: 'MIT',
+  codeRepository: 'https://github.com/acme/cmd-facts-kube',
+  commands: {
+    kubectl: {
+      facts: fact('Asks a cluster what is running on it.', { reversible: 'unknown', network: 'known-host' }),
+      sub: {
+        delete: {
+          facts: fact('Removes something from a cluster.', {
+            effect: ['delete'],
+            reversible: 'no',
+            network: 'known-host',
+          }),
+        },
+      },
+    },
+  },
+}
+```
+
+`name` has to be unique across the packs one consumer loads: it is the name `trust` and `override` refer to.
+
+## Two ways to write a row
+
+```ts
+fact(says, over?)
+opaqueFact(says, handsOverTo, over?)
+```
+
+`fact()` builds a row for a command the library can account for in full. `opaqueFact()` builds one for a command that hands over to something it cannot see, and makes you name what that is, in the same plain register as `says`. Such a row can never claim to be reversible or safe to repeat.
+
+If you are unsure which to write, the question is not how dangerous the command is. It is whether the fields could ever be complete. A tool that runs a hook, a plugin, a script or a subprocess is opaque, however tidy its own behaviour.
+
+## What a row may declare
+
+Beyond `facts`, a row describes just enough grammar for the line to be read.
+
+| Field | What it does |
+|---|---|
+| `operands` | Roles for the positional arguments; the last entry repeats for the rest. |
+| `flags` | Flags that change the fact set rather than the detail. Each is `{ flags, facts, takesValue?, role? }`. |
+| `values` | Flags that take a value whose role matters, where the flag changes nothing else. |
+| `flagStyle` | `posix` by default; `words` turns off single-dash bundling for programs whose flags are whole words, such as `find -exec`. |
+| `sub` | Subcommands, each a row of its own. |
+| `versioned` | The program answers to a version-suffixed name too: `python3` reaches the `python` row. |
+| `nestedHere` | This command hands over to another one carried as separate words on the same line. |
+| `assignmentsFirst` | The command carries leading `NAME=value` settings before the command, as `env` does. |
+
+A flag rule may only widen the claim:
+
+```ts
+{
+  flags: ['-o', '--output'],
+  takesValue: true,
+  role: 'path',
+  facts: { effect: ['read', 'write', 'create'], reversible: 'no', note: '…' },
+}
+```
+
+### `nestedHere` is off by default
+
+Turning it on says three things are true: the nested command runs on *this* computer, it is carried as separate words on *this* line, and it can therefore be looked up with the same tables. A command held inside one string would have to be split to be read, and splitting a string is reading meaning out of argument text. A command that runs on another computer is not a fact about this one.
+
+## Validate before you ship it
+
+```ts
+import { validate } from 'cmd-facts'
+
+const problems = validate(pack)   // Problem[] — each { where, says }
+```
+
+`createExplainer` refuses a pack that has any. `validate` checks the shape of a fact set, the consistency the built-in table holds itself to, and the grammar that decides where parsing recurses:
+
+- A row that deletes cannot say it can be put back.
+- A row that transmits cannot claim it touches no network.
+- A base row may not promise what one of its subcommands breaks.
+- An opaque row has to name what it hands over to.
+
+It does not check register or jargon. Those are editorial, and a pack should not fail to load over a sentence that reads badly.
+
+## Running the copy lints yourself
+
+`rows(pack)` gives you the same flat list the built-in table's own lints run over — every fact set a pack can produce, including the ones a flag rule produces.
+
+```ts
+import { rows } from 'cmd-facts'
+
+for (const { name, facts } of rows(pack)) {
+  // one sentence, ends in a full stop, under 150 characters, no jargon,
+  // no verdict about safety, no string that could be lifted out and run
+}
+```
+
+## Writing a pack as JSON
+
+A pack written as JSON can be checked against the bundled schema while it is being written:
+
+```json
+{ "$schema": "./node_modules/cmd-facts/schema/pack.schema.json" }
+```
+
+The schema is for authoring; `validate()` is the enforcement, and it catches consistency a schema cannot express.
+
+## Adding a row to the built-in table
+
+Rows live in `packages/cmd-facts/src/data/`. The register is enforced by tests, not by review alone:
+
+```bash
+pnpm test && pnpm typecheck
+```
+
+The suite checks that every sentence is one sentence, ends in a full stop, stays under 150 characters, avoids terms that assume the reader already knows what a command is, carries no verdict about safety, does not explain a program by repeating its name, and holds no string that could be lifted out and run. It also checks the facts hold together, and that every row points at something a doubtful reader can check.
