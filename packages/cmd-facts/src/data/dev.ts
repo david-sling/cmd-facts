@@ -12,6 +12,34 @@ export const GIT_ENTRY: Entry = {
     repeatSafe: false,
     docs: GIT,
   }),
+  globals: [
+    { flags: ['-C'], takesValue: true, role: 'path', facts: {} },
+    {
+      flags: ['-c', '--config-env'],
+      takesValue: true,
+      role: 'text',
+      facts: {
+        effect: ['execute'],
+        opaque: true,
+        handsOverTo: 'the programs the changed settings tell it to run',
+      },
+    },
+    { flags: ['--git-dir', '--work-tree'], takesValue: true, role: 'path', facts: {} },
+    { flags: ['--namespace'], takesValue: true, role: 'text', facts: {} },
+    {
+      flags: ['--exec-path'],
+      facts: {
+        effect: ['execute'],
+        opaque: true,
+        handsOverTo: 'the helper programs found in the named folder',
+      },
+    },
+    {
+      flags: ['-p', '--paginate'],
+      facts: { effect: ['execute'], opaque: true, handsOverTo: 'the pager the settings name' },
+    },
+    { flags: ['-P', '--no-pager', '--bare', '--no-optional-locks', '--literal-pathspecs', '--no-replace-objects'], facts: {} },
+  ],
   sub: {
     status: { facts: fact('Shows which files in a project have changed since its last save point.', { docs: GIT }) },
     log: { facts: fact('Shows the list of save points a project has, newest first.', { docs: GIT }) },

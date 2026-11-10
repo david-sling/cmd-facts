@@ -8,7 +8,14 @@ import type { Op, Step } from './line.ts'
 import { flatten, partsOf } from './tell.ts'
 import type { Part } from './tell.ts'
 
-export type ArgSlot = { index: number; value: string; role: Role; flag?: string }
+export type ArgSlot = {
+  index: number
+  value: string
+  role: Role
+  flag?: string
+  /** On a redirection's path: the stream that was sent there — `'2'` for errors, `'&'` for both at once. */
+  fd?: string
+}
 
 /** A pack that stands behind some part of this explanation, and the rows of it that answered. */
 export type Attribution = { pack: string; version: string; trusted: boolean; commands: string[] }
@@ -177,10 +184,13 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
       literal = true
       continue
     }
-    if (!literal && isFlag(token)) {
-      const eq = token.indexOf('=')
-      const head = eq > 1 ? token.slice(0, eq) : token
-      const inline = eq > 1 ? token.slice(eq + 1) : undefined
+    // `tar xf a.tar` carries its flags as a bare first word (the old option style), read as if it were `-xf`.
+    const bare = rule.bareFlagsFirst === true && i === start && !literal && !isFlag(token) && /^[A-Za-z]+$/.test(token)
+    if (!literal && (isFlag(token) || bare)) {
+      const spelled = bare ? `-${token}` : token
+      const eq = spelled.indexOf('=')
+      const head = eq > 1 ? spelled.slice(0, eq) : spelled
+      const inline = eq > 1 ? spelled.slice(eq + 1) : undefined
       const matched = flagsOf(rule, head)
       for (const m of matched) {
         if (!Object.keys(m.facts).length) continue
@@ -231,18 +241,58 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
   }
 
   const { key, entry, origin, trimmed } = found
-  const word = argv[1]
+
+  // Global options sit before the subcommand (`git -c pager.log=x log`), so the declared ones are stepped over to
+  // find it, applying whatever each changes on the way. One the table does not declare may be hiding the subcommand.
+  let cursor = 1
+  const preArgs: ArgSlot[] = []
+  const preRules: FlagRule[] = []
+  if (entry.sub && entry.globals?.length) {
+    while (cursor < argv.length && isFlag(argv[cursor]!)) {
+      const token = argv[cursor]!
+      const eq = token.indexOf('=')
+      const head = eq > 1 ? token.slice(0, eq) : token
+      const inline = eq > 1 ? token.slice(eq + 1) : undefined
+      const matched = entry.globals.filter((g) => g.flags.includes(head))
+      if (!matched.length) break
+      preRules.push(...matched.filter((m) => Object.keys(m.facts).length))
+      const taker = matched.findLast((m) => m.takesValue)
+      if (taker && inline !== undefined) {
+        preArgs.push({ index: cursor, value: inline, role: taker.role ?? 'unknown', flag: taker.flags[0]! })
+      } else if (taker && cursor + 1 < argv.length) {
+        preArgs.push({ index: ++cursor, value: argv[cursor]!, role: taker.role ?? 'unknown', flag: taker.flags[0]! })
+      }
+      cursor++
+    }
+  }
+
+  const word = argv[cursor]
   const wantsSub = entry.sub !== undefined && word !== undefined && !isFlag(word)
   const sub = wantsSub ? entry.sub![word] : undefined
   const rule: Rule = sub ?? entry
-  const start = wantsSub ? 2 : 1
+  const start = wantsSub ? cursor + 1 : cursor
+  // A word the table holds no row for, and a leading option it does not declare, both leave the exact subcommand
+  // unresolved, so the base row answers at `derived` either way.
+  const missed = entry.sub !== undefined && word !== undefined && !sub
   const base: Facts = sub
     ? sub.facts
-    : wantsSub
+    : missed
       ? merge(entry.facts, { confidence: 'derived', source: 'subcommand-miss' })
       : entry.facts
+  const seeded = preRules.reduce(
+    (acc, g) => merge(acc, { ...g.facts, source: 'curated+flags' as const }),
+    trimmed ? merge(base, { source: 'name-fallback' }) : base,
+  )
 
-  const parsed = parse(argv, start, rule, trimmed ? merge(base, { source: 'name-fallback' }) : base)
+  const stepped = parse(argv, start, rule, seeded)
+  const parsed =
+    preArgs.length || preRules.length
+      ? {
+          facts: stepped.facts,
+          args: [...preArgs, ...stepped.args],
+          escalated: [...new Set([...preRules.map((g) => g.flags[0]!), ...stepped.escalated])],
+        }
+      : stepped
   const head = { program, name, key, origin: origin.pack, ...(wantsSub ? { subcommand: word } : {}) }
   // The row that answered, not the words on the line: an unrecognised subcommand was answered by the base row.
   const own: Attribution[] = [
@@ -288,6 +338,14 @@ const widenBy = (base: Facts, other: Facts): Facts =>
     ...(other.opaque ? { opaque: true as const, handsOverTo: other.handsOverTo } : {}),
   })
 
+/** The words around a redirected path, telling a reader which stream went there. */
+const sentOf = (r: { op: string; fd?: string }): string => {
+  if (r.op === '<') return ' It is given what is in '
+  if (r.fd === '2') return ' The errors it prints are written to '
+  if (r.fd === '&') return ' Everything it prints, errors included, is written to '
+  return ' What it prints is written to '
+}
+
 /**
  * One command of a line, with what the line does to its output folded in. A redirection is the shell's doing rather
  * than the program's, so it widens the step: `echo x > notes.txt` creates and writes a file that `echo` knows nothing
@@ -312,13 +370,19 @@ function stepOf(registry: Registry, step: Step): Explanation {
 
   const parts: Part[] = [...partsOf(facts, e.args)]
   for (const r of step.redirects) {
-    parts.push({ kind: 'text', text: r.op === '<' ? ' It is given what is in ' : ' What it prints is written to ' })
-    parts.push({ kind: 'values', values: [r.path], role: 'path', flag: r.op })
+    parts.push({ kind: 'text', text: sentOf(r) })
+    parts.push({ kind: 'values', values: [r.path], role: 'path', flag: `${r.fd ?? ''}${r.op}` })
     parts.push({ kind: 'text', text: '.' })
   }
   const args: ArgSlot[] = [
     ...e.args,
-    ...step.redirects.map((r, n) => ({ index: step.argv.length + n, value: r.path, role: 'path' as Role, flag: r.op })),
+    ...step.redirects.map((r, n) => ({
+      index: step.argv.length + n,
+      value: r.path,
+      role: 'path' as Role,
+      flag: `${r.fd ?? ''}${r.op}`,
+      ...(r.fd ? { fd: r.fd } : {}),
+    })),
   ]
   return { ...e, facts, args, parts, sentence: flatten(parts), ...joined }
 }

@@ -63,11 +63,22 @@ export type Rule = {
   nestedHere?: boolean
   /** `env` carries its own settings as leading `NAME=value` words before the command. Part of its grammar, not a guess. */
   assignmentsFirst?: boolean
+  /**
+   * `tar xf` carries its flags as a bare first word, the old option style, so that word is read as if it were
+   * `-xf` rather than as the first thing the command was pointed at.
+   */
+  bareFlagsFirst?: boolean
 }
 
 export type Entry = Rule & {
   /** The program answers to a version-suffixed name too: `python3` reaches the `python` row, `base64` never reaches `base`. */
   versioned?: boolean
+  /**
+   * Options the program takes before its subcommand (`git -c pager.log=x log`), stepped over so the word after them
+   * still resolves to its row. One that is not declared here hides the subcommand, and the base row then answers at
+   * `derived`. A global that can change what runs carries facts, read the same way as a flag rule's.
+   */
+  globals?: FlagRule[]
   sub?: Record<string, Rule>
 }
 

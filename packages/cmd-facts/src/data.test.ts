@@ -102,7 +102,7 @@ describe('the grammar layer is declared honestly', () => {
 // The seed list is what a real remote support session touches. A gap here is a command that falls through to
 // "not in the list of known commands", which is honest but useless.
 const SEEDED =
-  'ls cat head tail grep find df du ps top sw_vers system_profiler log defaults launchctl networksetup ping curl rm cp mv mkdir chmod chown kill lsof open which env tar unzip sqlite3 git npm pnpm brew pip node python sh sudo security spctl tccutil softwareupdate diskutil docker ssh make xargs bash zsh'.split(
+  'ls cat head tail grep find df du ps top sw_vers system_profiler log defaults launchctl networksetup ping curl rm cp mv mkdir chmod chown kill lsof open which env tar unzip dd sqlite3 git npm pnpm brew pip node python sh sudo security spctl tccutil softwareupdate diskutil docker ssh make xargs bash zsh'.split(
     ' ',
   )
 

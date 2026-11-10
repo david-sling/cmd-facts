@@ -17,6 +17,9 @@ export function rows(pack: Pack): Row[] {
   }
   for (const [name, entry] of Object.entries(pack.commands) as [string, Entry][]) {
     add(name, entry)
+    for (const g of entry.globals ?? []) {
+      if (Object.keys(g.facts).length) out.push({ name: `${name} ${g.flags[0]}`, rule: entry, facts: merge(entry.facts, g.facts) })
+    }
     for (const [word, sub] of Object.entries(entry.sub ?? {})) add(`${name} ${word}`, sub)
   }
   return out

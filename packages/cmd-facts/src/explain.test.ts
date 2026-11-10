@@ -40,6 +40,30 @@ describe('lookup', () => {
     expect(got.facts.confidence).toBe('derived')
     expect(got.facts.source).toBe('subcommand-miss')
   })
+
+  // `git -c core.pager=evil log` still runs `log`; the option before it can also make the whole line run a program.
+  it('steps over global options to reach the subcommand', () => {
+    const got = run('git -c core.pager=evil log')
+    expect(got.subcommand).toBe('log')
+    expect(got.facts.says).toBe('Shows the list of save points a project has, newest first.')
+    expect(got.facts.opaque).toBe(true)
+    expect(effectsOf(got.facts)).toContain('execute')
+    expect(got.escalated).toContain('-c')
+    expect(got.args[0]).toEqual({ index: 2, value: 'core.pager=evil', role: 'text', flag: '-c' })
+
+    const harmless = run('git -C /tmp/proj status')
+    expect(harmless.subcommand).toBe('status')
+    expect(harmless.facts.opaque).toBe(false)
+    expect(harmless.facts.confidence).toBe('verified')
+    expect(harmless.args[0]).toEqual({ index: 2, value: '/tmp/proj', role: 'path', flag: '-C' })
+  })
+
+  it('cannot resolve the subcommand behind an option it does not hold, and says so', () => {
+    const got = run('git --frobnicate log')
+    expect(got.subcommand).toBeUndefined()
+    expect(got.facts.confidence).toBe('derived')
+    expect(got.facts.source).toBe('subcommand-miss')
+  })
 })
 
 describe('escalating flags', () => {
@@ -56,6 +80,24 @@ describe('escalating flags', () => {
     expect(got.escalated).toEqual(['-x'])
     expect(effectsOf(got.facts)).toContain('create')
     expect(got.args).toEqual([{ index: 2, value: 'backup.tgz', role: 'path', flag: '-f' }])
+  })
+
+  // `tar xf a.tar` carries its flags as a bare first word, which must not read as a file the command was pointed at.
+  it('reads an old-style mode word as the flags it bundles', () => {
+    const got = run('tar xf a.tar')
+    expect(got.escalated).toEqual(['-x'])
+    expect(effectsOf(got.facts)).toEqual(expect.arrayContaining(['create', 'write']))
+    expect(got.facts.reversible).toBe('no')
+    expect(got.args).toEqual([{ index: 2, value: 'a.tar', role: 'path', flag: '-f' }])
+  })
+
+  it('goes blind where an unpacking is told to run a program', () => {
+    for (const line of ['tar xf a.tar --to-command=sh', 'tar xf a.tar -I sh', 'tar xf a.tar --checkpoint-action=exec=sh']) {
+      const got = run(line)
+      expect(got.facts.opaque, line).toBe(true)
+      if (got.facts.opaque) expect(got.facts.handsOverTo, line).toBeTruthy()
+      expect(effectsOf(got.facts), line).toContain('execute')
+    }
   })
 
   it('leaves word flags alone where a program spells them out', () => {

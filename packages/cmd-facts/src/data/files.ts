@@ -217,6 +217,7 @@ export const FILES: Record<string, Entry> = {
   tar: {
     facts: fact('Packs files into one single file, or unpacks a file that was made that way.', { docs: 'man 1 tar' }),
     operands: ['path'],
+    bareFlagsFirst: true,
     flags: [
       {
         flags: ['-c', '--create'],
@@ -232,7 +233,34 @@ export const FILES: Record<string, Entry> = {
         },
       },
       { flags: ['-f', '--file'], takesValue: true, role: 'path', facts: {} },
+      {
+        flags: ['--to-command'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['execute'], opaque: true, handsOverTo: 'the program each unpacked file is handed to' },
+      },
+      {
+        flags: ['-I', '--use-compress-program'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['execute'], opaque: true, handsOverTo: 'the program named to pack or unpack the data' },
+      },
+      {
+        flags: ['--checkpoint-action'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['execute'], opaque: true, handsOverTo: 'the action it was told to carry out as it goes' },
+      },
     ],
+  },
+  dd: {
+    facts: fact('Copies raw data from one place to another exactly as it is, replacing whatever is at the destination.', {
+      effect: ['read', 'write', 'create'],
+      reversible: 'no',
+      repeatSafe: false,
+      note: 'Pointed at a disk, it writes over the disk itself rather than files on it, and what was there does not come back.',
+      docs: 'man 1 dd',
+    }),
   },
   unzip: {
     facts: fact('Unpacks a zip file, putting everything it holds onto this computer.', {

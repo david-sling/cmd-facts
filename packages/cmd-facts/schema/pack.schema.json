@@ -181,7 +181,11 @@
           "description": "The command it hands over to runs on this computer and is carried as separate words on this same line.",
           "type": "boolean"
         },
-        "assignmentsFirst": { "type": "boolean" }
+        "assignmentsFirst": { "type": "boolean" },
+        "bareFlagsFirst": {
+          "description": "The first word carries bundled flags with no dash, the old option style: `tar xf` reads as `tar -xf`.",
+          "type": "boolean"
+        }
       }
     },
 
@@ -199,6 +203,11 @@
         "versioned": {
           "description": "The program answers to a version-suffixed name too: `python3` reaches the `python` row.",
           "type": "boolean"
+        },
+        "globals": {
+          "description": "Options the program takes before its subcommand, stepped over so the word after them still resolves. One that is not declared here hides the subcommand, and the base row answers at `derived`.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/flagRule" }
         },
         "sub": { "type": "object", "additionalProperties": { "$ref": "#/$defs/rule" } }
       }

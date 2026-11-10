@@ -110,11 +110,21 @@ describe('reading where output was sent', () => {
     ['ls < in.txt', '<', 'in.txt', undefined],
     ['ls 2> err.log', '>', 'err.log', '2'],
     ['ls 2>> err.log', '>>', 'err.log', '2'],
-    ['ls &> all.log', '>', 'all.log', undefined],
+    ['ls &> all.log', '>', 'all.log', '&'],
+    ['ls &>> all.log', '>>', 'all.log', '&'],
+    ['echo hi >| notes.txt', '>', 'notes.txt', undefined],
   ])('%s', (line, op, path, fd) => {
     const [step] = stepsOf(line)
-    expect(step?.argv).toEqual(['ls'])
+    expect(step?.argv[0]).toBe(line.split(' ')[0])
     expect(step?.redirects[0]).toEqual({ op, path, ...(fd ? { fd } : {}) })
+  })
+
+  // `2>&1` points one stream at another that is already open: nothing new lands on disk, and the command keeps its row.
+  it.each(['ls 2>&1', 'ls >&2', 'ls 2>&-', 'make 2>&1 | tee build.log'])('%s', (line) => {
+    const steps = stepsOf(line)
+    expect(steps.length, line).toBeGreaterThan(0)
+    expect(steps[0]?.argv).toEqual([line.split(' ')[0]])
+    expect(steps[0]?.redirects).toEqual([])
   })
 
   it('reads one on each command of a line', () => {
@@ -226,5 +236,24 @@ describe('a redirection is the line’s doing, not the program’s', () => {
   it('appending is not the same as replacing', () => {
     expect(explain('echo x >> log').facts.reversible).toBe('unknown')
     expect(explain('echo x >> log').facts.repeatSafe).toBe(false)
+  })
+
+  it('keeps the stream on the written path, and says which one went there', () => {
+    const errs = explain('ls 2> err.txt')
+    expect(errs.sentence).toContain('The errors it prints are written to err.txt.')
+    expect(errs.args.at(-1)).toMatchObject({ value: 'err.txt', role: 'path', flag: '2>', fd: '2' })
+    expect(explain('ls 2>> err.txt').args.at(-1)).toMatchObject({ flag: '2>>', fd: '2' })
+
+    const both = explain('ls &> out.txt')
+    expect(both.sentence).toContain('Everything it prints, errors included, is written to out.txt.')
+    expect(both.args.at(-1)).toMatchObject({ value: 'out.txt', role: 'path', flag: '&>', fd: '&' })
+  })
+
+  it('reads a duplicated stream as the command alone, with nothing new written', () => {
+    const dup = explain('ls 2>&1')
+    expect(dup.key).toBe('ls')
+    expect(dup.facts.confidence).toBe('verified')
+    expect(effectsOf(dup.facts)).toEqual(['read'])
+    expect(explain('echo hi >| x').key).toBe('echo')
   })
 })

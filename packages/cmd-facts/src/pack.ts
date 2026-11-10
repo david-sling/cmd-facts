@@ -58,12 +58,36 @@ export function validate(pack: Pack): Problem[] {
   for (const [name, entry] of Object.entries(pack.commands)) {
     if (!COMMAND_NAME.test(name)) bad(name, 'A command name is the program basename, with no slash and no spaces.')
     checkRule(bad, name, entry)
+    checkGlobals(bad, name, entry)
     for (const [word, sub] of Object.entries(entry.sub ?? {})) {
       checkRule(bad, `${name} ${word}`, sub)
       checkStandIn(bad, `${name} ${word}`, entry.facts, sub.facts)
     }
   }
   return problems
+}
+
+/**
+ * A global option is held to the same rules as a flag, except that one which changes nothing still earns its place:
+ * it is stepped over so the subcommand behind it resolves.
+ */
+function checkGlobals(bad: Bad, name: string, entry: Entry) {
+  if (!entry.globals?.length) return
+  if (!entry.sub) bad(name, '`globals` only means something where there is a subcommand table to step toward.')
+  for (const g of entry.globals) {
+    const at = `${name} ${g.flags?.[0] ?? '(unnamed global)'}`
+    if (!g.flags?.length) {
+      bad(name, 'A global option has to name at least one flag.')
+      continue
+    }
+    for (const flag of g.flags) if (!flag.startsWith('-')) bad(at, `\`${flag}\` has to be declared with its dash.`)
+    if (g.role && !has(ROLES, g.role)) bad(at, `\`${g.role}\` is not a known role.`)
+    if (g.role && !g.takesValue) bad(at, 'A global that gives its value a role has to take a value.')
+    if (g.role === 'command' && g.facts?.opaque !== true) bad(at, 'A global that holds another command has to leave the row opaque.')
+    if ((g.facts as Record<string, unknown> | undefined)?.['opaque'] === false) bad(at, 'A global cannot make an opaque row clear again.')
+    if (g.facts?.repeatSafe === true) bad(at, 'A global cannot claim a row is safe to repeat.')
+    if (g.facts?.touchesCredentials === false) bad(at, 'A global cannot withdraw `touchesCredentials`.')
+  }
 }
 
 function checkFacts(bad: Bad, where: string, f: Facts) {
