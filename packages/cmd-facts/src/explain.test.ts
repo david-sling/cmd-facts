@@ -358,8 +358,8 @@ describe('tools that act on another service', () => {
   it('reads a flag that widens the line', () => {
     expect(run('kubectl apply -f app.yaml --prune').facts.reversible).toBe('no')
     expect(run('terraform apply -auto-approve').facts.note).toMatch(/without being shown/)
-    expect(run('helm template web ./chart --post-renderer ./hook').facts.opaque).toBe(true)
-    expect(run('helm template web ./chart').facts.opaque).toBe(false)
+    expect(run('helm lint ./chart -f values.yaml').facts.opaque).toBe(true)
+    expect(run('helm lint ./chart').facts.opaque).toBe(false)
   })
 
   it('follows the command a secret store hands its secrets to', () => {
