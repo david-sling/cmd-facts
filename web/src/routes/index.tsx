@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ArrowDown, Github } from 'lucide-react'
 import AnimatedGradient from '#/components/animated-gradient'
 import { ExplainDemo } from '#/components/explain-demo'
+import { HeroGlass } from '#/components/hero-glass'
 import { InstallCommand } from '#/components/install-command'
 
 export const Route = createFileRoute('/')({ component: Home })
@@ -26,7 +27,11 @@ function Home() {
       {/* the hero card: mist is its surface, and the only light on the page */}
       <section className="relative isolate mx-4 overflow-hidden rounded-[28px] sm:mx-8 lg:mx-14">
         <AnimatedGradient config={{ preset: 'Mist' }} radius="28px" noise={{ opacity: 0.35 }} />
-        <div className="relative flex min-h-[620px] flex-col justify-between p-8 sm:p-12 lg:p-16">
+        <HeroGlass />
+        <div
+          data-glass-text
+          className="relative flex min-h-[620px] flex-col justify-between p-8 sm:p-12 lg:p-16"
+        >
           <div className="pt-10 lg:pt-16">
             <h1 className="max-w-[16ch] text-[clamp(2.35rem,5.2vw,4.6rem)] font-light leading-[1.02] tracking-[-0.038em] text-white">
               Structured facts about what a command does.
@@ -39,7 +44,10 @@ function Home() {
           </div>
 
           <div className="mt-14 flex flex-col items-start gap-8 lg:flex-row lg:items-end lg:justify-between">
-            <InstallCommand />
+            {/* the one thing the glass leaves alone: it is a control, not a picture */}
+            <div data-no-glass>
+              <InstallCommand />
+            </div>
             <a
               href="#try"
               className="group flex items-center gap-2.5 border-b border-white/25 pb-1.5 text-[15px] font-medium text-white/85 transition-colors hover:border-pink hover:text-white"

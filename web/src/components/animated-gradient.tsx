@@ -258,6 +258,9 @@ export default function AnimatedGradient({
       premultipliedAlpha: true,
       alpha: true,
       antialias: true,
+      // the hero's glass copies this canvas every frame to refract it, and a drawing buffer the
+      // browser is free to clear after compositing reads back as nothing
+      preserveDrawingBuffer: true,
     });
     if (!gl) return;
 
