@@ -1,5 +1,6 @@
 import { fact, opaqueFact, valuesOf } from '../entry.ts'
-import type { Entry, FlagRule, Role } from '../entry.ts'
+import type { Entry, FlagRule, Role, Rule } from '../entry.ts'
+import { globalsOf } from './shared.ts'
 
 const GIT = 'man 1 git'
 const SETUP_STEPS = 'the set-up steps the downloaded packages bring with them'
@@ -373,6 +374,131 @@ const DOCKER_RUN_VALUES: Record<string, Role> = {
 // A file of hidden settings, the kind that usually holds passwords and access keys for other services.
 const ENV_FILE: FlagRule = { flags: ['--env-file'], takesValue: true, role: 'path', facts: { touchesCredentials: true } }
 
+// The text cannot say whether a folder of this computer or a store of the packaged program's own is meant, so both are
+// read as the wider one.
+const VOLUME: FlagRule = {
+  flags: ['-v', '--volume', '--mount'],
+  takesValue: true,
+  role: 'text',
+  facts: {
+    effect: ['read', 'write'],
+    note: 'Folders on this computer that it is pointed at can be read and changed from inside it.',
+  },
+}
+
+const COMPOSE = 'https://docs.docker.com/reference/cli/docker/compose/'
+const COMPOSED = 'the packaged programs the file names, whose contents were decided by whoever built them'
+const COMPOSE_VALUES: Record<string, Role> = {
+  ...valuesOf('path', ['-f', '--file', '--project-directory']),
+  ...valuesOf('text', ['-p', '--project-name', '--profile', '--ansi', '--progress', '--parallel']),
+}
+const COMPOSE_INSIDE = valuesOf('text', ['-e', '--env', '-u', '--user', '-w', '--workdir', '--index'])
+const COMPOSE_GONE: FlagRule = { flags: ['-v', '--volumes'], facts: { note: 'The stores of data they kept are removed as well.' } }
+
+/** What `docker compose` and the older `docker-compose` do, word for word. */
+const COMPOSE_SUBS: Record<string, Rule> = {
+  up: {
+    facts: opaqueFact('Starts the packaged programs described together in one file, building or downloading them first if needed.', COMPOSED, {
+      effect: ['create', 'execute', 'install'],
+      network: 'arbitrary',
+      docs: COMPOSE,
+    }),
+    operands: ['text'],
+    values: valuesOf('text', ['--scale', '-t', '--timeout', '--wait-timeout', '--exit-code-from', '--pull', '--attach', '--no-attach']),
+  },
+  down: {
+    facts: fact('Stops and removes the packaged programs described together in one file.', {
+      effect: ['terminate', 'delete'],
+      reversible: 'no',
+      docs: COMPOSE,
+    }),
+    operands: ['text'],
+    values: valuesOf('text', ['-t', '--timeout', '--rmi']),
+    flags: [COMPOSE_GONE],
+  },
+  ps: { facts: fact('Lists the packaged programs from one file, and whether each is running.', { docs: COMPOSE }), operands: ['text'], values: valuesOf('text', ['--format', '-f', '--filter', '--status']) },
+  logs: { facts: fact('Shows what the packaged programs from one file have written as they ran.', { docs: COMPOSE }), operands: ['text'], values: valuesOf('text', ['--since', '--until', '-n', '--tail', '--index']) },
+  config: {
+    facts: fact('Shows the file the packaged programs are started from, with its settings filled in.', {
+      touchesCredentials: true,
+      note: 'Secrets set in the environment or in settings files are filled in, in readable form.',
+      docs: COMPOSE,
+    }),
+    operands: ['text'],
+    values: { ...valuesOf('text', ['--format', '--hash']), '-o': 'path', '--output': 'path' },
+  },
+  build: {
+    facts: opaqueFact('Builds the packaged programs one file describes, from the steps written in their folders.', 'the steps written in those folders, which are not shown here', {
+      effect: ['read', 'create', 'write', 'execute'],
+      network: 'arbitrary',
+      docs: COMPOSE,
+    }),
+    operands: ['text'],
+    values: valuesOf('text', ['--build-arg', '--ssh', '--builder', '-m', '--memory', '--progress']),
+  },
+  pull: {
+    facts: fact('Downloads the packaged programs one file names onto this computer.', { effect: ['read', 'create', 'install'], network: 'arbitrary', docs: COMPOSE }),
+    operands: ['text'],
+    values: valuesOf('text', ['--policy']),
+  },
+  push: {
+    facts: fact('Sends the packaged programs one file names up to a service other people can reach.', {
+      effect: ['read', 'transmit'],
+      network: 'arbitrary',
+      reversible: 'no',
+      docs: COMPOSE,
+    }),
+    operands: ['text'],
+  },
+  exec: {
+    facts: opaqueFact('Runs another command inside one of the packaged programs from one file that is already running.', 'the command it was given, which runs inside the packaged program', {
+      effect: ['execute'],
+      network: 'arbitrary',
+      docs: COMPOSE,
+    }),
+    operands: ['text', 'command'],
+    values: COMPOSE_INSIDE,
+  },
+  run: {
+    facts: opaqueFact('Starts one of the packaged programs from one file to run a single command.', COMPOSED, {
+      effect: ['create', 'execute'],
+      network: 'arbitrary',
+      docs: COMPOSE,
+    }),
+    operands: ['text', 'command'],
+    values: { ...COMPOSE_INSIDE, ...valuesOf('text', ['-p', '--publish', '--name', '--entrypoint', '-l', '--label', '--cap-add', '--cap-drop']) },
+    flags: [VOLUME, ENV_FILE],
+  },
+  start: {
+    facts: opaqueFact('Starts the stopped packaged programs from one file again.', COMPOSED, { effect: ['execute'], network: 'arbitrary', docs: COMPOSE }),
+    operands: ['text'],
+  },
+  restart: {
+    facts: opaqueFact('Stops and starts again the packaged programs from one file.', COMPOSED, { effect: ['terminate', 'execute'], network: 'arbitrary', docs: COMPOSE }),
+    operands: ['text'],
+    values: valuesOf('text', ['-t', '--timeout']),
+  },
+  stop: {
+    facts: fact('Stops the packaged programs from one file, keeping them to start again.', { effect: ['terminate'], docs: COMPOSE }),
+    operands: ['text'],
+    values: valuesOf('text', ['-t', '--timeout']),
+  },
+  kill: {
+    facts: fact('Stops the packaged programs from one file at once, without letting them finish.', { effect: ['terminate'], docs: COMPOSE }),
+    operands: ['text'],
+    values: { '-s': 'signal', '--signal': 'signal' },
+  },
+  rm: {
+    facts: fact('Removes the stopped packaged programs from one file.', { effect: ['delete'], reversible: 'no', docs: COMPOSE }),
+    operands: ['text'],
+    flags: [COMPOSE_GONE],
+  },
+  images: { facts: fact('Lists the packaged programs one file has stored on this computer.', { docs: COMPOSE }), operands: ['text'], values: valuesOf('text', ['--format']) },
+  top: { facts: fact('Shows what is running inside the packaged programs from one file.', { docs: COMPOSE }), operands: ['text'] },
+  ls: { facts: fact('Lists the sets of packaged programs running from files on this computer.', { docs: COMPOSE }), values: valuesOf('text', ['--format', '--filter']) },
+  version: { facts: fact('Shows which version of the tool for files of packaged programs is installed.', { docs: COMPOSE }), values: valuesOf('text', ['-f', '--format']) },
+}
+
 const PY = 'https://pip.pypa.io/en/stable/cli/'
 
 // Where pip looks for packages. A link page given to `-f` can be a folder here as well as an address, so it is text.
@@ -627,7 +753,7 @@ export const DEV: Record<string, Entry> = {
     facts: opaqueFact(
       'Works with programs that run in their own sealed-off copy of a system.',
       'the packaged program, whose contents were decided by whoever built it',
-      { effect: ['read', 'write', 'execute'], network: 'arbitrary', repeatSafe: false, docs: 'https://docs.docker.com/reference/cli/docker/' },
+      { effect: ['read', 'write', 'execute'], network: 'arbitrary', repeatSafe: false, touchesCredentials: true, docs: 'https://docs.docker.com/reference/cli/docker/' },
     ),
     sub: {
       ps: {
@@ -661,17 +787,7 @@ export const DEV: Record<string, Entry> = {
               note: 'It is given full control of the system it runs on, so it is no longer sealed off from this computer.',
             },
           },
-          {
-            // The text cannot say whether a folder of this computer or a store of the packaged program's own is meant,
-            // so both are read as the wider one.
-            flags: ['-v', '--volume', '--mount'],
-            takesValue: true,
-            role: 'text',
-            facts: {
-              effect: ['read', 'write'],
-              note: 'Folders on this computer that it is pointed at can be read and changed from inside it.',
-            },
-          },
+          VOLUME,
         ],
       },
       exec: {
@@ -746,10 +862,28 @@ export const DEV: Record<string, Entry> = {
         facts: opaqueFact(
           'Starts or stops a set of packaged programs described together in one file.',
           'the packaged programs that file names, whose contents were decided by whoever built them',
-          { effect: ['create', 'execute', 'terminate'], network: 'arbitrary', docs: 'https://docs.docker.com/reference/cli/docker/' },
+          { effect: ['create', 'execute', 'terminate'], network: 'arbitrary', touchesCredentials: true, docs: 'https://docs.docker.com/reference/cli/docker/' },
         ),
         operands: ['text'],
+        values: COMPOSE_VALUES,
+        flags: [ENV_FILE],
       },
+      // Its own options (`-f`, `-p`) come before the subcommand: `docker compose logs -f` follows the log.
+      ...Object.fromEntries(Object.entries(COMPOSE_SUBS).map(([word, rule]) => [`compose ${word}`, rule])),
     },
+  },
+  // The file and project options come before the subcommand; after it, `logs -f` follows and `rm -f` does not ask.
+  'docker-compose': {
+    facts: opaqueFact('Starts or stops a set of packaged programs described together in one file.', COMPOSED, {
+      effect: ['read', 'create', 'write', 'delete', 'execute', 'terminate', 'install', 'transmit'],
+      network: 'arbitrary',
+      reversible: 'no',
+      touchesCredentials: true,
+      docs: COMPOSE,
+    }),
+    globals: globalsOf(COMPOSE_VALUES, [ENV_FILE]),
+    values: COMPOSE_VALUES,
+    flags: [ENV_FILE],
+    sub: COMPOSE_SUBS,
   },
 }

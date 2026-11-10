@@ -9,7 +9,7 @@ import type { Entry } from '../entry.ts'
 import type { Pack } from '../pack.ts'
 
 // Programs that are the same program under another name, as far as what the person approving needs to know.
-const SAME_AS: Record<string, keyof typeof TABLES | string> = { bash: 'sh', zsh: 'sh', dash: 'sh', ksh: 'sh', fish: 'sh', csh: 'sh', tcsh: 'sh' }
+const SAME_AS: Record<string, keyof typeof TABLES | string> = { bash: 'sh', zsh: 'sh', dash: 'sh', ksh: 'sh', fish: 'sh', csh: 'sh', tcsh: 'sh', podman: 'docker', tofu: 'terraform' }
 
 const TABLES: Record<string, Entry> = { ...FILES, ...SYSTEM, ...NET, ...SECRETS, ...DEV, ...LANG, ...CLOUD }
 

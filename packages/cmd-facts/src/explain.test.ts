@@ -247,6 +247,76 @@ describe('argument roles', () => {
   })
 })
 
+describe('tools that act on another service', () => {
+  it('answers from the subcommand of two or three words that names the action', () => {
+    expect(run('gh pr merge 12').subcommand).toBe('pr merge')
+    expect(run('aws s3 rm s3://bucket/a').subcommand).toBe('s3 rm')
+    expect(run('gcloud compute instances delete vm-1').subcommand).toBe('compute instances delete')
+    expect(run('docker compose down').subcommand).toBe('compose down')
+  })
+
+  it('steps over the options a tool takes before its subcommand', () => {
+    expect(run('kubectl -n web --context prod get pods').subcommand).toBe('get')
+    expect(run('gh -R acme/site pr list').subcommand).toBe('pr list')
+    expect(run('terraform -chdir=infra apply').subcommand).toBe('apply')
+    expect(run('aws --profile prod s3 ls').subcommand).toBe('s3 ls')
+    expect(run('docker-compose -f prod.yml up').subcommand).toBe('up')
+  })
+
+  it('marks a removal on the service as final', () => {
+    for (const line of ['gh repo delete acme/site', 'kubectl delete pod web-1', 'aws s3 rm s3://b/a', 'helm uninstall web', 'vercel rm my-app']) {
+      expect(run(line).facts.reversible, line).toBe('no')
+      expect(effectsOf(run(line).facts), line).toContain('delete')
+    }
+  })
+
+  it('marks every line that shows, saves or carries a key as touching credentials', () => {
+    for (const line of [
+      'gh auth token',
+      'gh auth status -t',
+      'kubectl config view --raw',
+      'kubectl --token abc get pods',
+      'aws configure get aws_secret_access_key',
+      'aws ssm get-parameter --name db --with-decryption',
+      'gcloud auth print-access-token',
+      'terraform output db_password',
+      'op read op://vault/db/password',
+      'doppler secrets download',
+      'vercel env pull',
+      'docker compose config',
+    ]) {
+      expect(run(line).facts.touchesCredentials, line).toBe(true)
+    }
+    for (const line of ['gh auth status', 'kubectl config view', 'aws configure list', 'op item list']) {
+      expect(run(line).facts.touchesCredentials, line).toBe(false)
+    }
+  })
+
+  it('reads a flag that widens the line', () => {
+    expect(run('kubectl apply -f app.yaml --prune').facts.reversible).toBe('no')
+    expect(run('terraform apply -auto-approve').facts.note).toMatch(/without being shown/)
+    expect(run('helm template web ./chart --post-renderer ./hook').facts.opaque).toBe(true)
+    expect(run('helm template web ./chart').facts.opaque).toBe(false)
+  })
+
+  it('follows the command a secret store hands its secrets to', () => {
+    const got = run('op run -- rm -rf build')
+    expect(got.runs?.key).toBe('rm')
+    expect(got.facts.touchesCredentials).toBe(true)
+    expect(effectsOf(got.facts)).toContain('delete')
+  })
+
+  it('reads compose options only where compose reads them', () => {
+    expect(roles('docker compose logs -f web')).toEqual(['web:text'])
+    expect(roles('docker-compose -f prod.yml up')).toEqual(['prod.yml:path'])
+  })
+
+  it('answers for the programs that work the same as one it holds', () => {
+    expect(run('podman run --privileged alpine').facts.privilege).toBe('root')
+    expect(run('tofu destroy').facts.says).toBe(run('terraform destroy').facts.says)
+  })
+})
+
 describe('credentials on a publishing line', () => {
   it('marks the token or one-time code a publish carries', () => {
     expect(run('cargo publish --token abc').facts.touchesCredentials).toBe(true)

@@ -132,6 +132,14 @@ const FIG_WRONG = new Set([
   'gh ssh-key add -t',
   'kubectl --dry-run', // `--dry-run` alone means `--dry-run=client`; a value only counts after `=`.
   'kubectl --cascade', // The same: `--cascade` alone means `--cascade=background`.
+  // Go's flag package reads the next word as the value of any option that is not a switch: `-out plan.bin` works.
+  'terraform plan -out',
+  'terraform plan -target',
+  // op takes a password recipe only after `=`: `--generate-password=letters,20`.
+  'op item create --generate-password',
+  'op item edit --generate-password',
+  // vercel: each takes a value in vercel's own `--help`; Fig declares no args.
+  ...['-e', '--env', '-b', '--build-env', '--listen'].map((f) => `vercel ${f}`),
 ])
 
 /** A bundle Fig spells out as its own option (`git commit -am`) is covered when its last letter takes a value. */
