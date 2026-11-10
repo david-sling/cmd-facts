@@ -86,6 +86,12 @@ export type Rule = {
    * `-xf` rather than as the first thing the command was pointed at.
    */
   bareFlagsFirst?: boolean
+  /**
+   * The word straight after this many operands is a flag written without its dash: `dscl . create` reads as
+   * `dscl . -create`. Only a word that follows an operand directly is read this way, so `dscl . -read Users` still
+   * takes `Users` as an operand.
+   */
+  bareFlagAfter?: number
 }
 
 export type Entry = Rule & {

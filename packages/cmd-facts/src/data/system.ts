@@ -1030,9 +1030,8 @@ export const SYSTEM: Record<string, Entry> = {
     },
   },
   // With no command given it opens a prompt that takes changes as they are typed, which the line does not show.
-  // A command may also be written without its dash (`dscl . create`), after the source; this row cannot yet read a
-  // word in that place as a command, so such a line is answered as if it only looked.
   dscl: {
+    bareFlagAfter: 1,
     facts: opaqueFact(
       'Looks at or changes the accounts and groups on this computer.',
       'the changes typed into it, if it is opened without a command to run',

@@ -107,6 +107,19 @@ describe('system commands answer what the line does', () => {
     expect(effectsOf(explain('dscl . -changei /Users/bob K 1 v').facts)).toContain('configure')
   })
 
+  it('dscl: a command written without its dash after the source is read as that command', () => {
+    const create = explain('dscl . create /Users/bob')
+    expect(create.facts).toMatchObject({ privilege: 'admin', confidence: 'verified' })
+    expect(effectsOf(create.facts)).toContain('create')
+    expect(effectsOf(explain('dscl -u admin -P pw . delete /Users/bob').facts)).toContain('delete')
+    expect(explain('dscl . read /Users/bob').facts).toMatchObject({ privilege: 'none', confidence: 'verified' })
+    const odd = explain('dscl . frobnicate /Users/bob')
+    expect(odd.facts.confidence).toBe('derived')
+    expect(odd.unread).toEqual(['frobnicate'])
+    // Only the word straight after the source is a command; after a dashed one, a bare word is an operand.
+    expect(explain('dscl . -list Users').unread).toBeUndefined()
+  })
+
   it('hdiutil: attach can fetch from the web, -passphrase takes its value, create keeps an existing file', () => {
     const web = explain('hdiutil attach https://x.example/a.dmg')
     expect(web.facts.network).toBe('arbitrary')

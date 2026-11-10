@@ -200,6 +200,11 @@
         "bareFlagsFirst": {
           "description": "The first word carries bundled flags with no dash, the old option style: `tar xf` reads as `tar -xf`.",
           "type": "boolean"
+        },
+        "bareFlagAfter": {
+          "description": "The word straight after this many operands is a flag written without its dash: `dscl . create` reads as `dscl . -create`.",
+          "type": "integer",
+          "minimum": 0
         }
       }
     },

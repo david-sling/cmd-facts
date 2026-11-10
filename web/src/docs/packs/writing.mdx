@@ -73,6 +73,8 @@ Beyond `facts`, a row describes just enough grammar for the line to be read.
 | `versioned` | The program answers to a version-suffixed name too: `python3` reaches the `python` row. |
 | `nestedHere` | This command hands over to another one carried as separate words on the same line. |
 | `assignmentsFirst` | The command carries leading `NAME=value` settings before the command, as `env` does. |
+| `bareFlagsFirst` | The first word carries bundled flags with no dash, the old option style: `tar xf` reads as `tar -xf`. |
+| `bareFlagAfter` | The word straight after this many operands is a flag written without its dash: `dscl . create` reads as `dscl . -create`. |
 
 The table is closed. A flag in none of `flags`, `values` or `plain` is one the row has not read, and so is a word on a row with no `operands`. A line carrying either is answered from the program's widest row at `derived`, and `unread` on the answer names what was not read. Listing a flag in `plain` is a claim about it, so list only the ones you checked.
 
