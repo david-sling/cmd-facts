@@ -1,0 +1,91 @@
+---
+title: The fact fields
+description: Every field on a fact set, the values it can take, and what a consumer is meant to do with it.
+---
+
+`facts` is what policy reads. It is one of two shapes: a transparent fact set, which carries a complete `effect` list, and an opaque one, which does not have the field at all.
+
+## The fields
+
+| Field | Values |
+|---|---|
+| `effect` | `read` `write` `create` `delete` `terminate` `install` `configure` `transmit` `execute` `elevate`. Only on a transparent fact set. |
+| `effectAtLeast` | The same list, as a floor. Only on an opaque fact set. |
+| `handsOverTo` | What an opaque command hands over to, in the same plain register as `says`. |
+| `opaque` | Whether the command hands over to something this library cannot see. |
+| `reversible` | `yes` `no` `with-backup` `unknown`. `yes` means there is nothing to undo, or it can be put back. |
+| `network` | `none` `known-host` `arbitrary` `listens`. |
+| `privilege` | `none` `admin` `root`. |
+| `touchesCredentials` | Reaches secrets by nature of the program, whatever paths it was given. |
+| `repeatSafe` | Running it twice leaves the same result as running it once. |
+| `confidence` | `verified` `derived` `unknown`. |
+| `source` | `curated` `curated+flags` `name-fallback` `subcommand-miss` `nested` `plugin` `unknown`. |
+| `says` | One sentence, plain register, standing alone with nothing templated into it. |
+| `tell` | The same claim with slots for the command's own arguments, where a row has one. |
+| `note` | A consequence the fields cannot carry, such as that deleted files do not go to the Bin. |
+| `docs` | A man page or official page, so a doubtful reader can check. |
+
+## `opaque` is in the type, not in a footnote
+
+When a command runs something this library cannot see — `sh -c`, `xargs`, `find -exec`, `ssh host cmd`, `npm run`, `npm install` and its set-up scripts, `make`, `sudo` — every other field stops being complete at that point. So an opaque fact set has **no `effect` field at all**. It has `effectAtLeast`, and `handsOverTo` naming what it handed over to.
+
+```json
+{
+  "says": "Runs the commands written straight into this one, one after another.",
+  "opaque": true,
+  "effectAtLeast": ["execute"],
+  "handsOverTo": "the commands it was given, which are not shown here",
+  "reversible": "unknown",
+  "network": "arbitrary",
+  "repeatSafe": false
+}
+```
+
+`facts.effect` does not compile there. Reading a complete effect list off an opaque command has to be a type error rather than a quiet mistake. Where a consumer wants one list for both shapes, `effectsOf()` returns it — the floor on an opaque fact set, reached deliberately:
+
+```ts
+import { effectsOf, isComplete } from 'cmd-facts'
+
+effectsOf(facts)    // Effect[] either way
+isComplete(facts)   // false where the list is a floor
+```
+
+An opaque fact set can never claim to be reversible or safe to repeat.
+
+## `confidence` and `source`
+
+`verified` is a hand-written row for that exact command, from a pack the consumer vouched for.
+
+`derived` is a row that was not written for this command, or was not vouched for: a subcommand the table does not hold, falling back to the deliberately cautious base row; a fact set that absorbed a nested command's reach; a row from a pack that was not named in `trust`.
+
+`unknown` means there is no entry at all. The fields are then the widest ones — a floor rather than a measurement — and `says` admits it.
+
+A nested line is always `derived` at the top, built-in or not: the outer fact set there was computed rather than written, and the inner program was never resolved to a path.
+
+Provenance is also what would let an optional model-drafted tier exist honestly later. Entries drafted from man pages would carry `derived` until a person had reviewed the line. See [What it does not do](/docs/reference/limits) for what such a tier may never be.
+
+## `repeatSafe` is a policy input
+
+It is not trivia. A consumer offering a standing grant — "allow this for the rest of the session" — should not offer one for a command where `repeatSafe` is false. `git commit`, `npm install` and `curl -d` are all false here.
+
+## `note` is about the command, never about the reader
+
+`note` carries a consequence of what the command does: that files removed this way do not go to the Bin, that a file already in that place is replaced. It never carries a mistake a person might make. Footgun notes are excellent in a teaching tool and corrosive in an approval prompt — a command carrying a warning implies the ones without are fine.
+
+## Widening with `merge`
+
+```ts
+import { merge } from 'cmd-facts'
+
+const wider = merge(base, { effect: ['delete'], reversible: 'no' })
+```
+
+A merge may only widen the claim, so a consumer that gated on the narrower facts is never surprised by the wider ones. This is how a flag rule applies, how a nested command's reach is absorbed, and how an untrusted pack's row is lowered on the way in. Handing over is one-way: once a command is opaque it cannot be made clear again.
+
+`RANK` exports the order `merge` uses, for anything that has to compare two fact sets the same way — a pack's own lints, or a consumer deciding whether an update made a claim weaker.
+
+## What is deliberately absent
+
+There is no risk score, no danger level and no severity. Risk depends on the target and the context, not on the command: `rm` on a build folder and `rm` on a home folder are the same command. Facts here; scoring at the consumer, which knows the target.
+
+There are no executable undo strings either. Prose about reversibility, yes. A literal command a consumer might auto-run, no.

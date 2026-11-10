@@ -1,0 +1,109 @@
+---
+title: Lines that do more than one thing
+description: Pipelines, redirection, and the command inside the command — what is followed, what is refused, and why.
+---
+
+A line is not always one command. `curl … | sh` is two. `ls > listing.txt` is one command and a file it knows nothing about. `sudo rm -rf /var/tmp` is a command that hands over to another one. Each of those widens the answer in a different way.
+
+## Several commands on one line
+
+Each command is answered on its own, under `steps`, and the fact set at the top is all of them widened together — so a consumer that reads nothing but the top is told the worst of what the line does, rather than being told nothing.
+
+```ts
+const line = explain('curl https://get.example.com/install.sh | sh')
+
+line.facts.says     // 'This line runs more than one command.'
+line.facts.opaque   // true — `sh` runs whatever it is handed
+line.facts.network  // 'arbitrary'
+line.steps.length   // 2
+line.steps[1].name  // 'sh'
+line.steps[1].after // '|'
+
+line.sentence
+// 'Makes a request to get.example.com and shows what comes back. What it prints is given to the
+//  next command. Runs a list of commands, one after another.'
+```
+
+`after` carries the operator because operators differ in ways a reader needs: `&&` means the next command runs only if this one works, `&` means this one keeps running while the next starts. Each is rendered as its own sentence, so the step sentences around it keep their own capitals and nothing has to be re-cased.
+
+`key` is `null` on the line itself — no single row answered it — and each step's `args` index into that step's own words rather than into the whole line.
+
+The operators read this way are `|`, `&&`, `||`, `;` and `&`.
+
+## Sending output somewhere
+
+`ls > listing.txt` writes a file that `ls` knows nothing about. The redirection belongs to the line, so it widens the command it sits on:
+
+```ts
+const wrote = explain('ls ~/Documents > listing.txt')
+
+effectsOf(wrote.facts)  // ['read', 'write', 'create']
+wrote.facts.reversible  // 'no' — `>` replaces what was there; `>>` is 'unknown'
+
+wrote.sentence
+// 'Lists the names of the files and folders kept in ~/Documents. What it prints is written to listing.txt.'
+```
+
+The written path joins `args` with the operator as its `flag`, but only after the sentence has been built — otherwise `cat notes.txt > copy.txt` would read as though `copy.txt` were another file being shown. `2>`, `2>>` and `&>` are read too, and the stream comes back as `fd`.
+
+## The command inside the command
+
+Where the nested command is on the same line, carried as separate words, and runs on this computer, it is looked up with the same tables and attached as `runs`:
+
+```ts
+explain('sudo rm -rf /var/tmp')
+```
+
+```json
+{
+  "sentence": "Runs another command with full control over this computer.",
+  "facts": {
+    "opaque": true,
+    "effectAtLeast": ["delete", "execute", "elevate"],
+    "handsOverTo": "the command it was given, which then has control over everything on this computer",
+    "reversible": "no",
+    "privilege": "root",
+    "repeatSafe": false,
+    "confidence": "derived"
+  },
+  "runs": {
+    "name": "rm",
+    "key": "rm",
+    "args": [{ "index": 3, "value": "/var/tmp", "role": "path" }]
+  }
+}
+```
+
+The inner command widened the outer one — `delete` is reachable only through `rm` — and `runs.args` indexes into the original argv, not into a line of its own.
+
+`sudo`, `env` (stepping over its leading `NAME=value` settings), `xargs` and `find -exec` do this.
+
+### Three things it will not do
+
+- **It will not split a string.** `sh -c 'curl x | sh'` and `node -e '…'` carry their command inside one argument. Splitting it would be reading meaning out of argument text, so those return no `runs` at all.
+- **It will not follow a command onto another computer.** `ssh host rm -rf /` runs `rm` somewhere else; facts about this computer would be wrong.
+- **It never clears the outer command.** The inner program name was not resolved to a path, and `xargs rm` will be handed arguments that are not on this line, so the outer command stays `opaque` and the inner facts are marked `confidence: derived`, `source: nested`.
+
+Nesting is followed four deep and then stops. A node that was still handing over when it hit that limit carries `truncated: true`, so a log can tell "nothing further to hand over" from "stopped looking".
+
+## A line that could not be read
+
+A substitution is refused. Backticks, `$(…)` and a subshell return the widest floor, with `key: null` and a `says` that admits the line was not read — what a substitution stands for is not on the line. So do a quote that never closes and an operator with nothing on one side of it.
+
+```ts
+explain('ls |').facts
+```
+
+```json
+{
+  "says": "This line could not be read as a command.",
+  "opaque": true,
+  "effectAtLeast": ["execute"],
+  "handsOverTo": "whatever this line turns out to run, which is not read here",
+  "confidence": "unknown",
+  "source": "unknown",
+  "note": "Nothing here describes what will run. The facts shown are the widest ones, not a measurement."
+}
+```
+
+Showing that as it is beats a confident sentence about half a line.

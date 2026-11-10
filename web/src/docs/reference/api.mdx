@@ -1,0 +1,96 @@
+---
+title: API reference
+description: Every export of cmd-facts, with its signature and the page that explains it.
+---
+
+`cmd-facts` is ESM only and needs Node 20 or newer. It has no runtime dependencies.
+
+```ts
+import { explain } from 'cmd-facts'           // the curated table, wired and trusted
+import { explain } from 'cmd-facts/facts'     // the fact helpers alone
+import pack from 'cmd-facts/schema'           // the JSON schema for authoring a pack
+```
+
+## Explaining
+
+| Export | Signature |
+|---|---|
+| `explain` | `(input: Input) => Explanation` — `BUILTIN` wired up and trusted. |
+| `createExplainer` | `(opts: RegistryOptions) => Explainer` — an explainer over the packs you name. |
+| `basename` | `(p: string) => string` — the name a row is keyed on. |
+| `tokenize` | `(line: string) => Tokens` — the line splitter, exposed for tooling. |
+| `UNKNOWN` | The floor returned for a program with no entry. |
+| `UNREAD_LINE` | The floor returned for a line that could not be read. |
+
+`Input` is a line or a split argv: `string | { program: string; argv: string[] }`. An `Explainer` is callable and carries `registry`.
+
+See [The shape of an answer](/docs/explanation).
+
+## Reading a fact set
+
+| Export | Signature |
+|---|---|
+| `effectsOf` | `(f: Facts) => Effect[]` — the effect list for either shape; a floor on an opaque one. |
+| `isComplete` | `(f: Facts) => boolean` — whether that list is a measurement rather than a floor. |
+| `merge` | `(base: Facts, over: Overlay) => Facts` — widen a fact set. It can never narrow one. |
+| `sortEffects` | `(es: Effect[]) => Effect[]` — the order the tables use. |
+| `EFFECTS` `REVERSIBLE` `NETWORK` `PRIVILEGE` `CONFIDENCE` | The allowed values of each field. |
+| `RANK` | How wide each value is, for anything comparing two fact sets the way `merge` does. |
+
+See [The fact fields](/docs/facts).
+
+## Rendering the sentence
+
+| Export | Signature |
+|---|---|
+| `partsOf` | `(facts: Facts, args: ArgSlot[]) => Part[]` |
+| `tellOf` | `(e: Explanation) => Part[]` |
+| `flatten` | `(parts: Part[]) => string` |
+
+See [Showing it to a person](/docs/sentence).
+
+## Packs
+
+| Export | Signature |
+|---|---|
+| `BUILTIN` | The curated table as a pack. `BUILTIN.name` is `@cmd-facts/builtin`. |
+| `COMMANDS` | The rows of that table, keyed by command name. |
+| `fact` | `(says: string, over?) => Facts` |
+| `opaqueFact` | `(says: string, handsOverTo: string, over?) => Facts` |
+| `validate` | `(pack: Pack) => Problem[]` — empty means loadable. |
+| `rows` | `(pack: Pack) => Row[]` — every fact set a pack can produce, for lints. |
+| `buildRegistry` | `(opts: RegistryOptions) => Registry` — what `createExplainer` builds on. |
+| `ROLES` | The closed list of argument roles. |
+
+See [Loading packs](/docs/packs/using) and [Writing a pack](/docs/packs/writing).
+
+## Types
+
+```ts
+import type {
+  ArgSlot, Attribution, Explainer, Explanation, Input,   // explaining
+  Blind, Confidence, Effect, Facts, Network, Overlay,    // fact sets
+  Privilege, Reversible, Segment, Slot, Source, Transparent,
+  Part,                                                  // rendering
+  Entry, FlagRule, Role, Rule, Pack, Problem, Row,       // packs
+  Found, Origin, Registry, RegistryOptions,              // registry
+  Tokens,                                                // the line splitter
+} from 'cmd-facts'
+```
+
+`Facts` is the union of `Transparent` and `Blind`. Narrow it on `opaque` before reading `effect`:
+
+```ts
+if (!facts.opaque) facts.effect   // Effect[]
+else facts.effectAtLeast          // Effect[], a floor
+```
+
+## Coverage
+
+The curated table answers for 64 programs today. Anything outside it resolves to the widest floor with `confidence: unknown` — a designed outcome, not a gap to be filled with a guess. To cover your own tools, write a pack.
+
+```ts
+import { COMMANDS } from 'cmd-facts'
+
+Object.keys(COMMANDS)   // what the built-in table holds
+```

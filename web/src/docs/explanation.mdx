@@ -1,0 +1,123 @@
+---
+title: The shape of an answer
+description: What explain() returns for one line, field by field, and which parts are only there for some lines.
+---
+
+`explain(input)` returns one `Explanation`. Everything below is on it; the fact set it carries has [a page of its own](/docs/facts).
+
+```ts
+import { explain } from 'cmd-facts'
+
+const answer = explain('curl -fsSL https://get.example.com/install.sh -o install.sh')
+```
+
+```json
+{
+  "program": "curl",
+  "name": "curl",
+  "key": "curl",
+  "origin": "@cmd-facts/builtin",
+  "facts": { "…": "…" },
+  "sentence": "Makes a request to get.example.com and saves what comes back into install.sh.",
+  "parts": ["…"],
+  "args": [
+    { "index": 2, "value": "https://get.example.com/install.sh", "role": "url" },
+    { "index": 4, "value": "install.sh", "role": "path", "flag": "-o" }
+  ],
+  "escalated": ["-o"],
+  "attribution": [
+    { "pack": "@cmd-facts/builtin", "version": "0.0.0", "trusted": true, "commands": ["curl"] }
+  ]
+}
+```
+
+## Always there
+
+| Field | What it holds |
+|---|---|
+| `program` | The resolved program path, as handed in. On a nested answer, the name as written on the line. |
+| `name` | The program's basename — `rm` for `/bin/rm`. |
+| `key` | The table row this was answered from, or `null` when no single row answered. |
+| `origin` | The pack that supplied the row, or `null` when the program is not known. |
+| `facts` | The fact set. See [The fact fields](/docs/facts). |
+| `sentence` | The sentence to show a person, with this command's own arguments already in it. |
+| `parts` | The same sentence unjoined, so prose and argument text can be rendered apart. |
+| `args` | What each argv position is. |
+| `escalated` | The flags on this line that widened the fact set, as the table declares them. |
+| `attribution` | Every pack behind `facts`, outermost first. |
+
+## There for some lines
+
+| Field | When it appears |
+|---|---|
+| `subcommand` | The row was reached through a subcommand, such as `git push`. |
+| `runs` | The command this one hands over to is on the same line and runs here. See [Lines that do more than one thing](/docs/lines). |
+| `steps` | The line runs more than one command. |
+| `after` | On a step: the operator that joined it to the one before — `\|`, `&&`, `\|\|`, `;`, `&`. |
+| `truncated` | The chain was still handing over when it hit the depth limit of four. |
+
+## What `explain` accepts
+
+```ts
+explain('rm -rf /Users/sam/Documents')
+explain({ program: '/bin/rm', argv: ['rm', '-rf', '/Users/sam/Documents'] })
+```
+
+A whole line is how a command usually arrives. A split argv is how a program that already holds one passes it on. Neither is the better form: a line is split into words and then answered by exactly the same path, and a row is keyed on the basename either way, so handing in a path never buys a stronger answer than handing in a name.
+
+### How a line is split
+
+Splitting a line into words is the one piece of reading-meaning-out-of-text this library does, so it is kept small.
+
+- **Quoting decides where a word ends, and nothing more.** Single quotes, double quotes and backslashes are read the way a shell reads them, so `rm -rf "/Users/sam/My Documents"` is one path and not two.
+- **Nothing is expanded.** `$HOME`, `~` and `*.log` stay the words they were written as, because what they stand for is not on the line. A consumer showing an argument shows what was written.
+- **A substitution is refused.** Backticks, `$(…)` and a subshell return the widest floor, with `key: null` and a `says` that admits the line was not read. So do a quote that never closes and an operator with nothing on one side of it, as in `ls |`.
+
+```ts
+explain('ls |').facts.says
+// 'This line could not be read as a command.'
+```
+
+## `args` and roles
+
+Each argument comes back with what it is, so a consumer can resolve and show the address or the path rather than parse them out of a string.
+
+```json
+{ "index": 4, "value": "install.sh", "role": "path", "flag": "-o" }
+```
+
+`index` points into the argv that was read — into that step's own words on a step, and into the original argv on a `runs`. `flag` is there when the value belongs to a flag, including the redirection operators `>` and `2>`.
+
+The roles are a closed list: `path`, `host`, `url`, `pid`, `package`, `domain`, `user`, `mode`, `service`, `signal`, `device`, `pattern`, `command`, `text`, `unknown`.
+
+## `escalated`
+
+Some flags change the fact set rather than the detail. Without `-o`, `curl` only reads; with it, the same line creates and overwrites a file. `escalated` names the flags that did that, in the form the table declares them, so a consumer can point at why the answer is wider than the bare command would be.
+
+```ts
+explain('rm -rf /tmp/build').escalated   // ['-r']
+explain('sh -c "…"').escalated           // ['-c']
+```
+
+## When nothing answered
+
+A program with no entry resolves to the widest floor rather than to a guess:
+
+```json
+{
+  "key": null,
+  "origin": null,
+  "attribution": [],
+  "sentence": "This runs a program that is not in the list of known commands.",
+  "facts": {
+    "opaque": true,
+    "effectAtLeast": ["execute"],
+    "handsOverTo": "a program this library has no entry for",
+    "confidence": "unknown",
+    "source": "unknown",
+    "note": "Nothing here describes what the program does. The facts shown are the widest ones, not a measurement."
+  }
+}
+```
+
+This is the designed outcome, not a failure. A consumer should say it does not know rather than show a fluent sentence nobody stands behind.

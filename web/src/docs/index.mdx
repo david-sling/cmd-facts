@@ -1,0 +1,52 @@
+---
+title: cmd-facts docs
+description: A library that answers what a command does in typed fields, for the surface that has to ask a person to approve it.
+---
+
+`cmd-facts` takes a command line and returns structured facts about what running it would do: what it touches, whether it can be undone, where it reaches on the network, what privileges it needs. It is built for the moment a person who did not write a command has to decide whether it may run.
+
+It is not a man-page browser and not a linter. It will not tell you that `-a` does not ignore entries starting with a dot, and it will not tell you your command could be written better. Everything here answers one question: if this runs, what happens to this computer?
+
+## Where it is used
+
+- A remote support session where a customer clicks **Allow**.
+- A CI gate where a release manager signs off on a deploy step.
+- An AI agent asking before it runs a tool.
+- An admin console that has to log what was approved, and on whose word.
+
+The reader at the other end is assumed never to have opened a terminal.
+
+## The schema is the deliverable
+
+`explain()` returns fields. The plain-English sentence is one rendering of those fields, not the product. A consumer that colours a button, gates a policy or computes its own risk level reads the fields; a consumer that has to tell a person reads the sentence.
+
+```ts
+import { explain } from 'cmd-facts'
+
+const { sentence, facts } = explain('rm -rf /tmp/build')
+
+sentence          // 'Removes /tmp/build from this computer, along with everything inside.'
+facts.reversible  // 'no'
+facts.privilege   // 'none'
+```
+
+## Where to start
+
+| You are | Start with |
+|---|---|
+| Wiring this into an approval prompt | [Quickstart](/docs/quickstart) |
+| Deciding what to show a person | [Showing it to a person](/docs/sentence) |
+| Writing policy against the output | [The fact fields](/docs/facts) |
+| Covering tools this library has never heard of | [Loading packs](/docs/packs/using) |
+| Looking for one export | [API reference](/docs/reference/api) |
+
+## Words used in these docs
+
+- **Consumer:** the program calling this library — the approval prompt, the gate, the console.
+- **Row:** one command's entry in a table, written by hand.
+- **Pack:** a set of rows shipped under one name. The curated table is itself a pack.
+- **Fact set:** the `facts` object on an answer, whether it came from one row or several merged.
+- **Opaque:** the command hands over to something this library cannot see, so every field is a floor rather than a measurement.
+- **Floor:** the widest answer, given when nothing narrower can be stood behind.
+
+> Every page has a **Copy as Markdown** button at the top. Paste a page into an agent to give it the full text.

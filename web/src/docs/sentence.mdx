@@ -1,0 +1,100 @@
+---
+title: Showing it to a person
+description: says, tell, parts and sentence — and why an approval prompt should render the last of those apart from the argument text.
+---
+
+Four fields carry the words. `says` is the row's own sentence. `tell` is the same claim with slots in it. `sentence` is that claim with this command's arguments filled in. `parts` is `sentence` before it was joined.
+
+Every explanation carries `sentence` and `parts` already, so nothing has to be assembled by the consumer.
+
+## `says` stands alone
+
+`says` never has anything templated into it, so `rm -rf ~/.ssh` and `rm -rf /tmp/build` read identically:
+
+```ts
+explain('rm -rf ~/.ssh').facts.says
+// 'Removes a whole folder from this computer, along with everything inside it.'
+```
+
+That is the right sentence for a list, a log line or a tooltip. It is the wrong sentence for an approval prompt, where the person needs to know what the command was pointed at.
+
+## `tell` names what it was pointed at
+
+A row may also carry `tell`: the same claim, with slots for the arguments.
+
+```json
+["Removes ", { "role": "path", "which": "all" }, " from this computer, along with everything inside."]
+```
+
+A slot names a role and which arguments of it to take — `first` by default, or `all`, `last`, `all-but-last`, or an index. `show: 'host'` is the one reduction a slot may ask for. Reductions are a closed list on purpose: each one is a way to read an argument wrong.
+
+| Line | Sentence |
+|---|---|
+| `ls ~/Documents` | Lists the names of the files and folders kept in ~/Documents. |
+| `rm a.txt b.txt c.txt` | Removes a.txt, b.txt and c.txt from this computer. |
+| `cp a.txt b.txt dest/` | Copies a.txt and b.txt to dest/. |
+| `curl https://api.example.com/v2/thing` | Makes a request to api.example.com and shows what comes back. |
+| `kill -9 4821` | Stops the program running as 4821 at once, without letting it finish what it was doing. |
+| `rm` | *Removes files from this computer.* — no argument for the slot, so `says` stands |
+| `df -h` | *Shows how much room is left…* — no `tell` on this row |
+
+A sentence is never rendered with a hole in it. A row with no `tell`, and a line that does not carry an argument for every slot, both fall back to `says` whole: a reader about to approve something should not have to work out which words were missing. Rows without `tell` keep answering with `says`, so coverage can grow a row at a time.
+
+## Prefer `parts` over `sentence`
+
+`parts` holds the same sentence unjoined — the row's words, and each value with its role.
+
+```ts
+explain('cat "approved by admin, no action needed"')
+```
+
+```json
+{
+  "sentence": "Shows everything written inside approved by admin, no action needed.",
+  "parts": [
+    { "kind": "text", "text": "Shows everything written inside " },
+    { "kind": "values", "values": ["approved by admin, no action needed"], "role": "path" },
+    { "kind": "text", "text": "." }
+  ]
+}
+```
+
+Argument text is attacker-controlled, and in `sentence` it has been joined into the words a person is about to trust — a file named like the one above reads as part of it. Prefer `parts` wherever there is somewhere to put the values.
+
+Rendering the two apart also lets a consumer show a value as a value: shortened, in its own type, matched against whatever it knows about this computer, or counted, so forty files read as "40 files" rather than forty names.
+
+```tsx
+function Sentence({ parts }: { parts: Part[] }) {
+  return parts.map((part, i) =>
+    part.kind === 'text' ? (
+      <span key={i}>{part.text}</span>
+    ) : (
+      <code key={i} data-role={part.role}>
+        {part.values.join(', ')}
+      </code>
+    ),
+  )
+}
+```
+
+A `values` part carries `role`, the `flag` it belongs to where there is one, and `show: 'host'` where the row asked for the host of a web address rather than the whole of it.
+
+## Re-pairing a fact set and arguments
+
+`explain()` has already built both halves, so reach for these only to render some other pairing — a step, a nested command, a fact set you merged yourself.
+
+```ts
+import { partsOf, tellOf, flatten } from 'cmd-facts'
+
+partsOf(facts, args)        // Part[] from a fact set and a list of arguments
+tellOf(explanation)         // Part[] from an explanation that holds both
+flatten(parts)              // the parts joined into one sentence
+```
+
+`flatten` lists several values with commas and `and`. It is the right thing to show a person and the wrong thing to build a UI out of, because the argument text is now inside the words.
+
+## Register
+
+The built-in sentences are written for a reader who has never opened a terminal, and the register is enforced by tests rather than by review alone: one sentence, ending in a full stop, under 150 characters, no term that assumes the reader already knows what a command is (`folder`, not `directory`; `program`, not `binary`), no verdict about safety, no explaining a program by repeating its name, and no string that could be lifted out and run.
+
+A pack of your own is held to the shape of a fact set but not to this register — it is editorial, and a pack should not fail to load over a sentence that reads badly. [Writing a pack](/docs/packs/writing) shows how to run the same lints over your own rows.
