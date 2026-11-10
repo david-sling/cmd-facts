@@ -301,16 +301,36 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
 
   const word = argv[cursor]
   const wantsSub = entry.sub !== undefined && word !== undefined && !isFlag(word)
-  const sub = wantsSub ? entry.sub![word] : undefined
+  // A subcommand can run to several words (`gh pr create`), and the longest one the table holds answers. The words
+  // are looked up as the table's own keys only, so `git constructor` is a subcommand the table does not hold.
+  let spoken = wantsSub ? 1 : 0
+  let subKey: string | undefined
+  if (wantsSub) {
+    const words: string[] = []
+    for (let i = cursor; i < argv.length && !isFlag(argv[i]!); i++) words.push(argv[i]!)
+    for (let k = words.length; k > 0 && subKey === undefined; k--) {
+      const candidate = words.slice(0, k).join(' ')
+      if (Object.hasOwn(entry.sub!, candidate)) [subKey, spoken] = [candidate, k]
+    }
+  }
+  const sub = subKey !== undefined ? entry.sub![subKey] : undefined
   const rule: Rule = sub ?? entry
-  const start = wantsSub ? cursor + 1 : cursor
+  // Where the table holds longer subcommands under the one that answered (`s3 cp` under `s3`), the word after it is
+  // one more step of the subcommand, and one the table does not hold.
+  const after = argv[cursor + spoken]
+  const deeper =
+    subKey !== undefined && after !== undefined && !isFlag(after) && Object.keys(entry.sub!).some((k) => k.startsWith(`${subKey} `))
+  const start = cursor + spoken + (deeper ? 1 : 0)
   // A word the table holds no row for, and a leading option it does not declare, both leave the exact subcommand
-  // unresolved, so the base row answers at `derived` either way.
+  // unresolved, so the base row (or the shorter subcommand) answers at `derived` either way.
   const missed = entry.sub !== undefined && word !== undefined && !sub
+  const derived = { confidence: 'derived', source: 'subcommand-miss' } as const
   const base: Facts = sub
-    ? sub.facts
+    ? deeper
+      ? merge(sub.facts, derived)
+      : sub.facts
     : missed
-      ? merge(entry.facts, { confidence: 'derived', source: 'subcommand-miss' })
+      ? merge(entry.facts, derived)
       : entry.facts
   const seeded = preRules.reduce(
     (acc, g) => merge(acc, { ...g.facts, source: 'curated+flags' as const }),
@@ -326,10 +346,10 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
           escalated: [...new Set([...preRules.map((g) => g.flags[0]!), ...stepped.escalated])],
         }
       : stepped
-  const head = { program, name, key, origin: origin.pack, ...(wantsSub ? { subcommand: word } : {}) }
+  const head = { program, name, key, origin: origin.pack, ...(wantsSub ? { subcommand: deeper ? `${subKey} ${after}` : (subKey ?? word) } : {}) }
   // The row that answered, not the words on the line: an unrecognised subcommand was answered by the base row.
   const own: Attribution[] = [
-    { pack: origin.pack, version: origin.version, trusted: origin.trusted, commands: [sub ? `${key} ${word}` : key] },
+    { pack: origin.pack, version: origin.version, trusted: origin.trusted, commands: [sub ? `${key} ${subKey}` : key] },
   ]
 
   const wanted = nestedAt(argv, parsed.args, rule)

@@ -159,4 +159,21 @@ describe('a base row stands in for its subcommands', () => {
     }
     expect(says(packOf({ k: entry }))).toEqual([])
   })
+
+  it('holds a shorter subcommand to the same for the longer ones under it', () => {
+    const cautious = fact('Talks to a cluster.', { reversible: 'unknown', network: 'known-host' })
+    const entry: Entry = {
+      facts: cautious,
+      sub: {
+        pods: { facts: fact('Works with pods.', { network: 'known-host' }) },
+        'pods delete': { facts: fact('Removes a pod.', { effect: ['delete'], reversible: 'no', network: 'known-host' }) },
+      },
+    }
+    expect(says(packOf({ k: entry }))).toContainEqual(expect.stringContaining('`pods` says it can be put back'))
+  })
+
+  it('refuses a subcommand key that is not words split by single spaces', () => {
+    const entry: Entry = { facts: fact('Talks to a cluster.'), sub: { 'pods  get': { facts: fact('Lists pods.') }, '-x': { facts: fact('Lists pods.') } } }
+    expect(says(packOf({ k: entry })).filter((m) => m.includes('one or more words'))).toHaveLength(2)
+  })
 })

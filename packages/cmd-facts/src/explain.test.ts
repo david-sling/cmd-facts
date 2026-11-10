@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { explain } from './index.ts'
+import { createExplainer, explain } from './index.ts'
+import { fact, opaqueFact } from './entry.ts'
 import { effectsOf, isComplete, merge } from './facts.ts'
 import type { Facts } from './facts.ts'
 
@@ -252,6 +253,49 @@ describe('credentials on a publishing line', () => {
     expect(run('cargo publish').facts.touchesCredentials).toBe(false)
     // Even where the subcommand has no row of its own, the option is read wherever it is.
     expect(run('yarn npm publish --otp 123456').facts.touchesCredentials).toBe(true)
+  })
+})
+
+describe('subcommands of more than one word', () => {
+  const entry = {
+    facts: opaqueFact('Works with a cluster.', 'the cluster', { reversible: 'no', network: 'arbitrary', repeatSafe: false, docs: 'x' }),
+    sub: {
+      pods: { facts: fact('Works with the pods.', { reversible: 'no', network: 'arbitrary', docs: 'x' }), operands: ['text' as const] },
+      'pods delete': {
+        facts: fact('Removes a pod.', { effect: ['delete'], reversible: 'no', network: 'arbitrary', docs: 'x' }),
+        operands: ['text' as const],
+      },
+    },
+  }
+  const kc = createExplainer({ packs: [{ name: 'k', version: '1', commands: { kc: entry } }], trust: ['k'] })
+  const read = (line: string) => kc({ program: 'kc', argv: line.split(' ') })
+
+  it('answers from the longest subcommand the words spell out', () => {
+    const got = read('kc pods delete web-1')
+    expect(got.subcommand).toBe('pods delete')
+    expect(got.facts.says).toBe('Removes a pod.')
+    expect(got.args).toEqual([{ index: 3, value: 'web-1', role: 'text' }])
+    expect(got.attribution[0]!.commands).toEqual(['kc pods delete'])
+  })
+
+  it('lets the shorter one answer, at derived, for a further word it does not hold', () => {
+    const got = read('kc pods restart web-1')
+    expect(got.subcommand).toBe('pods restart')
+    expect(got.facts.says).toBe('Works with the pods.')
+    expect(got.facts.confidence).toBe('derived')
+    expect(got.args).toEqual([{ index: 3, value: 'web-1', role: 'text' }])
+  })
+
+  it('reads a flag as the end of the subcommand', () => {
+    expect(read('kc pods -w delete').subcommand).toBe('pods')
+  })
+
+  it('never takes a name from the object machinery for a subcommand', () => {
+    for (const word of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      const got = run(`git ${word}`)
+      expect(got.facts.confidence).toBe('derived')
+      expect(got.key).toBe('git')
+    }
   })
 })
 

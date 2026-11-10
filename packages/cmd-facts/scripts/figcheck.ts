@@ -193,14 +193,16 @@ async function main() {
     if (entry.sub) {
       const figSubs = spec.subcommands ?? []
       for (const [word, rule] of Object.entries(entry.sub)) {
-        const figSub = figSubs.find((s) => namesOf(s.name).includes(word))
+        // A key of several words (`pr create`) walks Fig's nested subcommands one word at a time.
+        let figSub: FigSpec | undefined = spec
+        for (const part of word.split(' ')) figSub = figSub?.subcommands?.find((s) => namesOf(s.name).includes(part))
         if (!figSub) {
           lines.push(`  [${word}] not a subcommand fig lists`)
           continue
         }
         report(`[${word}]`, compare(declaredOf(rule), figSub.options ?? [], `${name} ${word}`))
       }
-      const covered = Object.keys(entry.sub).length
+      const covered = Object.keys(entry.sub).filter((k) => !k.includes(' ')).length
       if (figSubs.length) lines.push(`  subcommands: ${covered} covered of ${figSubs.length} in fig`)
     }
 

@@ -54,7 +54,7 @@ Beyond `facts`, a row describes just enough grammar for the line to be read.
 | `flags` | Flags that change the fact set rather than the detail. Each is `{ flags, facts, takesValue?, attached?, role?, operands? }`. `attached` is a value that only counts written onto the flag, as in `sed -i.bak` or `make -j4`; `operands` replaces the row's operand roles wherever the flag appears, as `grep -e` turns every operand into a file. |
 | `values` | Flags that take a value whose role matters, where the flag changes nothing else. |
 | `flagStyle` | `posix` by default; `words` turns off single-dash bundling for programs whose flags are whole words, such as `find -exec`. |
-| `sub` | Subcommands, each a row of its own. |
+| `sub` | Subcommands, each a row of its own. A key may run to several words, as `'pr create'` does, and the longest key the words after the program spell out answers. |
 | `versioned` | The program answers to a version-suffixed name too: `python3` reaches the `python` row. |
 | `nestedHere` | This command hands over to another one carried as separate words on the same line. |
 | `assignmentsFirst` | The command carries leading `NAME=value` settings before the command, as `env` does. |
@@ -86,7 +86,7 @@ const problems = validate(pack)   // Problem[] — each { where, says }
 
 - A row that deletes cannot say it can be put back.
 - A row that transmits cannot claim it touches no network.
-- A base row may not promise what one of its subcommands breaks.
+- A base row may not promise what one of its subcommands breaks, and a subcommand may not promise what a longer one under it breaks: `pr` answers for `pr lock` when the table holds `pr create` but not `pr lock`.
 - An opaque row has to name what it hands over to.
 
 It does not check register or jargon. Those are editorial, and a pack should not fail to load over a sentence that reads badly.
