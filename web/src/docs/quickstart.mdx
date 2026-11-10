@@ -61,7 +61,7 @@ facts.confidence   // whether to trust the first two
 
 ### Gate before you render
 
-`confidence` says where the answer came from. `verified` is a hand-written row for that exact command, from a pack you vouched for. Anything else is a reason to show less certainty, not a reason to hide the command.
+`confidence` says where the answer came from. `verified` is a row written for that exact command, from a pack you vouched for. Anything else is a reason to show less certainty, not a reason to hide the command.
 
 ```ts
 if (facts.confidence !== 'verified') {

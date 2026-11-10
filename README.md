@@ -315,7 +315,7 @@ read too, and the stream comes back as `fd`.
 
 ### `confidence` and `source`
 
-`verified` is a hand-written row for that exact command, from a pack the consumer vouched for. `derived` is a row
+`verified` is a row written for that exact command, from a pack the consumer vouched for. `derived` is a row
 that was not written for this command, or was not vouched for: a subcommand the table does not hold, falling back to
 the deliberately cautious base row; a fact set that absorbed a nested command's reach; a row from a pack that was not
 named in `trust`. `unknown` means there is no entry at all: the fields are then the widest ones, a floor rather than a
