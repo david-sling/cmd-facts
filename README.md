@@ -8,27 +8,21 @@ assumed never to have opened a terminal. **It is not a man-page browser and not 
 `-a` does not ignore entries starting with a dot, and it will not tell you that your command could be written better.
 Everything here answers one question: if this runs, what happens to this computer?
 
-## This is early, and the explanations can be wrong
+## Early stage
 
-The rows are hand-written, one command at a time, and there are not many of them yet. Expect both kinds of gap: a
-command nothing answers for, which comes back as the widest floor with a `says` that admits it, and — the one that
-matters — a command that is answered confidently and answered wrong. A sentence that misses what a flag does, a
-fact set narrower than what the command can actually reach, an argument read as the wrong kind of thing.
+The command table is hand-written and still small, so an explanation can be incomplete or wrong: a sentence that
+misses what a flag does, a fact set narrower than what the command can actually reach, an argument read as the wrong
+kind of thing. A command with no row at all comes back as the widest floor, with a `says` that admits it.
 
-A wrong answer above a command someone is about to approve is the worst failure this project has. Reports are the
-only way the table gets correct, so they are worth more here than almost anywhere else.
+Report anything that reads wrong — the command you ran, what came back, and what it should have said:
 
-**[Report an inaccurate explanation →](https://github.com/david-sling/cmd-facts/issues/new?template=inaccurate-explanation.yml)**
-&nbsp;·&nbsp;
-[Report a command nothing answers for →](https://github.com/david-sling/cmd-facts/issues/new?template=missing-command.yml)
+- [Inaccurate explanation](https://github.com/david-sling/cmd-facts/issues/new?template=inaccurate-explanation.yml)
+- [Command with no row](https://github.com/david-sling/cmd-facts/issues/new?template=missing-command.yml)
 
-Both land on the
-[`inaccurate-explanation`](https://github.com/david-sling/cmd-facts/issues?q=is%3Aissue+label%3Ainaccurate-explanation)
-label, which is where the accuracy backlog lives. Say what you ran, what came back, and what it should have said.
+Both are labelled [`inaccurate-explanation`](https://github.com/david-sling/cmd-facts/issues?q=is%3Aissue+label%3Ainaccurate-explanation).
 
-Until the table settles, gate on `confidence`: `verified` is a row hand-written for that exact command from a pack
-you vouched for, and it is the only tier that should ever feed an automatic decision. Everything else is a floor,
-and the point of showing it is that a person gets to look at it.
+Gate on `confidence` until coverage settles. `verified` is a row written by hand for that exact command, from a pack
+you trust, and it is the only tier that should feed an automatic decision.
 
 ## The schema is the deliverable
 

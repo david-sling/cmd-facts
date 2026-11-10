@@ -220,9 +220,9 @@ export function DocsPage({ doc }: { doc: Doc }) {
         <div id="docs-side" className="docs-side-wrap">
           <Sidebar current={doc.slug} />
           <div className="docs-side-foot">
-            {/* early table, so the way to report a wrong row sits wherever the reader is standing */}
+            {/* the table is still small, so the way to report a wrong row sits on every page */}
             <a className="docs-report" href={REPORT_URL} target="_blank" rel="noreferrer">
-              Report a wrong explanation
+              Report an inaccurate explanation
             </a>
             <p className="docs-version">MIT · no runtime dependencies</p>
           </div>

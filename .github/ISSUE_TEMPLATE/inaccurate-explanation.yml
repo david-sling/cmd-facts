@@ -6,11 +6,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        This library is early. The rows are hand-written, and a wrong answer above a command someone
-        is about to approve is the worst failure it has — so this report is worth more here than
-        almost anywhere else.
+        The command table is hand-written and still small, so explanations can be wrong. Thanks for
+        reporting one.
 
-        For a command nothing answers for at all, open a **Missing command** issue instead.
+        For a command with no row at all, use the **Command with no row** form instead.
   - type: input
     id: command
     attributes:
@@ -33,7 +32,7 @@ body:
       label: What it should have said
       description: >-
         What the command actually does to the computer. A link to the man page or official docs
-        helps the row get written correctly.
+        helps when the row is rewritten.
     validations:
       required: true
   - type: checkboxes

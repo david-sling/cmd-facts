@@ -22,8 +22,8 @@ export const OG_IMAGE = `${SITE}/og.png`
 export const REPO_URL = 'https://github.com/david-sling/cmd-facts'
 
 /**
- * The table is hand-written and early, so a wrong answer is the report worth asking for. Both forms
- * carry the `inaccurate-explanation` label, which is where the accuracy backlog is kept.
+ * The two issue forms for a wrong or missing explanation. Both carry the `inaccurate-explanation`
+ * label, so the accuracy backlog is one label rather than a search.
  */
 export const REPORT_URL = `${REPO_URL}/issues/new?template=inaccurate-explanation.yml`
 export const MISSING_URL = `${REPO_URL}/issues/new?template=missing-command.yml`
