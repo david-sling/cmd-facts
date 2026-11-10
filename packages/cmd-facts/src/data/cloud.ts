@@ -1117,8 +1117,23 @@ const TERRAFORM: Entry = words({
 
 // ── Helm ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+type Sub = NonNullable<Entry['sub']>[string]
+
+const ON_THE_LINE = 'Values given on the line itself can be seen and kept in the history of commands.'
+
 const HELM = 'https://helm.sh/docs/helm/'
 const HELM_CHART = 'the ready-made set it installs, whose contents and set-up steps were decided by whoever wrote it'
+// An address whose scheme an installed downloader add-on claims (s3://, secrets://) is fetched by running that add-on,
+// and the scheme is part of the argument's text, so every line that fetches a set or a settings file can hand over.
+const HELM_ADDON = 'an add-on command installed for this tool, where an address it was given calls for one'
+const HELM_FETCH = {
+  effect: ['execute'] as Effect[],
+  opaque: true,
+  handsOverTo: HELM_ADDON,
+  network: 'arbitrary',
+  reversible: 'unknown',
+  repeatSafe: false,
+} as const
 
 const HELM_VALUES: Record<string, Role> = {
   ...valuesOf('text', ['--kube-context', '-n', '--namespace', '--burst-limit', '--qps', '--kube-as-user', '--kube-as-group', '--kube-tls-server-name']),
@@ -1146,13 +1161,48 @@ const HELM_RENDERER: FlagRule = {
     repeatSafe: false,
   },
 }
-const HELM_SET: Record<string, Role> = {
-  ...valuesOf('path', ['-f', '--values', '--ca-file', '--cert-file', '--keyring']),
+const HELM_SET_INLINE: Record<string, Role> = {
+  ...valuesOf('path', ['--ca-file', '--cert-file', '--keyring']),
   ...valuesOf('text', [
-    '--set', '--set-string', '--set-file', '--set-json', '--set-literal', '--version', '--username', '-o', '--output', '--timeout',
+    '--set', '--set-string', '--set-json', '--set-literal', '--version', '--username', '-o', '--output', '--timeout',
     '--description', '--post-renderer-args', '--name-template', '--labels', '--kube-version', '-a', '--api-versions',
   ]),
   '--repo': 'url',
+}
+const HELM_SET: Record<string, Role> = { ...valuesOf('path', ['-f', '--values']), '--set-file': 'text', ...HELM_SET_INLINE }
+const HELM_FILES: FlagRule[] = [
+  { flags: ['-f', '--values'], takesValue: true, role: 'path', facts: HELM_FETCH },
+  { flags: ['--set-file'], takesValue: true, role: 'text', facts: HELM_FETCH },
+]
+// `install`, `upgrade` and `template` take `-l` for `--labels`; `list -l` is a selector.
+const HELM_RELEASE: Record<string, Role> = { ...HELM_SET, '-l': 'text' }
+// Charts run their pre- and post-delete or rollback steps on the cluster. `--no-hooks` stops them, but a flag cannot
+// narrow a row, so it is left unread.
+const HELM_UNINSTALL: Sub = {
+  facts: opaqueFact('Removes an installed set of programs from a Kubernetes cluster, with what it was running.', 'the clean-up steps the ready-made set brings, which run on the cluster', {
+    privilege: 'none', touchesCredentials: false,
+    effect: ['delete', 'terminate', 'execute'],
+    network: 'known-host',
+    reversible: 'no',
+    docs: HELM,
+  }),
+  operands: ['text'],
+  values: valuesOf('text', ['--timeout', '--cascade', '--description', '--deletion-propagation']),
+}
+const HELM_REPO_LIST: Sub = { facts: fact('Lists the places ready-made sets of programs are downloaded from.', { ...LOOKS, docs: HELM }), values: valuesOf('text', ['-o', '--output']) }
+const HELM_REPO_REMOVE: Sub = {
+  facts: fact('Removes a saved place ready-made sets of programs are downloaded from.', { ...LOCAL, repeatSafe: true, effect: ['configure', 'delete'], reversible: 'unknown', docs: HELM }),
+  operands: ['text'],
+}
+const HELM_PLUGIN_LIST: Sub = { facts: fact('Lists the add-on commands installed for this tool.', { ...LOOKS, docs: HELM }) }
+const HELM_PLUGIN_REMOVE: Sub = {
+  facts: opaqueFact('Removes add-on commands for this tool.', 'the clean-up step the add-on brings, which can do anything a program on this computer can', {
+    privilege: 'none', touchesCredentials: false,
+    effect: ['delete', 'execute'],
+    network: 'arbitrary',
+    docs: HELM,
+  }),
+  operands: ['text'],
 }
 
 const HELM_ENTRY: Entry = everywhere(
@@ -1172,44 +1222,48 @@ const HELM_ENTRY: Entry = everywhere(
     globals: globalsOf(HELM_VALUES, HELM_KEYS),
     sub: {
       install: {
-        facts: opaqueFact('Installs a ready-made set of programs on a Kubernetes cluster.', HELM_CHART, {
+        facts: opaqueFact('Installs a ready-made set of programs on a Kubernetes cluster.', `${HELM_CHART}, or ${HELM_ADDON}`, {
           privilege: 'none', touchesCredentials: false,
           effect: ['create', 'execute', 'install'],
           network: 'arbitrary',
           docs: HELM,
         }),
         operands: ['text', 'package'],
-        values: HELM_SET,
+        values: HELM_RELEASE,
         flags: [...HELM_SIGN_IN, HELM_RENDERER],
       },
       upgrade: {
-        facts: opaqueFact('Moves an installed set of programs on a Kubernetes cluster to a new version or new settings.', HELM_CHART, {
+        facts: opaqueFact('Moves an installed set of programs on a Kubernetes cluster to a new version or new settings.', `${HELM_CHART}, or ${HELM_ADDON}`, {
           privilege: 'none', touchesCredentials: false,
           effect: ['create', 'write', 'delete', 'execute', 'install'],
           network: 'arbitrary',
           docs: HELM,
         }),
         operands: ['text', 'package'],
-        values: { ...HELM_SET, '--history-max': 'text' },
+        values: { ...HELM_RELEASE, '--history-max': 'text' },
         flags: [...HELM_SIGN_IN, HELM_RENDERER],
       },
       template: {
-        facts: fact('Shows the files a ready-made set of programs would put on a Kubernetes cluster, without installing it.', {
-          effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true,
+        facts: opaqueFact('Shows the files a ready-made set of programs would put on a Kubernetes cluster, without installing it.', HELM_ADDON, {
+          effect: ['read', 'execute'], privilege: 'none', touchesCredentials: false,
           network: 'arbitrary',
           docs: HELM,
         }),
         operands: ['text', 'package'],
-        values: { ...HELM_SET, '--output-dir': 'path', '-s': 'text', '--show-only': 'text' },
+        values: { ...HELM_RELEASE, '--output-dir': 'path', '-s': 'text', '--show-only': 'text' },
         flags: [...HELM_SIGN_IN, HELM_RENDERER],
       },
-      uninstall: {
-        facts: removes('Removes an installed set of programs from a Kubernetes cluster, with what it was running.', HELM, { effect: ['delete', 'terminate'] }),
-        operands: ['text'],
-        values: valuesOf('text', ['--timeout', '--cascade', '--description', '--deletion-propagation']),
-      },
+      uninstall: HELM_UNINSTALL,
+      delete: HELM_UNINSTALL,
+      del: HELM_UNINSTALL,
+      un: HELM_UNINSTALL,
       rollback: {
-        facts: changes('Puts an installed set of programs on a Kubernetes cluster back to an earlier version.', HELM, ['write', 'delete', 'create']),
+        facts: opaqueFact('Puts an installed set of programs on a Kubernetes cluster back to an earlier version.', 'the steps the ready-made set brings for going back, which run on the cluster', {
+          privilege: 'none', touchesCredentials: false,
+          effect: ['write', 'delete', 'create', 'execute'],
+          network: 'known-host',
+          docs: HELM,
+        }),
         operands: ['text'],
         values: valuesOf('text', ['--timeout', '--history-max']),
       },
@@ -1236,11 +1290,10 @@ const HELM_ENTRY: Entry = everywhere(
         values: valuesOf('text', ['--timeout', '--filter']),
       },
       pull: {
-        facts: fact('Downloads a ready-made set of programs to this computer, without installing it.', {
-          privilege: 'none', touchesCredentials: false, repeatSafe: true,
-          effect: ['create', 'install'],
+        facts: opaqueFact('Downloads a ready-made set of programs to this computer, without installing it.', HELM_ADDON, {
+          privilege: 'none', touchesCredentials: false,
+          effect: ['create', 'install', 'execute'],
           network: 'arbitrary',
-          reversible: 'unknown',
           docs: HELM,
         }),
         operands: ['package'],
@@ -1257,21 +1310,50 @@ const HELM_ENTRY: Entry = everywhere(
         flags: HELM_SIGN_IN,
       },
       repo: {
-        facts: changes('Adds, updates, lists or removes the places ready-made sets of programs are downloaded from.', HELM, ['read', 'write', 'configure', 'delete'], {
+        facts: opaqueFact('Adds, updates, lists or removes the places ready-made sets of programs are downloaded from.', HELM_ADDON, {
+          privilege: 'none',
+          effect: ['read', 'create', 'write', 'configure', 'delete', 'execute'],
           network: 'arbitrary',
           touchesCredentials: true,
+          docs: HELM,
         }),
         operands: ['text'],
       },
       'repo add': {
-        facts: changes('Adds a place ready-made sets of programs can be downloaded from.', HELM, ['configure'], { network: 'arbitrary', repeatSafe: true }),
+        facts: opaqueFact('Adds a place ready-made sets of programs can be downloaded from.', HELM_ADDON, {
+          privilege: 'none', touchesCredentials: false,
+          effect: ['configure', 'execute'],
+          network: 'arbitrary',
+          docs: HELM,
+        }),
         operands: ['text', 'url'],
         values: { ...valuesOf('path', ['--ca-file', '--cert-file']), '--username': 'text' },
         flags: HELM_SIGN_IN,
       },
-      'repo update': { facts: reads('Downloads the latest lists of what each saved place offers.', HELM, { effect: ['read', 'write'], network: 'arbitrary' }), operands: ['text'] },
-      'repo list': { facts: fact('Lists the places ready-made sets of programs are downloaded from.', { ...LOOKS, docs: HELM }), values: valuesOf('text', ['-o', '--output']) },
-      'repo remove': { facts: fact('Removes a saved place ready-made sets of programs are downloaded from.', { ...LOCAL, repeatSafe: true, effect: ['configure', 'delete'], reversible: 'unknown', docs: HELM }), operands: ['text'] },
+      'repo update': {
+        facts: opaqueFact('Downloads the latest lists of what each saved place offers.', HELM_ADDON, {
+          privilege: 'none', touchesCredentials: false,
+          effect: ['read', 'write', 'execute'],
+          network: 'arbitrary',
+          docs: HELM,
+        }),
+        operands: ['text'],
+      },
+      'repo list': HELM_REPO_LIST,
+      'repo ls': HELM_REPO_LIST,
+      'repo remove': HELM_REPO_REMOVE,
+      'repo rm': HELM_REPO_REMOVE,
+      'repo index': {
+        facts: fact('Writes the list of the ready-made sets in a folder, so the folder can be served as a place to download them from.', {
+          ...LOCAL, repeatSafe: true,
+          effect: ['read', 'create', 'write'],
+          reversible: 'no',
+          docs: HELM,
+        }),
+        operands: ['path'],
+        values: { '--url': 'url', '--merge': 'path' },
+        plain: ['--json'],
+      },
       registry: {
         facts: fact('Signs in to or out of a service that stores ready-made sets of programs.', {
           privilege: 'none', repeatSafe: true,
@@ -1294,27 +1376,43 @@ const HELM_ENTRY: Entry = everywhere(
         }),
         operands: ['text'],
       },
-      'plugin list': { facts: fact('Lists the add-on commands installed for this tool.', { ...LOOKS, docs: HELM }) },
+      'plugin list': HELM_PLUGIN_LIST,
+      'plugin ls': HELM_PLUGIN_LIST,
+      'plugin uninstall': HELM_PLUGIN_REMOVE,
+      'plugin rm': HELM_PLUGIN_REMOVE,
+      'plugin remove': HELM_PLUGIN_REMOVE,
       dependency: {
-        facts: fact('Downloads or lists the other ready-made sets one set of programs needs.', {
-          privilege: 'none', touchesCredentials: false, repeatSafe: true,
-          effect: ['read', 'create', 'install'],
+        facts: opaqueFact('Downloads or lists the other ready-made sets one set of programs needs.', HELM_ADDON, {
+          privilege: 'none', touchesCredentials: false,
+          effect: ['read', 'create', 'install', 'execute'],
           network: 'arbitrary',
-          reversible: 'unknown',
           docs: HELM,
         }),
         operands: ['text', 'path'],
         values: { '--keyring': 'path' },
       },
       create: { facts: fact('Makes a new folder with the starting files for a ready-made set of programs.', { ...LOCAL, reversible: 'yes', repeatSafe: true, effect: ['create'], docs: HELM }), operands: ['path'], values: { '-p': 'text', '--starter': 'text' } },
-      lint: { facts: fact('Checks a ready-made set of programs for mistakes.', { ...LOOKS, docs: HELM }), operands: ['path'], values: HELM_SET },
+      lint: { facts: fact('Checks a ready-made set of programs for mistakes.', { ...LOOKS, docs: HELM }), operands: ['path'], values: HELM_SET_INLINE, flags: HELM_FILES },
       package: {
         facts: fact('Packs a folder of files into a ready-made set of programs that can be shared.', { ...LOCAL, reversible: 'yes', repeatSafe: true, effect: ['read', 'create'], docs: HELM }),
         operands: ['path'],
-        values: { ...valuesOf('path', ['-d', '--destination', '--keyring', '--passphrase-file']), ...valuesOf('text', ['--version', '--app-version', '--key']) },
+        values: { ...valuesOf('path', ['-d', '--destination', '--keyring']), ...valuesOf('text', ['--version', '--app-version', '--key']) },
+        flags: [
+          { flags: ['--sign'], facts: { touchesCredentials: true, note: 'It signs the set with a private key kept on this computer.' } },
+          { flags: ['--passphrase-file'], takesValue: true, role: 'path', facts: { touchesCredentials: true } },
+        ],
       },
       search: { facts: reads('Searches for ready-made sets of programs to install.', HELM, { network: 'arbitrary' }), operands: ['text'], values: valuesOf('text', ['-o', '--output', '--version', '--max-col-width', '--endpoint']) },
-      show: { facts: reads('Shows the description and settings of a ready-made set of programs.', HELM, { network: 'arbitrary' }), operands: ['text', 'package'], values: { ...HELM_SET } },
+      show: {
+        facts: opaqueFact('Shows the description and settings of a ready-made set of programs.', HELM_ADDON, {
+          privilege: 'none', touchesCredentials: false,
+          effect: ['read', 'execute'],
+          network: 'arbitrary',
+          docs: HELM,
+        }),
+        operands: ['text', 'package'],
+        values: { ...HELM_SET },
+      },
       version: { facts: fact('Shows which version of this tool is installed.', { ...LOOKS, docs: HELM }), values: { '--template': 'text' } },
       env: { facts: fact('Shows the settings and folders this tool uses.', { ...LOOKS, docs: HELM }) },
     },
@@ -1335,15 +1433,27 @@ const AWS_VALUES: Record<string, Role> = {
   '--endpoint-url': 'url',
   '--ca-bundle': 'path',
 }
-const AWS_FLAGS: FlagRule[] = [{ flags: ['--no-verify-ssl'], facts: { note: 'It does not check that the service is the one it claims to be.' } }]
+// `--cli-auto-prompt` is left out: it asks for the rest of the command and runs whatever is built there.
+const AWS_FLAGS: FlagRule[] = [
+  { flags: ['--no-verify-ssl'], facts: { note: 'It does not check that the service is the one it claims to be.' } },
+  { flags: ['--debug'], facts: { touchesCredentials: true, note: 'It prints every request in full, which can include the short-lived key in use.' } },
+]
+const AWS_PLAIN = ['--no-paginate', '--no-cli-pager', '--no-sign-request', '--no-cli-auto-prompt']
+// Switches every command takes, stepped over before the subcommand and read as `plain` on every row.
+const plainEverywhere = (entry: Entry, plain: string[]): Entry => ({
+  ...entry,
+  globals: [...(entry.globals ?? []), { flags: plain, facts: {} }],
+  plain: [...(entry.plain ?? []), ...plain],
+  sub: Object.fromEntries(Object.entries(entry.sub ?? {}).map(([word, rule]) => [word, { ...rule, plain: [...(rule.plain ?? []), ...plain] }])),
+})
 
 const S3_COPY: Record<string, Role> = {
   ...valuesOf('pattern', ['--include', '--exclude']),
   ...valuesOf('text', [
-    '--sse', '--sse-c', '--sse-kms-key-id', '--sse-c-copy-source', '--storage-class', '--grants', '--website-redirect', '--content-type',
+    '--sse', '--sse-c', '--sse-kms-key-id', '--sse-c-copy-source', '--storage-class', '--website-redirect', '--content-type',
     '--cache-control', '--content-disposition', '--content-encoding', '--content-language', '--expires', '--source-region',
     '--request-payer', '--checksum-mode', '--checksum-algorithm', '--copy-props', '--metadata', '--metadata-directive',
-    '--expected-size', '--case-conflict', '--page-size',
+    '--case-conflict', '--page-size', '--progress-frequency',
   ]),
 }
 const S3_ACL: FlagRule = {
@@ -1352,9 +1462,13 @@ const S3_ACL: FlagRule = {
   role: 'text',
   facts: { note: 'It sets who can read the files it writes, which can be anyone on the internet.' },
 }
+// `--grants` takes one or more values. Any after the first are read as more operands, which are only text here.
+const S3_GRANTS: FlagRule = { ...S3_ACL, flags: ['--grants'] }
+// A customer-held encryption key, written on the line.
+const S3_KEY: FlagRule = { flags: ['--sse-c-key', '--sse-c-copy-source-key'], takesValue: true, role: 'text', facts: { touchesCredentials: true, note: ON_THE_LINE } }
 const S3_EVERYTHING: FlagRule = { flags: ['--recursive'], facts: { note: 'Everything under the address goes, not one file.' } }
 
-const AWS_ENTRY: Entry = everywhere(
+const AWS_ENTRY: Entry = plainEverywhere(everywhere(
   {
     facts: opaqueFact(
       "Works with the services of an account on Amazon's cloud, including ones that remove or replace what is there.",
@@ -1391,8 +1505,8 @@ const AWS_ENTRY: Entry = everywhere(
           docs: AWS,
         }),
         operands: ['text'],
-        values: S3_COPY,
-        flags: [S3_ACL],
+        values: { ...S3_COPY, '--expected-size': 'text' },
+        flags: [S3_ACL, S3_GRANTS, S3_KEY],
       },
       's3 sync': {
         facts: fact("Copies whatever is new or changed between a folder and storage on Amazon's cloud.", {
@@ -1404,7 +1518,7 @@ const AWS_ENTRY: Entry = everywhere(
         }),
         operands: ['text'],
         values: S3_COPY,
-        flags: [S3_ACL, { flags: ['--delete'], facts: { effect: ['delete'], note: 'Files at the far end that are not at the near end are removed.' } }],
+        flags: [S3_ACL, S3_GRANTS, S3_KEY, { flags: ['--delete'], facts: { effect: ['delete'], note: 'Files at the far end that are not at the near end are removed.' } }],
       },
       's3 mv': {
         facts: fact("Moves files between this computer and storage on Amazon's cloud, replacing any with the same name.", {
@@ -1416,12 +1530,12 @@ const AWS_ENTRY: Entry = everywhere(
         }),
         operands: ['text'],
         values: S3_COPY,
-        flags: [S3_ACL],
+        flags: [S3_ACL, S3_GRANTS, S3_KEY],
       },
       's3 rm': {
         facts: removes("Removes files from storage on Amazon's cloud.", AWS),
         operands: ['url'],
-        values: valuesOf('pattern', ['--include', '--exclude']),
+        values: { ...valuesOf('pattern', ['--include', '--exclude']), ...valuesOf('text', ['--request-payer', '--page-size']) },
         flags: [S3_EVERYTHING],
       },
       's3 mb': { facts: changes("Makes a new storage bucket on Amazon's cloud.", AWS, ['create'], { reversible: 'yes' }), operands: ['url'] },
@@ -1532,7 +1646,11 @@ const AWS_ENTRY: Entry = everywhere(
         values: valuesOf('text', ['--instance-ids']),
       },
       'ec2 stop-instances': {
-        facts: changes("Stops cloud computers on Amazon's cloud, keeping their disks.", AWS, ['terminate'], { reversible: 'yes', repeatSafe: true }),
+        facts: changes("Stops cloud computers on Amazon's cloud, keeping their lasting disks but wiping any temporary ones.", AWS, ['terminate', 'delete'], {
+          reversible: 'no',
+          repeatSafe: true,
+          note: 'Unless its public address was reserved, it gets a different one when it starts again.',
+        }),
         values: valuesOf('text', ['--instance-ids']),
       },
       'ec2 start-instances': {
@@ -1561,7 +1679,7 @@ const AWS_ENTRY: Entry = everywhere(
   },
   AWS_VALUES,
   AWS_FLAGS,
-)
+), AWS_PLAIN)
 
 // ── Google Cloud ───────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -1579,6 +1697,7 @@ const GCLOUD_FLAGS: FlagRule[] = [
   { flags: ['-q', '--quiet'], facts: { note: 'It answers yes to every question it would have asked first.' } },
 ]
 const GCLOUD_PLACE = valuesOf('text', ['--zone', '--region'])
+const GCLOUD_SSH_KEY = 'The first time, it makes a sign-in key here and adds it to the project, which lets that key into its cloud computers.'
 
 const GCLOUD_ENTRY: Entry = everywhere(
   {
@@ -1642,10 +1761,35 @@ const GCLOUD_ENTRY: Entry = everywhere(
           touchesCredentials: true,
           reversible: 'unknown',
           repeatSafe: false,
-          note: KEY_SHOWN,
           docs: GCLOUD,
         }),
         operands: ['text'],
+      },
+      'auth application-default login': {
+        facts: fact('Signs the programs on this computer in to Google Cloud, and keeps the sign-in in a file they read.', {
+          reversible: 'yes', privilege: 'none', repeatSafe: true,
+          effect: ['create', 'configure'],
+          network: 'known-host',
+          touchesCredentials: true,
+          docs: GCLOUD,
+        }),
+        operands: ['text'],
+        values: { ...valuesOf('path', ['--client-id-file', '--login-config']), '--scopes': 'text' },
+        plain: ['--browser', '--no-browser', '--launch-browser', '--no-launch-browser', '--disable-quota-project'],
+      },
+      'auth application-default print-access-token': {
+        facts: fact('Shows a short-lived key that the programs on this computer use to act as their Google Cloud account.', { effect: ['read'], reversible: 'yes', privilege: 'none', repeatSafe: true, network: 'known-host', touchesCredentials: true, note: KEY_SHOWN, docs: GCLOUD }),
+        values: { '--scopes': 'text' },
+      },
+      'auth application-default revoke': {
+        facts: fact('Signs the programs on this computer out of Google Cloud and removes the sign-in they used.', {
+          privilege: 'none', repeatSafe: true,
+          effect: ['delete', 'configure'],
+          network: 'known-host',
+          touchesCredentials: true,
+          reversible: 'unknown',
+          docs: GCLOUD,
+        }),
       },
       'auth revoke': {
         facts: fact('Signs an account out of Google Cloud and removes its saved sign-in from this computer.', {
@@ -1660,8 +1804,10 @@ const GCLOUD_ENTRY: Entry = everywhere(
       },
       config: {
         facts: fact('Shows or changes the settings this tool uses, such as the project it works on.', {
-          ...LOCAL, repeatSafe: true,
+          privilege: 'none', repeatSafe: true,
           effect: ['read', 'configure'],
+          network: 'known-host',
+          touchesCredentials: true,
           reversible: 'unknown',
           docs: GCLOUD,
         }),
@@ -1669,6 +1815,17 @@ const GCLOUD_ENTRY: Entry = everywhere(
       },
       'config list': { facts: fact('Lists the settings this tool uses, such as the project it works on.', { ...LOOKS, docs: GCLOUD }) },
       'config get': { facts: fact('Shows one setting this tool uses.', { ...LOOKS, docs: GCLOUD }), operands: ['text'] },
+      'config config-helper': {
+        facts: fact('Shows the settings this tool uses, with a short-lived key that acts as the signed-in Google Cloud account.', {
+          effect: ['read'], reversible: 'yes', privilege: 'none', repeatSafe: true,
+          network: 'known-host',
+          touchesCredentials: true,
+          note: KEY_SHOWN,
+          docs: GCLOUD,
+        }),
+        values: { '--min-expiry': 'text' },
+        plain: ['--force-auth-refresh'],
+      },
       projects: {
         facts: changes('Lists, makes or removes projects on Google Cloud, or changes who can reach them.', GCLOUD, ['read', 'create', 'configure', 'delete', 'terminate'], {
           reversible: 'no',
@@ -1686,8 +1843,8 @@ const GCLOUD_ENTRY: Entry = everywhere(
       },
       compute: {
         facts: opaqueFact('Works with the cloud computers of a project on Google Cloud, and connects to them.', 'whatever is run on the cloud computer it connects to', {
-          privilege: 'none', touchesCredentials: false,
-          effect: ['read', 'create', 'delete', 'execute', 'terminate', 'transmit'],
+          privilege: 'none', touchesCredentials: true,
+          effect: ['read', 'create', 'delete', 'execute', 'terminate', 'transmit', 'configure'],
           network: 'known-host',
           reversible: 'no',
           docs: GCLOUD,
@@ -1712,9 +1869,22 @@ const GCLOUD_ENTRY: Entry = everywhere(
         values: { ...GCLOUD_PLACE, '--delete-disks': 'text', '--keep-disks': 'text' },
       },
       'compute instances stop': {
-        facts: changes('Stops cloud computers on Google Cloud, keeping their disks.', GCLOUD, ['terminate'], { reversible: 'yes', repeatSafe: true }),
+        facts: changes('Stops cloud computers on Google Cloud, keeping their lasting disks.', GCLOUD, ['terminate'], {
+          reversible: 'unknown',
+          repeatSafe: true,
+          note: 'Unless its public address was reserved, it gets a different one when it starts again.',
+        }),
         operands: ['text'],
         values: GCLOUD_PLACE,
+        plain: ['--async'],
+        flags: [
+          {
+            flags: ['--discard-local-ssd'],
+            attached: true,
+            role: 'text',
+            facts: { effect: ['delete'], reversible: 'no', note: 'It can wipe the fast disks built into the computer it stops.' },
+          },
+        ],
       },
       'compute instances start': {
         facts: changes('Starts stopped cloud computers on Google Cloud.', GCLOUD, ['execute'], { reversible: 'yes', repeatSafe: true }),
@@ -1723,21 +1893,28 @@ const GCLOUD_ENTRY: Entry = everywhere(
       },
       'compute ssh': {
         facts: opaqueFact('Connects to a cloud computer on Google Cloud and works on it from here.', 'whatever is run on the cloud computer it connects to', {
-          privilege: 'none', touchesCredentials: false,
-          effect: ['execute'],
+          privilege: 'none', touchesCredentials: true,
+          effect: ['execute', 'create', 'configure'],
           network: 'known-host',
+          note: GCLOUD_SSH_KEY,
           docs: GCLOUD,
         }),
         operands: ['text', 'text'],
-        values: { ...GCLOUD_PLACE, '--ssh-key-file': 'path', ...valuesOf('text', ['--ssh-flag', '--container', '--internal-ip', '--strict-host-key-checking']) },
+        values: {
+          ...GCLOUD_PLACE,
+          '--ssh-key-file': 'path',
+          ...valuesOf('text', ['--ssh-flag', '--container', '--strict-host-key-checking', '--ssh-key-expire-after', '--ssh-key-expiration']),
+        },
+        plain: ['--internal-ip', '--tunnel-through-iap'],
         flags: [{ flags: ['--command'], takesValue: true, role: 'text', facts: {} }],
       },
       'compute scp': {
         facts: fact('Copies files between this computer and a cloud computer on Google Cloud.', {
-          privilege: 'none', touchesCredentials: false, repeatSafe: true,
-          effect: ['read', 'create', 'write', 'transmit'],
+          privilege: 'none', touchesCredentials: true, repeatSafe: true,
+          effect: ['read', 'create', 'write', 'transmit', 'configure'],
           network: 'known-host',
           reversible: 'no',
+          note: GCLOUD_SSH_KEY,
           docs: GCLOUD,
         }),
         operands: ['text'],
@@ -1801,7 +1978,15 @@ const GCLOUD_ENTRY: Entry = everywhere(
       'secrets versions access': {
         facts: reads('Shows a secret a project keeps on Google Cloud, in readable form.', GCLOUD, { touchesCredentials: true, note: SHOWN }),
         operands: ['text'],
-        values: valuesOf('text', ['--secret', '--out-file']),
+        values: valuesOf('text', ['--secret', '--location']),
+        flags: [
+          {
+            flags: ['--out-file'],
+            takesValue: true,
+            role: 'path',
+            facts: { effect: ['create', 'write'], reversible: 'no', note: 'The secret is written to that file in readable form.' },
+          },
+        ],
       },
       'container clusters get-credentials': {
         facts: fact('Saves the sign-in details for a Kubernetes cluster on Google Cloud, so commands here can reach it.', {
@@ -1823,10 +2008,10 @@ const GCLOUD_ENTRY: Entry = everywhere(
         values: valuesOf('text', ['--iam-account', '--key-file-type']),
       },
       components: {
-        facts: fact('Installs, updates, lists or removes the parts of this tool.', {
+        facts: fact('Installs, updates, lists or removes the parts of this tool, or changes where they come from.', {
           privilege: 'none', touchesCredentials: false, repeatSafe: true,
-          effect: ['read', 'create', 'write', 'delete', 'install'],
-          network: 'known-host',
+          effect: ['read', 'create', 'write', 'delete', 'install', 'configure'],
+          network: 'arbitrary',
           reversible: 'unknown',
           docs: GCLOUD,
         }),
@@ -1845,7 +2030,6 @@ const GCLOUD_ENTRY: Entry = everywhere(
 // ── Secret stores: 1Password and Doppler ──────────────────────────────────────────────────────────────────────────────
 
 const OP = 'https://developer.1password.com/docs/cli/reference/'
-const ON_THE_LINE = 'Values given on the line itself can be seen and kept in the history of commands.'
 
 const OP_VALUES: Record<string, Role> = { ...valuesOf('text', ['--account', '--encoding', '--format']), '--config': 'path' }
 const OP_KEYS: FlagRule[] = [{ flags: ['--session'], takesValue: true, role: 'text', facts: { touchesCredentials: true } }]
@@ -1913,7 +2097,11 @@ const OP_ENTRY: Entry = everywhere(
         facts: reads('Shows an item kept in 1Password, with its secret fields hidden unless asked for.', OP, { touchesCredentials: true }),
         operands: ['text'],
         values: OP_ITEM,
-        flags: [{ flags: ['--reveal'], facts: { note: `Its secret fields are shown in readable form. ${SHOWN}` } }],
+        flags: [
+          { flags: ['--reveal'], facts: { note: `Its secret fields are shown in readable form. ${SHOWN}` } },
+          // JSON output carries concealed values whether or not `--reveal` is given, and the value is not read.
+          { flags: ['--format'], takesValue: true, role: 'text', facts: { note: 'Written out as data for other programs, its secret fields are shown in readable form.' } },
+        ],
       },
       'item create': {
         facts: changes('Adds a new item to 1Password.', OP, ['create', 'transmit'], { touchesCredentials: true, note: ON_THE_LINE }),
@@ -2017,8 +2205,9 @@ const DOPPLER_ENTRY: Entry = everywhere(
         nestedHere: true,
         values: {
           ...valuesOf('path', ['--mount', '--mount-template', '--fallback']),
-          ...valuesOf('text', ['--mount-format', '--name-transformer', '--mount-max-reads', '--passphrase']),
+          ...valuesOf('text', ['--mount-format', '--name-transformer', '--mount-max-reads', '--passphrase', '--only-secrets']),
         },
+        plain: ['--watch', '--forward-signals'],
         flags: [{ flags: ['--command'], takesValue: true, role: 'command', facts: {} }],
       },
       secrets: {
@@ -2041,12 +2230,13 @@ const DOPPLER_ENTRY: Entry = everywhere(
       },
       'secrets delete': { facts: removes('Removes secrets kept in Doppler.', DOPPLER, { touchesCredentials: true }), operands: ['text'] },
       'secrets download': {
-        facts: fact('Saves the secrets kept in Doppler for a project to a file, in readable form.', {
+        facts: fact('Saves the secrets kept in Doppler for a project to a file, locked with a passphrase.', {
           privilege: 'none', repeatSafe: true,
           effect: ['read', 'create', 'write'],
           network: 'known-host',
           touchesCredentials: true,
           reversible: 'no',
+          note: "Unless one is given, the passphrase is worked out from this computer's Doppler settings, so they open the file too.",
           docs: DOPPLER,
         }),
         operands: ['path'],
@@ -2109,6 +2299,13 @@ const VERCEL_VALUES: Record<string, Role> = {
 const VERCEL_KEYS: FlagRule[] = [{ flags: ['-t', '--token'], takesValue: true, role: 'text', facts: { touchesCredentials: true } }]
 const VERCEL_LIST = valuesOf('text', ['-m', '--meta', '--environment', '-N', '--next', '-p', '--policy'])
 const VERCEL_PROD: FlagRule = { flags: ['--prod'], facts: { note: 'It replaces what the live address shows.' } }
+const VERCEL_TARGET: FlagRule = {
+  flags: ['--target'],
+  takesValue: true,
+  role: 'text',
+  facts: { note: 'Where the target named is the live one, it replaces what the live address shows.' },
+}
+const VERCEL_PULLS = "It downloads the project's secret settings from Vercel first, and hands them to the project's own steps."
 const VERCEL_PUBLIC: FlagRule = { flags: ['-p', '--public'], facts: { note: 'Its source files can be seen by anyone.' } }
 const VERCEL_SETTINGS: FlagRule = { flags: ['-e', '--env', '-b', '--build-env'], takesValue: true, role: 'text', facts: { note: ON_THE_LINE } }
 
@@ -2124,7 +2321,7 @@ const VERCEL_ENTRY: Entry = everywhere(
     }),
     operands: ['path'],
     globals: globalsOf(VERCEL_VALUES, VERCEL_KEYS),
-    flags: [VERCEL_SETTINGS, VERCEL_PROD, VERCEL_PUBLIC],
+    flags: [VERCEL_SETTINGS, VERCEL_PROD, VERCEL_TARGET, VERCEL_PUBLIC],
     sub: {
       deploy: {
         facts: opaqueFact('Uploads a project to Vercel and puts it online, building it there first.', VERCEL_BUILD, {
@@ -2135,8 +2332,8 @@ const VERCEL_ENTRY: Entry = everywhere(
           docs: VERCEL,
         }),
         operands: ['path'],
-        values: valuesOf('text', ['-m', '--meta', '--target', '--archive', '--regions']),
-        flags: [VERCEL_SETTINGS, VERCEL_PROD, VERCEL_PUBLIC],
+        values: valuesOf('text', ['-m', '--meta', '--archive', '--regions']),
+        flags: [VERCEL_SETTINGS, VERCEL_PROD, VERCEL_TARGET, VERCEL_PUBLIC],
       },
       redeploy: {
         facts: opaqueFact('Builds and puts online again an earlier upload of a project on Vercel.', VERCEL_BUILD, {
@@ -2146,13 +2343,14 @@ const VERCEL_ENTRY: Entry = everywhere(
           docs: VERCEL,
         }),
         operands: ['text'],
-        values: valuesOf('text', ['--target']),
+        flags: [VERCEL_TARGET],
       },
       dev: {
         facts: opaqueFact('Runs a project on this computer the way Vercel would, for trying it out.', VERCEL_BUILD, {
-          privilege: 'none', touchesCredentials: false,
+          privilege: 'none', touchesCredentials: true,
           effect: ['execute'],
           network: 'arbitrary',
+          note: VERCEL_PULLS,
           docs: VERCEL,
         }),
         operands: ['path'],
@@ -2160,12 +2358,14 @@ const VERCEL_ENTRY: Entry = everywhere(
       },
       build: {
         facts: opaqueFact('Builds a project on this computer the way Vercel would.', VERCEL_BUILD, {
-          privilege: 'none', touchesCredentials: false,
+          privilege: 'none', touchesCredentials: true,
           effect: ['read', 'create', 'write', 'execute'],
           network: 'arbitrary',
+          note: VERCEL_PULLS,
           docs: VERCEL,
         }),
         values: { '--output': 'path', '--target': 'text' },
+        plain: ['--prod', '-y', '--yes'],
       },
       env: {
         facts: changes('Lists, adds, removes or downloads the secret settings a project keeps on Vercel.', VERCEL, ['read', 'create', 'write', 'delete', 'transmit'], {
@@ -2181,6 +2381,7 @@ const VERCEL_ENTRY: Entry = everywhere(
         operands: ['text'],
       },
       'env rm': { facts: removes('Removes a secret setting from a project on Vercel.', VERCEL, { touchesCredentials: true }), operands: ['text'] },
+      'env remove': { facts: removes('Removes a secret setting from a project on Vercel.', VERCEL, { touchesCredentials: true }), operands: ['text'] },
       'env pull': {
         facts: fact('Saves the secret settings a project keeps on Vercel to a file here, in readable form.', {
           privilege: 'none', repeatSafe: true,
