@@ -1,4 +1,4 @@
-import { fact, opaqueFact, valuesOf } from '../entry.ts'
+import { fact, opaqueFact, valuesOf, LOCAL, LOOKS } from '../entry.ts'
 import type { Entry } from '../entry.ts'
 import type { Overlay } from '../facts.ts'
 
@@ -7,6 +7,7 @@ const REPLACED = 'A file already in that place with the same name is replaced by
 
 const FINGERPRINT = (docs: string): Entry => ({
   facts: fact('Works out a short fingerprint of a file, which comes out different if anything in the file changes.', {
+    ...LOOKS,
     tell: ['Works out a short fingerprint of ', { role: 'path', which: 'all' }, '.'],
     docs,
   }),
@@ -23,6 +24,7 @@ const XATTR_REMOVES: Overlay = {
 export const FILES: Record<string, Entry> = {
   ls: {
     facts: fact('Lists the names of the files and folders kept in one place on this computer.', {
+      ...LOOKS,
       tell: ['Lists the names of the files and folders kept in ', { role: 'path' }, '.'],
       docs: 'man 1 ls',
     }),
@@ -30,6 +32,7 @@ export const FILES: Record<string, Entry> = {
   },
   cat: {
     facts: fact('Shows everything written inside a file.', {
+      ...LOOKS,
       tell: ['Shows everything written inside ', { role: 'path', which: 'all' }, '.'],
       docs: 'man 1 cat',
     }),
@@ -37,6 +40,7 @@ export const FILES: Record<string, Entry> = {
   },
   head: {
     facts: fact('Shows the first few lines of a file.', {
+      ...LOOKS,
       tell: ['Shows the first few lines of ', { role: 'path' }, '.'],
       docs: 'man 1 head',
     }),
@@ -45,6 +49,7 @@ export const FILES: Record<string, Entry> = {
   },
   tail: {
     facts: fact('Shows the last few lines of a file.', {
+      ...LOOKS,
       tell: ['Shows the last few lines of ', { role: 'path' }, '.'],
       docs: 'man 1 tail',
     }),
@@ -62,6 +67,7 @@ export const FILES: Record<string, Entry> = {
   },
   wc: {
     facts: fact('Counts the lines, words and letters in a file.', {
+      ...LOOKS,
       tell: ['Counts the lines, words and letters in ', { role: 'path', which: 'all' }, '.'],
       docs: 'man 1 wc',
     }),
@@ -69,6 +75,7 @@ export const FILES: Record<string, Entry> = {
   },
   tee: {
     facts: fact('Saves what it is given into a file, and shows it as well.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['read', 'create', 'write'],
       reversible: 'no',
       tell: ['Saves what it is given into ', { role: 'path', which: 'all' }, ', and shows it as well.'],
@@ -89,6 +96,7 @@ export const FILES: Record<string, Entry> = {
   },
   grep: {
     facts: fact('Searches files for the lines that contain a piece of text.', {
+      ...LOOKS,
       tell: ['Searches ', { role: 'path', which: 'all', from: 'operands' }, ' for the lines that contain ', { role: 'pattern' }, '.'],
       docs: 'man 1 grep',
     }),
@@ -115,7 +123,7 @@ export const FILES: Record<string, Entry> = {
     ],
   },
   find: {
-    facts: fact('Looks for files by name, size or age, in one place and in everything inside it.', { docs: 'man 1 find' }),
+    facts: fact('Looks for files by name, size or age, in one place and in everything inside it.', { ...LOOKS, docs: 'man 1 find' }),
     flagStyle: 'words',
     operands: ['path'],
     nestedHere: true,
@@ -152,20 +160,22 @@ export const FILES: Record<string, Entry> = {
       },
     ],
   },
-  df: { facts: fact('Shows how much room is left on each disk.', { docs: 'man 1 df' }), values: { '-T': 'text' } },
+  df: { facts: fact('Shows how much room is left on each disk.', { ...LOOKS, docs: 'man 1 df' }), values: { '-T': 'text' } },
   du: {
-    facts: fact('Shows how much room files and folders take up.', { docs: 'man 1 du' }),
+    facts: fact('Shows how much room files and folders take up.', { ...LOOKS, docs: 'man 1 du' }),
     operands: ['path'],
     values: { '-d': 'text', '-I': 'pattern' },
   },
   rm: {
     facts: fact('Removes files from this computer.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['delete'],
       reversible: 'no',
       tell: ['Removes ', { role: 'path', which: 'all' }, ' from this computer.'],
       note: GONE,
       docs: 'man 1 rm',
     }),
+    plain: ['-f', '--force', '-i', '-I', '-v', '--verbose', '-d', '--dir', '-P', '-x', '--one-file-system'],
     operands: ['path'],
     flags: [
       {
@@ -179,6 +189,7 @@ export const FILES: Record<string, Entry> = {
   },
   cp: {
     facts: fact('Copies files to another place on this computer.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['read', 'create', 'write'],
       reversible: 'no',
       tell: ['Copies ', { role: 'path', which: 'all-but-last' }, ' to ', { role: 'path', which: 'last' }, '.'],
@@ -204,6 +215,7 @@ export const FILES: Record<string, Entry> = {
   },
   mv: {
     facts: fact('Moves files to another place on this computer, or gives them a new name.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['create', 'delete'],
       reversible: 'unknown',
       tell: ['Moves ', { role: 'path', which: 'all-but-last' }, ' to ', { role: 'path', which: 'last' }, '.'],
@@ -214,6 +226,7 @@ export const FILES: Record<string, Entry> = {
   },
   mkdir: {
     facts: fact('Makes a new, empty folder.', {
+      ...LOCAL, reversible: 'yes', repeatSafe: true,
       effect: ['create'],
       tell: ['Makes a new, empty folder at ', { role: 'path', which: 'all' }, '.'],
       docs: 'man 1 mkdir',
@@ -223,6 +236,7 @@ export const FILES: Record<string, Entry> = {
   },
   chmod: {
     facts: fact('Changes who is allowed to open or change a file.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['configure'],
       reversible: 'unknown',
       tell: ['Changes who is allowed to open or change ', { role: 'path', which: 'all' }, '.'],
@@ -241,6 +255,7 @@ export const FILES: Record<string, Entry> = {
   },
   chown: {
     facts: fact('Changes which account on this computer owns a file.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['configure'],
       reversible: 'unknown',
       tell: ['Makes ', { role: 'user' }, ' the owner of ', { role: 'path', which: 'all' }, '.'],
@@ -258,7 +273,8 @@ export const FILES: Record<string, Entry> = {
     ],
   },
   tar: {
-    facts: fact('Packs files into one single file, or unpacks a file that was made that way.', { docs: 'man 1 tar' }),
+    facts: fact('Packs files into one single file, or unpacks a file that was made that way.', { ...LOOKS, docs: 'man 1 tar' }),
+    plain: ['-z', '--gzip', '--gunzip', '-j', '--bzip2', '-J', '--xz', '-v', '--verbose', '-t', '--list'],
     operands: ['path'],
     bareFlagsFirst: true,
     values: {
@@ -308,6 +324,7 @@ export const FILES: Record<string, Entry> = {
   },
   dd: {
     facts: fact('Copies raw data from one place to another exactly as it is, replacing whatever is at the destination.', {
+      ...LOCAL,
       effect: ['read', 'write', 'create'],
       reversible: 'no',
       repeatSafe: false,
@@ -317,6 +334,7 @@ export const FILES: Record<string, Entry> = {
   },
   unzip: {
     facts: fact('Unpacks a zip file, putting everything it holds onto this computer.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['create', 'write'],
       reversible: 'no',
       note: 'The zip file decides where its contents are put, and can replace files already there.',
@@ -330,7 +348,7 @@ export const FILES: Record<string, Entry> = {
     facts: opaqueFact(
       'Opens a file, a folder or a web address the way double-clicking it would.',
       'the app macOS picks to handle what it was given',
-      { effect: ['read', 'execute'], docs: 'man 1 open' },
+      { ...LOCAL, effect: ['read', 'execute'], docs: 'man 1 open' },
     ),
     operands: ['path'],
     // `--args` is left out: it hands every word after it to the app, which a single value cannot say.
@@ -341,9 +359,10 @@ export const FILES: Record<string, Entry> = {
       ...valuesOf('text', ['-a', '--application', '-b', '-s', '--env']),
     },
   },
-  which: { facts: fact('Shows where a program is kept on this computer.', { docs: 'man 1 which' }), operands: ['text'] },
+  which: { facts: fact('Shows where a program is kept on this computer.', { ...LOOKS, docs: 'man 1 which' }), operands: ['text'] },
   touch: {
     facts: fact('Marks a file as changed at this moment, and makes an empty file where none is there yet.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['create', 'write'],
       reversible: 'unknown',
       tell: ['Marks ', { role: 'path', which: 'all', from: 'operands' }, ' as changed at this moment, making an empty file where none is there yet.'],
@@ -354,10 +373,12 @@ export const FILES: Record<string, Entry> = {
   },
   ln: {
     facts: fact('Makes a second name that leads to a file or folder already on this computer.', {
+      ...LOCAL, reversible: 'yes', repeatSafe: true,
       effect: ['create'],
       tell: ['Makes ', { role: 'path', which: 'last' }, ' lead to ', { role: 'path', which: 'all-but-last' }, '.'],
       docs: 'man 1 ln',
     }),
+    plain: ['-s', '--symbolic', '-v', '--verbose', '-i', '--interactive', '-n', '-h', '--no-dereference', '-w', '-L', '-P'],
     operands: ['path'],
     flags: [
       {
@@ -368,6 +389,7 @@ export const FILES: Record<string, Entry> = {
   },
   rmdir: {
     facts: fact('Removes a folder that has nothing inside it.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['delete'],
       reversible: 'unknown',
       tell: ['Removes ', { role: 'path', which: 'all' }, ' from this computer, as long as nothing is inside.'],
@@ -386,7 +408,7 @@ export const FILES: Record<string, Entry> = {
     facts: opaqueFact(
       'Changes text as it passes through, following a list of edits it was given.',
       'the list of edits it was given, which can also save to files and on some systems run other commands',
-      { effect: ['read'], docs: 'man 1 sed' },
+      { ...LOCAL, effect: ['read'], docs: 'man 1 sed' },
     ),
     operands: ['text', 'path'],
     flags: [
@@ -410,7 +432,7 @@ export const FILES: Record<string, Entry> = {
     facts: opaqueFact(
       'Reads text line by line and does with each line what a small program written into the command says.',
       'the small program it was given, which can change files and run other commands',
-      { effect: ['read', 'execute'], docs: 'man 1 awk' },
+      { ...LOCAL, effect: ['read', 'execute'], docs: 'man 1 awk' },
     ),
     operands: ['text', 'path'],
     values: { '-F': 'text', '-v': 'text' },
@@ -418,6 +440,7 @@ export const FILES: Record<string, Entry> = {
   },
   sort: {
     facts: fact('Puts lines of text in order.', {
+      ...LOOKS,
       tell: ['Puts the lines of ', { role: 'path', which: 'all', from: 'operands' }, ' in order.'],
       docs: 'man 1 sort',
     }),
@@ -447,16 +470,17 @@ export const FILES: Record<string, Entry> = {
     ],
   },
   cut: {
-    facts: fact('Shows only some columns or letters from each line of text.', { docs: 'man 1 cut' }),
+    facts: fact('Shows only some columns or letters from each line of text.', { ...LOOKS, docs: 'man 1 cut' }),
     operands: ['path'],
     values: valuesOf('text', ['-b', '-c', '-d', '-f', '--bytes', '--characters', '--delimiter', '--fields']),
   },
   tr: {
-    facts: fact('Swaps or removes letters in text as it passes through.', { docs: 'man 1 tr' }),
+    facts: fact('Swaps or removes letters in text as it passes through.', { ...LOOKS, docs: 'man 1 tr' }),
     operands: ['text'],
   },
   diff: {
     facts: fact('Shows the differences between two files.', {
+      ...LOOKS,
       tell: ['Shows how ', { role: 'path', which: 0, from: 'operands' }, ' and ', { role: 'path', which: 1, from: 'operands' }, ' differ.'],
       docs: 'man 1 diff',
     }),
@@ -476,7 +500,7 @@ export const FILES: Record<string, Entry> = {
     facts: opaqueFact(
       'Shows what is written inside a file, a screenful at a time.',
       'whatever is typed into it while it is open, since it can start other commands',
-      { effect: ['read'], tell: ['Shows what is written inside ', { role: 'path', from: 'operands' }, ', a screenful at a time.'], docs: 'man 1 less' },
+      { ...LOCAL, effect: ['read'], tell: ['Shows what is written inside ', { role: 'path', from: 'operands' }, ', a screenful at a time.'], docs: 'man 1 less' },
     ),
     operands: ['path'],
     values: {
@@ -506,13 +530,14 @@ export const FILES: Record<string, Entry> = {
     facts: opaqueFact(
       'Shows what is written inside a file, a screenful at a time.',
       'whatever is typed into it while it is open, since it can start other commands',
-      { effect: ['read'], tell: ['Shows what is written inside ', { role: 'path' }, ', a screenful at a time.'], docs: 'man 1 more' },
+      { ...LOCAL, effect: ['read'], tell: ['Shows what is written inside ', { role: 'path' }, ', a screenful at a time.'], docs: 'man 1 more' },
     ),
     operands: ['path'],
     values: { '-n': 'text', '--lines': 'text' },
   },
   file: {
     facts: fact('Shows what kind of contents something on this computer holds, such as a picture or plain text.', {
+      ...LOOKS,
       tell: ['Shows what kind of contents are in ', { role: 'path', which: 'all', from: 'operands' }, '.'],
       docs: 'man 1 file',
     }),
@@ -521,6 +546,7 @@ export const FILES: Record<string, Entry> = {
   },
   stat: {
     facts: fact('Shows the details of a file, such as its size, its owner and when it last changed.', {
+      ...LOOKS,
       tell: ['Shows the size, owner and dates of ', { role: 'path', which: 'all' }, '.'],
       docs: 'man 1 stat',
     }),
@@ -528,24 +554,25 @@ export const FILES: Record<string, Entry> = {
     values: valuesOf('text', ['-f', '-t', '-c', '--format', '--printf']),
   },
   realpath: {
-    facts: fact('Shows the full location of a file on this computer.', { docs: 'man 1 realpath' }),
+    facts: fact('Shows the full location of a file on this computer.', { ...LOOKS, docs: 'man 1 realpath' }),
     operands: ['path'],
   },
   readlink: {
-    facts: fact('Shows where a second name for a file leads.', { docs: 'man 1 readlink' }),
+    facts: fact('Shows where a second name for a file leads.', { ...LOOKS, docs: 'man 1 readlink' }),
     operands: ['path'],
   },
   basename: {
-    facts: fact('Shows the last part of a file location, without the folders before it.', { docs: 'man 1 basename' }),
+    facts: fact('Shows the last part of a file location, without the folders before it.', { ...LOOKS, docs: 'man 1 basename' }),
     operands: ['text'],
     values: { '-s': 'text', '--suffix': 'text' },
   },
   dirname: {
-    facts: fact('Shows the folders part of a file location, without the file name at the end.', { docs: 'man 1 dirname' }),
+    facts: fact('Shows the folders part of a file location, without the file name at the end.', { ...LOOKS, docs: 'man 1 dirname' }),
     operands: ['text'],
   },
   base64: {
     facts: fact('Turns data into plain letters and numbers that can be sent as text, or turns it back.', {
+      ...LOOKS,
       docs: 'man 1 base64',
     }),
     operands: ['path'],
@@ -566,6 +593,7 @@ export const FILES: Record<string, Entry> = {
   sha1sum: FINGERPRINT('man 1 sha1sum'),
   zip: {
     facts: fact('Packs files together into one smaller file that can be unpacked later.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['read', 'create', 'write'],
       reversible: 'unknown',
       tell: ['Packs files into ', { role: 'path', from: 'operands' }, '.'],
@@ -604,6 +632,7 @@ export const FILES: Record<string, Entry> = {
   },
   gzip: {
     facts: fact('Squeezes a file so it takes less room, and puts the squeezed copy in its place.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['read', 'create', 'delete'],
       reversible: 'unknown',
       tell: ['Squeezes ', { role: 'path', which: 'all' }, ' so it takes less room, and puts the squeezed copy in its place.'],
@@ -621,6 +650,7 @@ export const FILES: Record<string, Entry> = {
   },
   gunzip: {
     facts: fact('Unpacks a squeezed file and puts the full-size copy in its place.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['read', 'create', 'delete'],
       reversible: 'unknown',
       tell: ['Unpacks ', { role: 'path', which: 'all' }, ' and puts the full-size copy in its place.'],
@@ -632,6 +662,7 @@ export const FILES: Record<string, Entry> = {
   },
   ditto: {
     facts: fact('Copies files and folders to another place, keeping their details as they were.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['read', 'create', 'write'],
       reversible: 'no',
       tell: [
@@ -649,6 +680,7 @@ export const FILES: Record<string, Entry> = {
   },
   xattr: {
     facts: fact('Shows the hidden labels macOS keeps on a file, such as where it was downloaded from.', {
+      ...LOOKS,
       tell: ['Shows the hidden labels macOS keeps on ', { role: 'path', which: 'all' }, '.'],
       docs: 'man 1 xattr',
     }),
@@ -670,6 +702,7 @@ export const FILES: Record<string, Entry> = {
   },
   chflags: {
     facts: fact('Changes special settings on a file, such as whether it can be changed or is hidden.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['configure'],
       reversible: 'unknown',
       tell: ['Changes special settings on ', { role: 'path', which: 'all' }, '.'],

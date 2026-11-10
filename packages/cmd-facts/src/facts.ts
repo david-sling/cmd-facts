@@ -54,6 +54,8 @@ export type Source =
   | 'curated+flags'
   | 'name-fallback'
   | 'subcommand-miss'
+  /** The line carries a flag or a word the row does not account for, named in `unread`. */
+  | 'unread'
   | 'nested'
   /** A row from a pack the consumer did not vouch for. It arrives `derived` whatever it was written as. */
   | 'plugin'
