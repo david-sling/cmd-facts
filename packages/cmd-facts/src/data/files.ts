@@ -306,7 +306,8 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 unzip',
     }),
     operands: ['path'],
-    values: { '-d': 'path', '-P': 'text' },
+    values: { '-d': 'path' },
+    flags: [{ flags: ['-P'], takesValue: true, role: 'text', facts: { touchesCredentials: true } }],
   },
   open: {
     facts: opaqueFact(
