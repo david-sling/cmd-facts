@@ -3,6 +3,7 @@ import { motion } from 'motion/react'
 import {
   ArrowUpRight,
   BadgeCheck,
+  Check,
   ChevronDown,
   CornerDownRight,
   Eye,
@@ -10,8 +11,10 @@ import {
   Fingerprint,
   Globe,
   KeyRound,
+  Minus,
   Repeat,
   RotateCcw,
+  X,
   Zap,
 } from 'lucide-react'
 import { effectsOf, explain } from 'cmd-facts'
@@ -34,6 +37,13 @@ const TONE_TEXT: Record<Tone, string> = {
   neutral: 'text-ink-2',
 }
 
+/** The verdict as a mark: the words stay plain, the colour and the mark carry the reading. */
+const TONE_MARK: Record<Tone, typeof Check> = {
+  good: Check,
+  bad: X,
+  neutral: Minus,
+}
+
 const TONE_RING: Record<Tone, string> = {
   good: 'text-good',
   bad: 'text-bad',
@@ -42,54 +52,43 @@ const TONE_RING: Record<Tone, string> = {
 
 const SPRING = { type: 'spring', stiffness: 380, damping: 32, mass: 0.85 } as const
 
-/** Collapsed, the body hides inside the circle; open, it is the card below it. */
+/** Collapsed, the body hides inside the circle; open, it is the card under the pill. */
 const BODY = {
   closed: { left: 5, width: 28, height: 8 },
-  open: { height: 88 },
+  open: { height: 64 },
 }
 const CIRCLE = 38
+const RADIUS = 19
+/** How far the body's top edge rides up under the head, so the two read as one shape. */
 const BODY_TOP = 22
-/** Space from the card's edge to its words, on every side the circle does not take. */
-const CARD_PAD = 18
 /** Narrower than this and the shape stops reading as a card. */
-const MIN_CARD = 150
-/** Room to the left of the circle for a card that opens that way, inside the filter region. */
-const PAD = 320
+const MIN_CARD = 132
+/** Margin around the shapes for the filter's blur to land in. */
+const BLUR_ROOM = 22
+/** The card always outruns the head by this much, so the two never share an edge. */
+const CARD_LEAD = 26
+const NAME_LEFT = 40
+const NAME_RIGHT = 14
+const VALUE_PAD = 18
 
 /**
- * A card opens away from the edge it is near: the first circles open to the right, the
- * middle ones open around themselves, the last ones open back to the left. The side the
- * circle sits on gets a square corner, because a rounded one there curves back in under
- * the circle and pinches the silhouette; the open sides keep their radius and the filter
- * gives them the concave join.
+ * An island opens away from the border it sits nearer, measured where the circle actually
+ * is rather than where it falls in the list: the row wraps on a narrow screen, where the
+ * last field can be the first on its line. The side the head sits on gets a square corner,
+ * because a rounded one there curves back in under the head and pinches the silhouette;
+ * the open side keeps its radius and the filter gives it the concave join.
  */
-type Anchor = 'left' | 'center' | 'right'
+type Side = 'left' | 'right'
 
-const OPEN_CORNER: Record<Anchor, React.CSSProperties> = {
+const OPEN_CORNER: Record<Side, React.CSSProperties> = {
   left: { borderTopLeftRadius: 0 },
-  center: {},
   right: { borderTopRightRadius: 0 },
 }
 
-function openLeftFor(anchor: Anchor, width: number) {
-  if (anchor === 'left') return 0
-  if (anchor === 'center') return (CIRCLE - width) / 2
-  return CIRCLE - width
+function openLeftFor(side: Side, width: number) {
+  return side === 'left' ? 0 : CIRCLE - width
 }
 
-function anchorFor(index: number, count: number): Anchor {
-  if (index < count / 3) return 'left'
-  if (index < (count * 2) / 3) return 'center'
-  return 'right'
-}
-
-/**
- * Circle and body are two shapes, not one box, and the goo filter merges them: where the
- * body's top edge runs into the circle's side, the blur-and-threshold leaves the concave
- * fillet a single growing rounded box can never have. Everything inside the filter has to
- * be opaque — the threshold erases a half-transparent fill — so the ring is a second,
- * larger copy of the same two shapes, dimmed by opacity outside the filter.
- */
 type Pill = {
   icon: typeof Zap
   field: string
@@ -200,7 +199,9 @@ function pillsFor(facts: Facts) {
 
 function IslandShape({
   isOpen,
-  anchor,
+  corner,
+  headLeft,
+  headWidth,
   openLeft,
   openWidth,
   outset,
@@ -208,7 +209,9 @@ function IslandShape({
   style,
 }: {
   isOpen: boolean
-  anchor: Anchor
+  corner: Side | null
+  headLeft: number
+  headWidth: number
   openLeft: number
   openWidth: number
   outset: number
@@ -218,36 +221,48 @@ function IslandShape({
   const body = isOpen
     ? { left: openLeft, width: openWidth, height: BODY.open.height }
     : BODY.closed
+  // the layer is only as wide as the shapes it holds: a box that reached far past the
+  // card would widen the page itself, however little of it is ever painted
+  const layerLeft = Math.min(0, openLeft, headLeft) - BLUR_ROOM
+  const origin = -layerLeft
   return (
     <span
       aria-hidden
       className={`pointer-events-none absolute top-0 block h-[130px] ${className}`}
       style={{
-        left: -PAD,
-        width: PAD + openWidth + 20,
+        left: layerLeft,
+        width:
+          Math.max(CIRCLE, headLeft + headWidth, openLeft + openWidth) -
+          Math.min(0, openLeft, headLeft) +
+          BLUR_ROOM * 2,
         filter: 'url(#island-goo)',
         ...style,
       }}
     >
-      <span
-        className="absolute block rounded-full bg-current"
+      <motion.span
+        className="absolute block bg-current"
         style={{
-          left: PAD - outset,
           top: -outset,
-          width: CIRCLE + outset * 2,
           height: CIRCLE + outset * 2,
+          borderRadius: RADIUS + outset,
         }}
+        initial={false}
+        animate={{
+          left: origin + (isOpen ? headLeft : 0) - outset,
+          width: (isOpen ? headWidth : CIRCLE) + outset * 2,
+        }}
+        transition={SPRING}
       />
       <motion.span
         className="absolute block bg-current"
         style={{
           top: BODY_TOP - outset,
-          borderRadius: 19 + outset,
-          ...OPEN_CORNER[anchor],
+          borderRadius: RADIUS + outset,
+          ...(corner ? OPEN_CORNER[corner] : {}),
         }}
         initial={false}
         animate={{
-          left: PAD + body.left - outset,
+          left: origin + body.left - outset,
           width: body.width + outset * 2,
           height: body.height + outset * 2,
         }}
@@ -258,95 +273,239 @@ function IslandShape({
 }
 
 /**
- * One field. The card is as wide as the words it holds, so a short value leaves no void
- * on the right; the text has to be measured because it is painted outside the filter that
- * draws the shape, and the two layers have to agree on one width.
+ * One field. The head carries the icon and the field's name; the card under it carries the
+ * reading. Both are measured, because their words are painted outside the filter that
+ * draws their shapes and the two layers have to agree on one width.
  */
 function IslandField({
   pill,
+  index,
+  count,
   isOpen,
-  anchor,
   onOpen,
   onClose,
   onToggle,
 }: {
   pill: Pill
+  index: number
+  count: number
   isOpen: boolean
-  anchor: Anchor
   onOpen: () => void
   onClose: () => void
   onToggle: () => void
 }) {
   const { icon: Icon, field, text, tone } = pill
-  const textRef = useRef<HTMLSpanElement>(null)
-  const [width, setWidth] = useState(MIN_CARD)
+  const Mark = TONE_MARK[tone]
+  const itemRef = useRef<HTMLLIElement>(null)
+  const nameRef = useRef<HTMLSpanElement>(null)
+  const valueRef = useRef<HTMLSpanElement>(null)
+  const [size, setSize] = useState({ head: CIRCLE, card: MIN_CARD })
+  const [row, setRow] = useState({ offset: 0, width: 0 })
 
   useEffect(() => {
-    const element = textRef.current
-    if (!element) return
-    const measure = () =>
-      setWidth(Math.max(MIN_CARD, CARD_PAD + Math.ceil(element.scrollWidth)))
+    const name = nameRef.current
+    const value = valueRef.current
+    if (!name || !value) return
+    const measure = () => {
+      const head = Math.max(
+        CIRCLE,
+        NAME_LEFT + Math.ceil(name.scrollWidth) + NAME_RIGHT,
+      )
+      setSize({
+        head,
+        card: Math.max(
+          MIN_CARD,
+          head + CARD_LEAD,
+          VALUE_PAD * 2 + Math.ceil(value.scrollWidth),
+        ),
+      })
+    }
     measure()
     if (typeof ResizeObserver === 'undefined') return
     // the words are measured again once the webfont lands, or they size to the fallback
     const observer = new ResizeObserver(measure)
-    observer.observe(element)
+    observer.observe(name)
+    observer.observe(value)
     return () => observer.disconnect()
   }, [field, text])
 
-  const openLeft = openLeftFor(anchor, width)
+  // where this circle sits among the icons, so an open card can be kept inside them:
+  // the row wraps on a narrow screen, where an index near the end is no longer near
+  // the right. The bounds are the circles' own span, not the list box, which stretches
+  // the full width of the console and would let a card run past the last icon.
+  useEffect(() => {
+    const item = itemRef.current
+    const list = item?.parentElement
+    if (!item || !list) return
+    // rects, not offsetLeft: the circle's offsetParent is not the row, so the two
+    // numbers would be measured from different origins
+    const measure = () => {
+      const seat = item.getBoundingClientRect()
+      let first = Infinity
+      let last = -Infinity
+      for (const circle of list.children) {
+        const box = circle.getBoundingClientRect()
+        first = Math.min(first, box.left)
+        last = Math.max(last, box.right)
+      }
+      if (!Number.isFinite(first)) return
+      setRow({ offset: seat.left - first, width: last - first })
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(list)
+    return () => observer.disconnect()
+  }, [])
+
+  // nearer the icons’ left border than their right? then open rightwards. Before the
+  // first measurement the list order is the only clue there is
+  const side: Side = row.width
+    ? row.offset + CIRCLE / 2 > row.width / 2
+      ? 'right'
+      : 'left'
+    : index < count / 2
+      ? 'left'
+      : 'right'
+
+  const wanted = openLeftFor(side, size.card)
+  const leftmost = -row.offset
+  const rightmost = Math.max(leftmost, row.width - row.offset - size.card)
+  const openLeft = row.width
+    ? Math.min(Math.max(wanted, leftmost), rightmost)
+    : wanted
+
+  // the squared corner follows where the head ended up on the card, not where the side
+  // wanted it: clamping can move the card out from under its own head, and then neither
+  // corner belongs to it
+  const corner: Side | null =
+    openLeft > -0.5
+      ? 'left'
+      : openLeft < CIRCLE - size.card + 0.5
+        ? 'right'
+        : null
+
+  const body = isOpen
+    ? { left: openLeft, width: size.card, height: BODY.open.height }
+    : BODY.closed
+
+  // the head opens the same way the card does, or the two would pull apart. Opening
+  // leftward it keeps the icon at its right end; otherwise the icon travels to its left
+  // end, which for a centred head means moving out of the seat the circle sat in.
+  const wantedHead = openLeftFor(side, size.head)
+  const headLeft = row.width
+    ? Math.min(
+        Math.max(wantedHead, leftmost),
+        Math.max(leftmost, row.width - row.offset - size.head),
+      )
+    : wantedHead
+  const iconAtRight = side === 'right'
+  const iconLeft = iconAtRight
+    ? headLeft + size.head - CIRCLE + 10
+    : headLeft + 10
 
   return (
-    <li className={`relative size-[38px] ${isOpen ? 'z-20' : 'z-10'}`}>
+    <li
+      ref={itemRef}
+      className={`relative size-[38px] ${isOpen ? 'z-20' : 'z-10'}`}
+    >
       {/* the shapes are painted, never pointed at: an open card covers the circles
           to its right, and the pointer has to reach them to open theirs */}
       <IslandShape
         isOpen={isOpen}
-        anchor={anchor}
+        corner={corner}
+        headLeft={headLeft}
+        headWidth={size.head}
         openLeft={openLeft}
-        openWidth={width}
+        openWidth={size.card}
         outset={2}
         className={TONE_RING[tone]}
         style={{ opacity: 0.45 }}
       />
       <IslandShape
         isOpen={isOpen}
-        anchor={anchor}
+        corner={corner}
+        headLeft={headLeft}
+        headWidth={size.head}
         openLeft={openLeft}
-        openWidth={width}
+        openWidth={size.card}
         outset={0}
         className="text-panel"
       />
 
-      <Icon
+      <motion.span
         aria-hidden
-        className={`pointer-events-none absolute left-[10px] top-[10px] size-[17px] ${TONE_TEXT[tone]}`}
-      />
-      <span
-        ref={textRef}
-        aria-hidden
-        style={{ left: openLeft + CARD_PAD }}
-        className={`pointer-events-none absolute top-[48px] pr-[18px] transition-opacity duration-200 ${
-          isOpen ? 'opacity-100 delay-[90ms]' : 'opacity-0'
-        }`}
+        className={`pointer-events-none absolute left-[10px] top-[10px] block ${TONE_TEXT[tone]}`}
+        initial={false}
+        animate={{ x: isOpen ? iconLeft - 10 : 0 }}
+        transition={SPRING}
       >
-        <span className="block whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">
+        <Icon className="size-[17px]" />
+      </motion.span>
+
+      {/* each set of words rides in a box running the same spring as the shape under it,
+          so they are clipped to it at every frame instead of landing outside while it grows */}
+      <motion.span
+        aria-hidden
+        className="pointer-events-none absolute top-0 block h-[38px] overflow-hidden"
+        style={{ borderRadius: RADIUS }}
+        initial={false}
+        animate={{
+          left: isOpen ? headLeft : 0,
+          width: isOpen ? size.head : CIRCLE,
+        }}
+        transition={SPRING}
+      >
+        <span
+          ref={nameRef}
+          className={`absolute top-1/2 block -translate-y-1/2 whitespace-nowrap font-mono text-[12.5px] transition-opacity duration-200 ${TONE_TEXT[tone]} ${
+            isOpen ? 'opacity-100 delay-[90ms]' : 'opacity-0'
+          }`}
+          style={{ left: iconAtRight ? NAME_RIGHT : NAME_LEFT }}
+        >
           {field}
         </span>
+      </motion.span>
+
+      <motion.span
+        aria-hidden
+        className="pointer-events-none absolute block overflow-hidden"
+        style={{
+          top: BODY_TOP,
+          borderRadius: RADIUS,
+          ...(corner ? OPEN_CORNER[corner] : {}),
+        }}
+        initial={false}
+        animate={{ left: body.left, width: body.width, height: body.height }}
+        transition={SPRING}
+      >
         <span
-          className={`mt-1.5 block whitespace-nowrap text-[15px] ${TONE_TEXT[tone]}`}
+          ref={valueRef}
+          className={`absolute flex items-center gap-2 whitespace-nowrap text-[15.5px] leading-[1.4] text-ink transition-opacity duration-200 ${
+            isOpen ? 'opacity-100 delay-[90ms]' : 'opacity-0'
+          }`}
+          style={{ left: VALUE_PAD, top: 22 }}
         >
+          <Mark className={`size-[15px] shrink-0 ${TONE_TEXT[tone]}`} />
           {text}
         </span>
-      </span>
+      </motion.span>
 
       <button
         type="button"
         aria-expanded={isOpen}
         aria-label={`${field}: ${text}`}
-        onMouseEnter={onOpen}
-        onMouseLeave={onClose}
-        onFocus={onOpen}
+        onPointerEnter={(event) => {
+          if (event.pointerType === 'mouse') onOpen()
+        }}
+        onPointerLeave={(event) => {
+          if (event.pointerType === 'mouse') onClose()
+        }}
+        onFocus={(event) => {
+          // a tap focuses the button too; only a keyboard focus should open the card,
+          // or the tap's own click would toggle it straight back shut
+          if (event.target.matches(':focus-visible')) onOpen()
+        }}
         onBlur={onClose}
         onClick={onToggle}
         className="absolute inset-0 rounded-full"
@@ -371,7 +530,7 @@ export function ExplainDemo() {
     // gutter of prompt marks the way a devtools scrollback does
     <div className="max-w-[820px] rounded-2xl border border-line bg-panel">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 rounded-t-2xl bg-white/[0.015] px-5 pb-4 pt-5 sm:px-7">
-        <div className="min-w-0 font-mono text-[14px] leading-relaxed">
+        <div className="min-w-0 font-mono text-[12.5px] leading-relaxed sm:text-[14px]">
           <div className="flex gap-3.5">
             <span aria-hidden className="select-none text-ink-3/60">
               &rsaquo;
@@ -392,7 +551,10 @@ export function ExplainDemo() {
               <span className="text-ink-2">(&quot;</span>
               {/* the visible text sizes the control; the native select sits invisibly on top of it */}
               <span className="relative inline-flex items-center border-b border-dashed border-line-2 py-0.5 pr-6 transition-colors hover:border-white/40 focus-within:border-white/65">
-                <span className="whitespace-pre text-ink">{command}</span>
+                {/* a phone has no room for the longest command; the picker still shows it whole */}
+                <span className="block max-w-[48vw] overflow-hidden text-ellipsis whitespace-pre text-ink sm:max-w-none">
+                  {command}
+                </span>
                 <ChevronDown
                   aria-hidden
                   className="pointer-events-none absolute right-1 size-3.5 text-ink-3"
@@ -428,7 +590,7 @@ export function ExplainDemo() {
         </a>
       </div>
 
-      <div className="flex gap-3.5 border-t border-line px-5 pb-[74px] pt-6 sm:px-7">
+      <div className="flex gap-3.5 border-t border-line px-5 pb-[50px] pt-6 sm:px-7">
         {/* what the line above returned */}
         <CornerDownRight
           aria-hidden
@@ -481,8 +643,9 @@ export function ExplainDemo() {
               <IslandField
                 key={pill.field}
                 pill={pill}
+                index={index}
+                count={pills.length}
                 isOpen={open === index}
-                anchor={anchorFor(index, pills.length)}
                 onOpen={() => setOpen(index)}
                 onClose={() => close(index)}
                 onToggle={() =>

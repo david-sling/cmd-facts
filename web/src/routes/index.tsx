@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, Github } from 'lucide-react'
 import AnimatedGradient from '#/components/animated-gradient'
 import { ExplainDemo } from '#/components/explain-demo'
 import { InstallCommand } from '#/components/install-command'
@@ -24,9 +24,10 @@ function Home() {
         </nav>
         <a
           href="https://github.com/david-sling/cmd-facts"
-          className="flex items-center gap-1.5 text-sm text-ink-2 transition-colors hover:text-ink"
+          aria-label="cmd-facts on GitHub"
+          className="text-ink-2 transition-colors hover:text-ink"
         >
-          GitHub <ArrowUpRight className="size-4" />
+          <Github aria-hidden className="size-[19px]" />
         </a>
       </header>
 
