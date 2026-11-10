@@ -11,6 +11,23 @@ const FETCH_VALUES = valuesOf('text', [
   '--submodule-prefix', '-o', '--server-option',
 ])
 
+// `-f` and `-p` change only this computer's copy of the server's lines of work, which collecting rewrites anyway. `-P` is
+// left out: it removes tags made here. So is `--recurse-submodules`: the projects it also collects can be on any server.
+const FETCH_PLAIN = [
+  '-v', '--verbose', '-q', '--quiet', '--progress', '--all', '-a', '--append', '--atomic', '-f', '--force',
+  '-t', '--tags', '--no-tags', '-p', '--prune', '--dry-run', '-k', '--keep', '--unshallow',
+  '--update-shallow', '--show-forced-updates', '--no-show-forced-updates', '-4', '--ipv4', '-6', '--ipv6',
+  '--no-recurse-submodules',
+]
+
+// Writes which server branch this one follows into the project's settings.
+const SET_UPSTREAM = (flags: string[]): FlagRule => ({ flags, facts: { effect: ['configure'] } })
+
+const FORCED = {
+  effect: ['delete'] as Effect[],
+  note: 'Save points already on the server that the ones sent do not build on are thrown away there.',
+}
+
 // The program that serves the other end of a transfer. Where the other end is a folder on this computer, it runs here.
 const TRANSFER_PROGRAM = (flags: string[]): FlagRule => ({
   flags,
@@ -60,20 +77,72 @@ export const GIT_ENTRY: Entry = {
       flags: ['-p', '--paginate'],
       facts: { effect: ['execute'], opaque: true, handsOverTo: 'the pager the settings name' },
     },
-    { flags: ['-P', '--no-pager', '--bare', '--no-optional-locks', '--literal-pathspecs', '--no-replace-objects'], facts: {} },
+    {
+      flags: [
+        '-P', '--no-pager', '--bare', '--no-optional-locks', '--literal-pathspecs', '--no-replace-objects', '--version',
+        '--html-path', '--man-path', '--info-path',
+      ],
+      facts: {},
+    },
   ],
   sub: {
-    status: { facts: fact('Shows which files in a project have changed since its last save point.', { ...LOOKS, docs: GIT }) },
+    status: {
+      facts: fact('Shows which files in a project have changed since its last save point.', { ...LOOKS, docs: GIT }),
+      operands: ['path'],
+      // Each optional value is taken only after `=`.
+      plain: [
+        '-s', '--short', '-b', '--branch', '-v', '--verbose', '--show-stash', '--porcelain', '--long', '--ahead-behind',
+        '--no-ahead-behind', '-z', '--null', '-u', '--untracked-files', '--ignored', '--ignore-submodules', '--column',
+        '--no-column', '--renames', '--no-renames', '-M', '--find-renames',
+      ],
+    },
     log: {
       facts: fact('Shows the list of save points a project has, newest first.', { ...LOOKS, docs: GIT }),
-      values: { '--grep': 'pattern', ...valuesOf('text', ['--author', '-n', '--max-count']) },
+      operands: ['text'],
+      // `--show-signature` is left out: it runs the signing program the settings name. `-<n>` limits how many are shown:
+      // `-5`, and `-10` read a digit at a time.
+      plain: [
+        '--oneline', '--graph', '--all', '--decorate', '--no-decorate', '--abbrev-commit', '--pretty', '--reverse', '--follow',
+        '-q', '--quiet', '--source', '-p', '-u', '--patch', '-s', '--no-patch', '--stat', '--shortstat',
+        '--numstat', '--name-only', '--name-status', '--merges', '--no-merges', '--first-parent', '--no-color', '--color',
+        '-0', '-1', '-2', '-3', '-4', '-5', '-6', '-7', '-8', '-9',
+      ],
+      values: {
+        '--grep': 'pattern',
+        ...valuesOf('text', ['--author', '-n', '--max-count', '--since', '--after', '--until', '--before', '--date']),
+      },
+      // The layout is taken only after `=`: `--format %h` reads `%h` as a save point.
+      flags: [{ flags: ['--format'], attached: true, role: 'text', facts: {} }],
     },
-    diff: { facts: fact('Shows exactly what changed in the files of a project since its last save point.', { ...LOOKS, docs: GIT }) },
-    show: { facts: fact('Shows what one save point in a project changed.', { ...LOOKS, docs: GIT }) },
+    diff: {
+      facts: fact('Shows exactly what changed in the files of a project since its last save point.', { ...LOOKS, docs: GIT }),
+      operands: ['text'],
+      plain: [
+        '--staged', '--cached', '--stat', '--numstat', '--shortstat', '--name-only', '--name-status', '--summary', '-w',
+        '--ignore-all-space', '-b', '--ignore-space-change', '--word-diff', '--color-words', '--color', '--no-color', '-R',
+        '--check', '--exit-code', '--quiet', '--minimal', '--no-index',
+      ],
+    },
+    show: {
+      facts: fact('Shows what one save point in a project changed.', { ...LOOKS, docs: GIT }),
+      operands: ['text'],
+      plain: [
+        '--oneline', '--stat', '--shortstat', '--numstat', '--name-only', '--name-status', '-s', '--no-patch', '-q', '--quiet',
+        '--pretty', '--abbrev-commit', '--color', '--no-color',
+      ],
+      values: valuesOf('text', ['--date']),
+      flags: [{ flags: ['--format'], attached: true, role: 'text', facts: {} }],
+    },
     branch: {
       facts: fact('Lists or sets up the separate lines of work a project keeps.', { ...LOCAL, reversible: 'yes', repeatSafe: true, effect: ['read', 'write'], docs: GIT }),
-      // `--merged`, `--track` and `--abbrev` are left out: each takes its value only after `=`, if at all.
-      values: valuesOf('text', ['--sort', '--format', '--points-at', '-u', '--set-upstream-to']),
+      operands: ['text'],
+      // `--merged`, `--track` and `--abbrev` are left out: each takes its value only after `=`, if at all. So are the
+      // options that remove, rename or copy a line of work, which the row was not written to say.
+      plain: [
+        '-a', '--all', '-r', '--remotes', '-l', '--list', '-v', '--verbose', '-q', '--quiet', '--show-current', '--column',
+        '--no-column', '-i', '--ignore-case', '--color', '--no-color', '--no-abbrev', '--create-reflog', '--omit-empty',
+      ],
+      values: valuesOf('text', ['--sort', '--format', '--points-at', '-u', '--set-upstream-to', '--contains', '--no-contains']),
     },
     clone: {
       facts: fact('Copies a project from a server onto this computer.', {
@@ -83,9 +152,16 @@ export const GIT_ENTRY: Entry = {
         docs: GIT,
       }),
       operands: ['url', 'path'],
+      // `--recurse-submodules` is left out: the projects it also copies can be on any server.
+      plain: [
+        '-q', '--quiet', '-v', '--verbose', '--progress', '-n', '--no-checkout', '--checkout', '--bare', '--mirror', '-l',
+        '--local', '--no-hardlinks', '--hardlinks', '-s', '--shared', '--dissociate', '--single-branch', '--no-single-branch',
+        '--tags', '--no-tags', '--shallow-submodules', '--no-shallow-submodules', '--sparse', '-4', '--ipv4', '-6', '--ipv6',
+      ],
       values: {
         ...valuesOf('text', [
           '-b', '--branch', '-o', '--origin', '--depth', '--shallow-since', '--shallow-exclude', '--filter', '--server-option',
+          '-j', '--jobs', '--revision',
         ]),
         ...valuesOf('path', ['--reference', '--reference-if-able', '--separate-git-dir']),
       },
@@ -113,8 +189,10 @@ export const GIT_ENTRY: Entry = {
         network: 'known-host',
         docs: GIT,
       }),
+      operands: ['text'],
+      plain: FETCH_PLAIN,
       values: FETCH_VALUES,
-      flags: [TRANSFER_PROGRAM(['--upload-pack'])],
+      flags: [TRANSFER_PROGRAM(['--upload-pack']), SET_UPSTREAM(['--set-upstream'])],
     },
     pull: {
       facts: fact('Collects the latest changes from the server and puts them into the files you see.', {
@@ -125,8 +203,17 @@ export const GIT_ENTRY: Entry = {
         note: 'Changes made here that were never saved to a save point can be lost.',
         docs: GIT,
       }),
+      operands: ['text'],
+      // `-e` and `--edit` are left out: they open an editor. So are `-S` and `--gpg-sign`, which sign with a key, and
+      // `--verify-signatures`, which runs the signing program the settings name.
+      plain: [
+        ...FETCH_PLAIN, '-r', '--rebase', '--no-rebase', '--ff', '--no-ff', '--ff-only', '--commit', '--no-commit', '--no-edit',
+        '-n', '--stat', '--no-stat', '--squash', '--no-squash', '--log', '--no-log', '--signoff', '--no-signoff', '--verify',
+        '--no-verify', '--no-verify-signatures', '--summary', '--no-summary', '--autostash',
+        '--no-autostash', '--allow-unrelated-histories', '--no-gpg-sign',
+      ],
       values: { ...FETCH_VALUES, ...valuesOf('text', ['--cleanup', '-s', '--strategy', '-X', '--strategy-option']) },
-      flags: [TRANSFER_PROGRAM(['--upload-pack'])],
+      flags: [TRANSFER_PROGRAM(['--upload-pack']), SET_UPSTREAM(['--set-upstream'])],
     },
     push: {
       facts: fact('Sends the save points made here up to the server, where other people can see them.', {
@@ -136,12 +223,32 @@ export const GIT_ENTRY: Entry = {
         reversible: 'no',
         docs: GIT,
       }),
+      operands: ['text'],
+      // `-d`, `--delete`, `--prune` and `--mirror` are left out: each removes things from the server. So is `--signed`,
+      // which signs with a key.
+      plain: [
+        '-v', '--verbose', '-q', '--quiet', '--all', '--branches', '--tags', '--follow-tags', '--no-follow-tags', '-n',
+        '--dry-run', '--porcelain', '--progress', '--no-progress', '--thin', '--no-thin', '--verify',
+        '--no-verify', '--atomic', '--no-atomic', '--no-force-with-lease', '-4', '--ipv4', '-6', '--ipv6',
+      ],
       values: valuesOf('text', ['--repo', '-o', '--push-option', '--recurse-submodules']),
-      flags: [TRANSFER_PROGRAM(['--receive-pack', '--exec'])],
+      flags: [
+        TRANSFER_PROGRAM(['--receive-pack', '--exec']),
+        SET_UPSTREAM(['-u', '--set-upstream']),
+        { flags: ['-f', '--force'], facts: FORCED },
+        // The ref and what it is expected to hold are given only after `=`.
+        { flags: ['--force-with-lease', '--force-if-includes'], attached: true, role: 'text', facts: FORCED },
+      ],
     },
     add: {
       facts: fact('Marks changed files to be included in the next save point.', { ...LOCAL, reversible: 'yes', repeatSafe: true, effect: ['write'], docs: GIT }),
       operands: ['path'],
+      // `-e` and `--edit` are left out: they open an editor.
+      plain: [
+        '-A', '--all', '--no-ignore-removal', '--no-all', '--ignore-removal', '-u', '--update', '-n', '--dry-run', '-v',
+        '--verbose', '-f', '--force', '-p', '--patch', '-i', '--interactive', '-N', '--intent-to-add', '--refresh',
+        '--ignore-errors', '--ignore-missing', '--renormalize', '--sparse', '--pathspec-file-nul', '--no-warn-embedded-repo',
+      ],
       values: { '--chmod': 'text', '--pathspec-from-file': 'path' },
     },
     commit: {
@@ -151,7 +258,16 @@ export const GIT_ENTRY: Entry = {
         repeatSafe: false,
         docs: GIT,
       }),
-      plain: ['-a', '--all'],
+      operands: ['path'],
+      // `--amend` is left out: it replaces the last save point rather than making a new one. `-e` and `--edit` open an
+      // editor, and `-S` and `--gpg-sign` sign with a key.
+      plain: [
+        '-a', '--all', '-q', '--quiet', '-v', '--verbose', '-s', '--signoff', '--no-signoff', '-n', '--no-verify', '--verify',
+        '--allow-empty', '--allow-empty-message', '--no-edit', '--reset-author', '--short', '--branch', '--porcelain',
+        '--long', '-z', '--null', '-i', '--include', '-o', '--only', '-p', '--patch', '--interactive', '-u',
+        '--untracked-files', '--dry-run', '--status', '--no-status', '--no-gpg-sign', '--no-post-rewrite',
+        '--pathspec-file-nul',
+      ],
       values: {
         ...valuesOf('text', [
           '-m', '--message', '-C', '--reuse-message', '-c', '--reedit-message', '--fixup', '--squash', '--author',
@@ -168,7 +284,15 @@ export const GIT_ENTRY: Entry = {
         note: 'Changes that were never saved to a save point can be lost.',
         docs: GIT,
       }),
-      values: { ...valuesOf('text', ['-b', '-B', '--orphan']), '--pathspec-from-file': 'path' },
+      operands: ['text'],
+      plain: [
+        '-q', '--quiet', '--progress', '--no-progress', '--no-track', '--guess', '--no-guess', '-l', '-d',
+        '--detach', '-m', '--merge', '-p', '--patch', '-2', '--ours', '-3', '--theirs', '--overlay', '--no-overlay',
+        '--overwrite-ignore', '--no-overwrite-ignore', '--ignore-other-worktrees', '--ignore-skip-worktree-bits',
+        '--recurse-submodules', '--no-recurse-submodules', '--pathspec-file-nul',
+      ],
+      values: { ...valuesOf('text', ['-b', '-B', '--orphan', '--conflict']), '--pathspec-from-file': 'path' },
+      flags: [{ flags: ['-f', '--force'], facts: { reversible: 'no', note: 'Changes that were never saved to a save point are thrown away.' } }],
     },
     restore: {
       facts: fact('Puts files back to the way they were at the last save point.', {
@@ -179,6 +303,12 @@ export const GIT_ENTRY: Entry = {
         docs: GIT,
       }),
       operands: ['path'],
+      // `--no-overlay` is left out: it also removes files the source does not have.
+      plain: [
+        '-p', '--patch', '-W', '--worktree', '-S', '--staged', '-q', '--quiet', '--progress', '--no-progress', '-2', '--ours',
+        '-3', '--theirs', '-m', '--merge', '--ignore-unmerged', '--ignore-skip-worktree-bits', '--recurse-submodules',
+        '--no-recurse-submodules', '--overlay', '--pathspec-file-nul',
+      ],
       values: { ...valuesOf('text', ['-s', '--source', '--conflict']), '--pathspec-from-file': 'path' },
     },
     reset: {
@@ -189,6 +319,11 @@ export const GIT_ENTRY: Entry = {
         note: 'Work that was never saved to a save point cannot be put back.',
         docs: GIT,
       }),
+      operands: ['text'],
+      plain: [
+        '--soft', '--mixed', '--hard', '--merge', '--keep', '-N', '--intent-to-add', '-q', '--quiet', '--no-quiet', '-p',
+        '--patch', '--refresh', '--no-refresh', '--recurse-submodules', '--no-recurse-submodules', '--pathspec-file-nul',
+      ],
       values: { '--pathspec-from-file': 'path' },
     },
     clean: {
@@ -199,6 +334,7 @@ export const GIT_ENTRY: Entry = {
         note: 'Those files do not go to the Bin and cannot be put back.',
         docs: GIT,
       }),
+      plain: ['-d', '-f', '--force', '-i', '--interactive', '-n', '--dry-run', '-q', '--quiet', '-X'],
       values: { '-e': 'pattern', '--exclude': 'pattern' },
       flags: [
         {
@@ -219,6 +355,7 @@ export const GIT_ENTRY: Entry = {
     },
     remote: {
       facts: fact('Shows or changes which servers a project sends its work to.', { ...LOCAL, reversible: 'yes', repeatSafe: true, effect: ['read', 'configure'], docs: GIT }),
+      plain: ['-v', '--verbose'],
     },
     config: {
       facts: fact('Shows or changes the settings a project uses, or the ones used across this computer.', {
@@ -346,9 +483,9 @@ const OTP: FlagRule = { flags: ['--otp'], takesValue: true, role: 'text', facts:
 /**
  * npm and pnpm share their rows but not their flags: `-w` names a workspace in npm and is a bare switch in pnpm.
  * Both read their flags anywhere on the line, so every subcommand takes them, and the ones written before the
- * subcommand are stepped over to reach it.
+ * subcommand are stepped over to reach it. `plain` adds the switches each subcommand takes of its own.
  */
-const nodePackager = (docs: string, values: Record<string, Role>, bare: string[]): Entry => {
+const nodePackager = (docs: string, values: Record<string, Role>, bare: string[], plain: Record<string, string[]> = {}): Entry => {
   const rows = packagerRows(docs)
   const flags = [OTP]
   const globals: FlagRule[] = [
@@ -357,9 +494,52 @@ const nodePackager = (docs: string, values: Record<string, Role>, bare: string[]
     ...flags,
   ]
   const sub = Object.fromEntries(
-    Object.entries(rows.sub!).map(([word, rule]) => [word, { ...rule, values: { ...values, ...rule.values }, flags: [...(rule.flags ?? []), ...flags] }]),
+    Object.entries(rows.sub!).map(([word, rule]) => [
+      word,
+      { ...rule, ...(plain[word] && { plain: plain[word] }), values: { ...values, ...rule.values }, flags: [...(rule.flags ?? []), ...flags] },
+    ]),
   )
   return { ...rows, values, globals, flags, sub }
+}
+
+// npm reads these on every command, so they are read after the subcommand too.
+const NPM_ANYWHERE = ['-g', '--global', '--workspaces', '-s', '--silent', '-y', '--yes']
+// Which list in package.json a package is written to, and how. `-ws` is one shorthand for `--workspaces`, not a bundle.
+const NPM_SAVE = [
+  '-S', '--save', '--no-save', '-P', '--save-prod', '-D', '--save-dev', '-O', '--save-optional', '--save-peer', '-B',
+  '--save-bundle', '-E', '--save-exact',
+]
+const NPM_WORKSPACES = [...NPM_ANYWHERE, '-ws', '--include-workspace-root', '--install-links']
+// How the packages are laid out and checked. `--ignore-scripts` and `--no-audit` only leave something out. `-f` and
+// `--force` are left out: they turn off several of npm's own protections at once.
+const NPM_INSTALLING = [
+  ...NPM_WORKSPACES, '--legacy-bundling', '--global-style', '--legacy-peer-deps', '--strict-peer-deps', '--prefer-dedupe',
+  '--foreground-scripts', '--ignore-scripts', '--audit', '--no-audit', '--bin-links', '--no-bin-links', '--fund', '--no-fund',
+  '--dry-run', '--verbose',
+]
+const NPM_LOCKFILE = ['--package-lock', '--no-package-lock', '--package-lock-only']
+const NPM_INSTALL = [...NPM_SAVE, ...NPM_INSTALLING, ...NPM_LOCKFILE]
+const NPM_REMOVE = [...NPM_SAVE, ...NPM_WORKSPACES]
+const NPM_LIST = [
+  ...NPM_WORKSPACES, '-a', '--all', '--json', '-l', '--long', '-p', '--parseable', '--link', '--package-lock-only', '--unicode',
+  '--no-unicode',
+]
+const NPM_SCRIPT = ['--ignore-scripts', '--foreground-scripts']
+const NPM_PLAIN: Record<string, string[]> = {
+  install: NPM_INSTALL,
+  i: NPM_INSTALL,
+  add: NPM_INSTALL,
+  ci: NPM_INSTALLING,
+  update: NPM_INSTALL,
+  uninstall: NPM_REMOVE,
+  remove: NPM_REMOVE,
+  run: [...NPM_WORKSPACES, ...NPM_SCRIPT, '--if-present'],
+  test: [...NPM_ANYWHERE, ...NPM_SCRIPT],
+  start: [...NPM_ANYWHERE, ...NPM_SCRIPT],
+  publish: [...NPM_WORKSPACES, '--dry-run'],
+  list: NPM_LIST,
+  ls: NPM_LIST,
+  audit: [...NPM_WORKSPACES, ...NPM_SCRIPT, ...NPM_LOCKFILE, '--dry-run', '--json', '--include-attestations'],
 }
 
 const NPM_VALUES: Record<string, Role> = {
@@ -494,6 +674,12 @@ const DEVICE_RULE: FlagRule = {
 const DOCKER_RUN_FLAGS: FlagRule[] = [ENV_FILE, PRIVILEGED, CAP_ADD, DEVICE, DEVICE_RULE, VOLUME, MOUNT, VOLUMES_FROM, ...HOST_PARTS]
 
 const DOCKER = 'https://docs.docker.com/reference/cli/docker/'
+// Switches `docker run` and `docker create` share. `--disable-content-trust` is already the default, and `-P` publishes
+// ports, which the row's network reach already covers.
+const DOCKER_CREATE_PLAIN = [
+  '-i', '--interactive', '-t', '--tty', '--rm', '--init', '--read-only', '--no-healthcheck', '--oom-kill-disable', '-P',
+  '--publish-all', '--disable-content-trust', '-q', '--quiet', '--help',
+]
 const DOCKER_RUN: Rule = {
   facts: opaqueFact(
     'Starts a packaged program in its own sealed-off copy of a system.',
@@ -501,6 +687,7 @@ const DOCKER_RUN: Rule = {
     { privilege: 'none', touchesCredentials: false, effect: ['create', 'execute'], network: 'arbitrary', docs: DOCKER },
   ),
   operands: ['package', 'command'],
+  plain: [...DOCKER_CREATE_PLAIN, '-d', '--detach', '--sig-proxy'],
   values: DOCKER_RUN_VALUES,
   flags: DOCKER_RUN_FLAGS,
 }
@@ -514,6 +701,7 @@ const DOCKER_CREATE: Rule = {
   }),
   // The command it is set up with does not run here, so it is not looked up.
   operands: ['package', 'text'],
+  plain: DOCKER_CREATE_PLAIN,
   values: DOCKER_CREATE_VALUES,
   flags: DOCKER_RUN_FLAGS,
 }
@@ -524,6 +712,7 @@ const DOCKER_EXEC: Rule = {
     { privilege: 'none', touchesCredentials: false, effect: ['execute'], network: 'arbitrary', docs: DOCKER },
   ),
   operands: ['text', 'command'],
+  plain: ['-d', '--detach', '-i', '--interactive', '-t', '--tty'],
   values: valuesOf('text', ['--detach-keys', '-e', '--env', '-u', '--user', '-w', '--workdir']),
   flags: [ENV_FILE, PRIVILEGED_EXEC],
 }
@@ -666,7 +855,7 @@ const PIP_INDEX_VALUES: Record<string, Role> = valuesOf('text', ['-i', '--index-
 
 export const DEV: Record<string, Entry> = {
   git: GIT_ENTRY,
-  npm: nodePackager('https://docs.npmjs.com/cli/commands', NPM_VALUES, ['-g', '--global', '--workspaces', '-s', '--silent', '-y', '--yes']),
+  npm: nodePackager('https://docs.npmjs.com/cli/commands', NPM_VALUES, NPM_ANYWHERE, NPM_PLAIN),
   pnpm: nodePackager('https://pnpm.io/cli/add', PNPM_VALUES, ['-r', '--recursive', '-w', '--workspace-root', '-s', '--silent', '-g', '--global']),
   brew: {
     facts: opaqueFact(
@@ -884,7 +1073,11 @@ export const DEV: Record<string, Entry> = {
       { privilege: 'none', touchesCredentials: false, effect: ['execute'], network: 'arbitrary', docs: 'man 1 xargs' },
     ),
     operands: ['command'],
-    // `-d` and `-a` are GNU's; the macOS one has neither and stops at them.
+    // `-d` and `-a` are GNU's; the macOS one has neither and stops at them. `-p` asks before each run, and `-o` lets the
+    // command it runs read from the keyboard.
+    plain: [
+      '-0', '--null', '-o', '--open-tty', '-p', '--interactive', '-r', '--no-run-if-empty', '-t', '--verbose', '-x', '--exit',
+    ],
     values: valuesOf('text', ['-E', '-I', '-J', '-L', '-n', '-P', '-R', '-S', '-s', '-d', '--delimiter']),
     flags: [{ flags: ['-a', '--arg-file'], takesValue: true, role: 'path', facts: { effect: ['read'] } }],
     nestedHere: true,
@@ -931,10 +1124,12 @@ export const DEV: Record<string, Entry> = {
     sub: {
       ps: {
         facts: fact('Lists the packaged programs running right now.', { ...LOOKS, docs: 'https://docs.docker.com/reference/cli/docker/' }),
+        plain: ['-a', '--all', '-l', '--latest', '--no-trunc', '-q', '--quiet', '-s', '--size'],
         values: valuesOf('text', ['-f', '--filter', '--format', '-n', '--last']),
       },
       images: {
         facts: fact('Lists the packaged programs stored on this computer.', { ...LOOKS, docs: 'https://docs.docker.com/reference/cli/docker/' }),
+        plain: ['-a', '--all', '--digests', '--no-trunc', '-q', '--quiet', '--tree'],
         values: valuesOf('text', ['-f', '--filter', '--format']),
       },
       logs: {
@@ -956,6 +1151,7 @@ export const DEV: Record<string, Entry> = {
           { privilege: 'none', touchesCredentials: false, effect: ['read', 'create', 'write', 'execute'], network: 'arbitrary', docs: 'https://docs.docker.com/reference/cli/docker/' },
         ),
         operands: ['path'],
+        plain: ['--no-cache', '--pull', '-q', '--quiet', '--squash', '--disable-content-trust'],
         values: {
           ...valuesOf('path', ['-f', '--file', '--iidfile']),
           ...valuesOf('text', [
@@ -972,6 +1168,7 @@ export const DEV: Record<string, Entry> = {
           docs: 'https://docs.docker.com/reference/cli/docker/',
         }),
         operands: ['package'],
+        plain: ['-a', '--all-tags', '-q', '--quiet', '--disable-content-trust'],
         values: { '--platform': 'text' },
       },
       push: {
@@ -983,6 +1180,8 @@ export const DEV: Record<string, Entry> = {
           docs: 'https://docs.docker.com/reference/cli/docker/',
         }),
         operands: ['package'],
+        plain: ['-a', '--all-tags', '-q', '--quiet', '--disable-content-trust'],
+        values: { '--platform': 'text' },
       },
       stop: {
         facts: fact('Stops a packaged program that is running.', {
@@ -1002,6 +1201,13 @@ export const DEV: Record<string, Entry> = {
           docs: 'https://docs.docker.com/reference/cli/docker/',
         }),
         operands: ['text'],
+        plain: ['-l', '--link', '-v', '--volumes'],
+        flags: [
+          {
+            flags: ['-f', '--force'],
+            facts: { effect: ['terminate'], says: 'Stops a packaged program if it is running, and removes it and anything it had kept.' },
+          },
+        ],
       },
       rmi: {
         facts: fact('Removes a stored packaged program from this computer.', {
@@ -1011,6 +1217,8 @@ export const DEV: Record<string, Entry> = {
           docs: 'https://docs.docker.com/reference/cli/docker/',
         }),
         operands: ['package'],
+        plain: ['-f', '--force', '--no-prune'],
+        values: { '--platform': 'text' },
       },
       compose: {
         facts: opaqueFact(

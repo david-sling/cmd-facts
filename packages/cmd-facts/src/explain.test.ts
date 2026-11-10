@@ -187,8 +187,8 @@ describe('a line the table has not read all of', () => {
   })
 
   it('falls back past a known subcommand to the program, which is where the widest reach is written', () => {
-    const got = run('git log --oneline')
-    expect(got.unread).toEqual(['--oneline'])
+    const got = run('git log --show-signature')
+    expect(got.unread).toEqual(['--show-signature'])
     expect(got.facts.opaque).toBe(true)
     expect(got.facts.says).toBe(run('git frobnicate').facts.says)
     expect(got.attribution[0]!.commands).toEqual(['git'])
@@ -204,6 +204,33 @@ describe('a line the table has not read all of', () => {
     for (const line of ['rm -rf x', 'tar -xzf backup.tgz', 'curl -fsSL https://x.example']) {
       expect(run(line).unread, line).toBeUndefined()
       expect(run(line).facts.confidence, line).toBe('verified')
+    }
+  })
+
+  it('reads the everyday lines in full', () => {
+    const everyday = [
+      'ls -la', 'ls -lah /tmp', 'ls -1', 'ls --color=auto', 'cat -n notes.txt', 'cp -a src dest', 'mv -i a b', 'mkdir -p a/b/c',
+      'grep -rn foo src', 'grep -rli foo src', 'grep -E foo notes.txt', 'grep -v foo notes.txt', 'wc -l notes.txt',
+      'sort -rn nums.txt', 'df -h', 'df -h /', 'du -sh .', 'du -h -d 1 .', 'ps -ef', 'ps -A', 'find . -type f -name x -print',
+      'find -L . -iname x -o -name y', 'find . -empty -delete', 'zip -r out.zip src', 'zip -9q out.zip a', 'unzip -o a.zip',
+      'tar -czvf a.tgz src', 'chmod -v 644 a', 'touch -c a.txt', 'diff -ru a b', 'less -R app.log', 'echo -n hi',
+      'which -a node', 'tr -d x', 'file -b a.txt', 'uname -a', 'date -u', 'sed -n 1,5p a.txt', 'readlink -f a',
+      'git status -s', 'git status -sb', 'git log --oneline', 'git log --oneline --graph --all', 'git log -10 --stat',
+      'git diff --staged', 'git diff HEAD~1 -- src', 'git show --stat HEAD', 'git add -A', 'git commit -am msg',
+      'git push -u origin main', 'git pull --rebase', 'git fetch --all --prune', 'git branch -a', 'git checkout main',
+      'git clone --depth 1 https://github.com/a/b.git', 'git restore --staged a.ts', 'git reset --hard HEAD~1',
+      'git clean -fd', 'git remote -v', 'docker ps -a', 'docker images -q', 'docker run -d --rm -it ubuntu',
+      'docker build --no-cache -t app .', 'docker rm -f web', 'npm install -D vitest', 'npm i -g pnpm', 'npm ci --ignore-scripts',
+      'npm run build --if-present', 'npm ls --all',
+    ]
+    for (const line of everyday) {
+      expect(run(line).unread, line).toBeUndefined()
+      expect(run(line).facts.confidence, line).toBe('verified')
+    }
+    // A command run from inside another is answered at `derived` whatever the outer line says, so only the reading is pinned.
+    for (const line of ['xargs -0 -r rm', 'xargs -t echo', 'docker exec -it web bash']) {
+      expect(run(line).unread, line).toBeUndefined()
+      expect(run(line).facts.source, line).not.toBe('unread')
     }
   })
 
