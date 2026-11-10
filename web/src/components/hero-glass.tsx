@@ -2,6 +2,22 @@ import { useEffect, useRef, useState } from 'react'
 import { domToCanvas } from 'modern-screenshot'
 import FluidGlass from '#/components/FluidGlass'
 
+type Lens = 'torus' | 'blob' | 'pill'
+
+/** What each shape is worth across the lens, in page pixels. */
+const SIZE: Record<Lens, number> = { torus: 380, blob: 400, pill: 200 }
+
+/** Where the lens waits when the pointer is elsewhere, as a fraction of the hero. */
+const REST: [number, number] = [0.82, 0.5]
+
+/**
+ * A screen with no pointer to follow gets a torus that wanders on its own in the bottom-right
+ * corner, about two thirds of it on the page and the rest past the edge: enough to be seen over
+ * black, far enough out of the way to leave every word to be read.
+ */
+const SHOWN: [number, number] = [0.91, 0.95]
+const SHOWN_SIZE = 190
+
 /**
  * The hero, handed to the glass.
  *
@@ -12,24 +28,27 @@ import FluidGlass from '#/components/FluidGlass'
  * glass draws what you see. Anything marked `data-no-glass`, the install card, is left out of the
  * picture and goes on living as itself above the canvas.
  */
-type Lens = 'torus' | 'blob' | 'pill'
-
-/** What each shape is worth across the lens, in page pixels. */
-const SIZE: Record<Lens, number> = { torus: 380, blob: 400, pill: 200 }
-
-/** Where the lens waits when the pointer is elsewhere, as a fraction of the hero. */
-const REST: [number, number] = [0.82, 0.5]
-
 export function HeroGlass() {
   const host = useRef<HTMLDivElement>(null)
   const [surface, setSurface] = useState<HTMLCanvasElement | null>(null)
   const [lens, setLens] = useState<Lens>('torus')
   const [size, setSize] = useState(SIZE.torus)
   const sized = useRef(SIZE.torus)
+  const [shown, setShown] = useState(false)
+
+  // a finger has nothing to hover with, and a tap that changed the shape would be a control the
+  // page never offered
+  useEffect(() => {
+    const pointing = window.matchMedia('(hover: hover) and (pointer: fine)')
+    const read = () => setShown(!pointing.matches)
+    read()
+    pointing.addEventListener('change', read)
+    return () => pointing.removeEventListener('change', read)
+  }, [])
 
   // the shape morphs on its own clock; the size would otherwise snap, so it is eased to meet it
   useEffect(() => {
-    const want = SIZE[lens]
+    const want = shown ? SHOWN_SIZE : SIZE[lens]
     let frame = 0
     const close = () => {
       sized.current += (want - sized.current) * 0.14
@@ -39,12 +58,12 @@ export function HeroGlass() {
     }
     frame = requestAnimationFrame(close)
     return () => cancelAnimationFrame(frame)
-  }, [lens])
+  }, [lens, shown])
 
   // what the pointer is over decides the shape: the words say so themselves
   useEffect(() => {
     const hero = host.current?.parentElement
-    if (!hero) return
+    if (!hero || shown) return
     let waiting = 0
 
     const read = (event: PointerEvent) => {
@@ -72,7 +91,7 @@ export function HeroGlass() {
       hero.removeEventListener('pointermove', read)
       hero.removeEventListener('pointerleave', away)
     }
-  }, [])
+  }, [shown])
 
   useEffect(() => {
     const hero = host.current?.parentElement
@@ -164,10 +183,10 @@ export function HeroGlass() {
           text=""
           src={surface}
           fit="fill"
-          shape={lens}
-          interaction="follow"
+          shape={shown ? 'torus' : lens}
+          interaction={shown ? 'static' : 'follow'}
           size={size}
-          position={REST}
+          position={shown ? SHOWN : REST}
           background="transparent"
           shadow={0}
           morphOnClick={false}

@@ -142,6 +142,6 @@ body {
 
 /* Once the hero's glass has the words, the page keeps them without showing them: still there to
    select, to click and to read aloud, drawn by the canvas above. */
-[data-glass='on'] [data-glass-text] :where(h1, p, a) {
+[data-glass='on'] [data-glass-text] :where(h1, p, a):not([data-no-glass], [data-no-glass] *) {
   opacity: 0;
 }
