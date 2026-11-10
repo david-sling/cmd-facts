@@ -18,11 +18,11 @@
 import { pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
 import allSpecNames from '@withfig/autocomplete'
-import { DEV, FILES, NET, SECRETS, SYSTEM } from '../src/data/index.ts'
+import { DEV, FILES, LANG, NET, SECRETS, SYSTEM } from '../src/data/index.ts'
 import type { Entry, FlagRule, Rule } from '../src/entry.ts'
 
 // The rows written by hand, without the same-program aliases: an alias's grammar belongs to the row it points at.
-const CURATED: Record<string, Entry> = { ...FILES, ...SYSTEM, ...NET, ...SECRETS, ...DEV }
+const CURATED: Record<string, Entry> = { ...FILES, ...SYSTEM, ...NET, ...SECRETS, ...DEV, ...LANG }
 
 // The slice of a Fig spec this check reads. Everything else a spec carries is completion UI.
 type FigOption = { name: string | string[]; args?: FigArg | FigArg[] }
@@ -121,6 +121,11 @@ const FIG_WRONG = new Set([
   'unzip -l', // Switches.
   'unzip -c',
   'unzip -0',
+  // cargo: each takes a value in cargo's own `--help`; Fig declares no args.
+  ...['-F', '--features', '--manifest-path'].map((f) => `cargo add ${f}`),
+  'cargo remove --manifest-path',
+  ...['-Werror', '-Wno-error'].map((f) => `cmake ${f}`), // Take a value only after `=`.
+  ...['-0', '-F', '-K', '-T', '-x'].map((f) => `ruby ${f}`), // Take a value only attached: `ruby -F :` loads a file named `:`.
 ])
 
 /** A bundle Fig spells out as its own option (`git commit -am`) is covered when its last letter takes a value. */

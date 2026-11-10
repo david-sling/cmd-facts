@@ -221,6 +221,38 @@ describe('argument roles', () => {
     expect(explain('grep -e TODO a.ts b.ts').sentence).toBe('Searches a.ts and b.ts for the lines that contain TODO.')
     expect(roles('grep -f patterns.txt notes.txt')).toEqual(['patterns.txt:path', 'notes.txt:path'])
   })
+
+  it('reads the options a language tool takes anywhere on the line, before or after its subcommand', () => {
+    expect(roles('cargo add serde -F derive')).toEqual(['serde:package', 'derive:text'])
+    expect(roles('yarn --cwd web add react')).toEqual(['web:path', 'react:package'])
+    expect(roles('conda install -n ml -c conda-forge numpy')).toEqual(['ml:text', 'conda-forge:text', 'numpy:package'])
+    expect(roles('poetry -C app add requests')).toEqual(['app:path', 'requests:package'])
+    expect(roles('cmake -S . -B build')).toEqual(['.:path', 'build:path'])
+  })
+
+  it('leaves a subcommand its own reading of a letter the tool uses elsewhere', () => {
+    // `conda list -c` asks for the canonical names; it takes no channel.
+    expect(roles('conda list -c numpy')).toEqual(['numpy:unknown'])
+  })
+
+  it('takes a value written onto the letter, and only that, where the tool reads it so', () => {
+    expect(roles('ruby -F, script.rb')).toEqual([',:text', 'script.rb:path'])
+    expect(roles('ruby -0 script.rb')).toEqual(['script.rb:path'])
+  })
+
+  it('reads the line npx is told to run as a command', () => {
+    const got = explain({ program: '/usr/local/bin/npx', argv: ['npx', '-c', 'eslint .'] })
+    expect(got.args).toEqual([{ index: 2, value: 'eslint .', role: 'command', flag: '-c' }])
+  })
+})
+
+describe('credentials on a publishing line', () => {
+  it('marks the token or one-time code a publish carries', () => {
+    expect(run('cargo publish --token abc').facts.touchesCredentials).toBe(true)
+    expect(run('cargo publish').facts.touchesCredentials).toBe(false)
+    // Even where the subcommand has no row of its own, the option is read wherever it is.
+    expect(run('yarn npm publish --otp 123456').facts.touchesCredentials).toBe(true)
+  })
 })
 
 describe('opacity', () => {
