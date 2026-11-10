@@ -33,10 +33,10 @@ function Home() {
           className="relative flex min-h-[620px] flex-col justify-between p-8 sm:p-12 lg:p-16"
         >
           <div className="pt-10 lg:pt-16">
-            <h1 className="max-w-[16ch] text-[clamp(2.35rem,5.2vw,4.6rem)] font-light leading-[1.02] tracking-[-0.038em] text-white">
+            <h1 data-lens="blob" className="max-w-[16ch] text-[clamp(2.35rem,5.2vw,4.6rem)] font-light leading-[1.02] tracking-[-0.038em] text-white">
               Structured facts about what a command does.
             </h1>
-            <p className="mt-7 max-w-[44ch] text-[17px] leading-relaxed text-white/70 sm:text-[19px]">
+            <p data-lens="pill" className="mt-7 max-w-[44ch] text-[17px] leading-relaxed text-white/70 sm:text-[19px]">
               For the person who has to approve it and did not write it.{' '}
               <span className="font-mono text-[0.92em] text-white/55">explain()</span> returns typed
               fields — effect, reversibility, network reach, privilege — and no score.

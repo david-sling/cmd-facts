@@ -9,7 +9,7 @@ export type FluidGlassProps = {
   fontSize?: number
   /** A URL, or a canvas this project keeps redrawing — see the LOCAL notes in FluidGlass.jsx. */
   src?: string | HTMLCanvasElement
-  fit?: 'cover' | 'contain'
+  fit?: 'cover' | 'contain' | 'fill'
   background?: string
   shape?: 'lens' | 'blob' | 'cube' | 'pill' | 'torus' | 'prism' | 'diamond'
   shapes?: readonly FluidGlassProps['shape'][]

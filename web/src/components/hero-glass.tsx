@@ -12,9 +12,67 @@ import FluidGlass from '#/components/FluidGlass'
  * glass draws what you see. Anything marked `data-no-glass`, the install card, is left out of the
  * picture and goes on living as itself above the canvas.
  */
+type Lens = 'torus' | 'blob' | 'pill'
+
+/** What each shape is worth across the lens, in page pixels. */
+const SIZE: Record<Lens, number> = { torus: 380, blob: 400, pill: 200 }
+
+/** Where the lens waits when the pointer is elsewhere, as a fraction of the hero. */
+const REST: [number, number] = [0.82, 0.5]
+
 export function HeroGlass() {
   const host = useRef<HTMLDivElement>(null)
   const [surface, setSurface] = useState<HTMLCanvasElement | null>(null)
+  const [lens, setLens] = useState<Lens>('torus')
+  const [size, setSize] = useState(SIZE.torus)
+  const sized = useRef(SIZE.torus)
+
+  // the shape morphs on its own clock; the size would otherwise snap, so it is eased to meet it
+  useEffect(() => {
+    const want = SIZE[lens]
+    let frame = 0
+    const close = () => {
+      sized.current += (want - sized.current) * 0.14
+      if (Math.abs(want - sized.current) < 0.5) sized.current = want
+      setSize(sized.current)
+      if (sized.current !== want) frame = requestAnimationFrame(close)
+    }
+    frame = requestAnimationFrame(close)
+    return () => cancelAnimationFrame(frame)
+  }, [lens])
+
+  // what the pointer is over decides the shape: the words say so themselves
+  useEffect(() => {
+    const hero = host.current?.parentElement
+    if (!hero) return
+    let waiting = 0
+
+    const read = (event: PointerEvent) => {
+      const over = (event.target as Element | null)?.closest?.('[data-lens]')
+      const name = over instanceof HTMLElement ? over.dataset.lens : undefined
+      window.clearTimeout(waiting)
+      if (name === 'blob' || name === 'pill') {
+        setLens(name)
+        return
+      }
+      // crossing the gap between the title and the words under it is not a visit to the gap, so
+      // the shape in between is only taken up by someone who stays there
+      waiting = window.setTimeout(() => setLens('torus'), 180)
+    }
+
+    const away = () => {
+      window.clearTimeout(waiting)
+      setLens('torus')
+    }
+
+    hero.addEventListener('pointermove', read)
+    hero.addEventListener('pointerleave', away)
+    return () => {
+      window.clearTimeout(waiting)
+      hero.removeEventListener('pointermove', read)
+      hero.removeEventListener('pointerleave', away)
+    }
+  }, [])
 
   useEffect(() => {
     const hero = host.current?.parentElement
@@ -29,6 +87,7 @@ export function HeroGlass() {
     const sheet = document.createElement('canvas')
     const ink = sheet.getContext('2d')
     if (!ink) return
+    ink.imageSmoothingQuality = 'high'
 
     let printed: HTMLCanvasElement | null = null
     let ratio = 1
@@ -47,7 +106,9 @@ export function HeroGlass() {
     const print = async () => {
       const box = hero.getBoundingClientRect()
       if (box.width < 1 || box.height < 1) return
-      ratio = Math.min(window.devicePixelRatio || 1, 2)
+      // text that is photographed rather than typed needs the pixels: at the page's own scale its
+      // edges come back thin, so the sheet is kept at twice the page even on a screen that is not
+      ratio = Math.min(Math.max(window.devicePixelRatio || 1, 2), 3)
       sheet.width = Math.round(box.width * ratio)
       sheet.height = Math.round(box.height * ratio)
 
@@ -97,17 +158,18 @@ export function HeroGlass() {
     // the component's own stylesheet owns `.fluid-glass`, position included, so the box it fills
     // is one this file puts around it; it reads the pointer off the window, not off itself, so
     // taking it out of the way of the hero's own links costs it nothing
-    <div ref={host} className="pointer-events-none absolute inset-0">
+    <div ref={host} data-lens-now={lens} className="pointer-events-none absolute inset-0">
       {surface && (
         <FluidGlass
           text=""
           src={surface}
-          fit="cover"
-          shape="torus"
-          shapes={['torus']}
+          fit="fill"
+          shape={lens}
           interaction="follow"
-          size={220}
+          size={size}
+          position={REST}
           background="transparent"
+          shadow={0}
           morphOnClick={false}
         />
       )}

@@ -923,7 +923,10 @@ const FluidGlass = ({
       gl.uniform2f(u.uView, view.width, view.height);
       gl.uniform1f(u.uRatio, view.ratio);
       let rect = [0, 0, 1, 1];
-      if (media.ready) {
+      // LOCAL: `fill` is for a source drawn to fit the view already — rounding a canvas to whole
+      // pixels leaves its ratio a hair off the view's, and cover would resample the whole picture
+      // over that hair, which costs the text its edges
+      if (media.ready && s.fit !== 'fill') {
         const boxRatio = view.width / view.height;
         const mediaRatio = media.width / media.height;
         if (mediaRatio > boxRatio === (s.fit !== 'contain')) {
