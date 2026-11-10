@@ -16,7 +16,9 @@ const REST: [number, number] = [0.82, 0.5]
  * black, far enough out of the way to leave every word to be read.
  */
 const SHOWN: [number, number] = [0.91, 0.95]
-const SHOWN_SIZE = 190
+const SHOWN_SIZE = 320
+const SHOWN_CAP = 0.5
+const SHOWN_DRIFT = 0.4
 
 /**
  * The hero, handed to the glass.
@@ -186,6 +188,8 @@ export function HeroGlass() {
           shape={shown ? 'torus' : lens}
           interaction={shown ? 'static' : 'follow'}
           size={size}
+          cap={shown ? SHOWN_CAP : undefined}
+          drift={shown ? SHOWN_DRIFT : undefined}
           position={shown ? SHOWN : REST}
           background="transparent"
           shadow={0}

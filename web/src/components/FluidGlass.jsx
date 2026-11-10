@@ -560,6 +560,8 @@ const FluidGlass = ({
   shape = 'torus',
   shapes,
   size = 260,
+  cap = 0.36,
+  drift = 1,
   refraction = 1,
   dispersion = 0.35,
   reflection = 1,
@@ -601,6 +603,8 @@ const FluidGlass = ({
     shape: SHAPES.includes(shape) ? shape : 'torus',
     cycle: cycle.length ? cycle : SHAPES,
     size: Math.max(16, size),
+    cap: clamp(cap, 0.1, 1),
+    drift: clamp(drift, 0, 2),
     ior: 1 + 0.5 * clamp(refraction, 0, 2),
     dispersion: clamp(dispersion, 0, 1),
     reflection: clamp(reflection, 0, 2),
@@ -910,7 +914,9 @@ const FluidGlass = ({
 
     const radius = () => {
       const s = settingsRef.current;
-      return Math.min(s.size / 2, Math.min(view.width, view.height) * 0.36);
+      // LOCAL: `cap` was the constant 0.36 — the share of the shorter side the shape may take.
+      // A lens meant to run off the edge of a narrow box needs to be allowed past it.
+      return Math.min(s.size / 2, Math.min(view.width, view.height) * s.cap);
     };
 
     const bindContent = (u, s) => {
@@ -947,7 +953,7 @@ const FluidGlass = ({
     const settle = () => {
       const s = settingsRef.current;
       const size = radius();
-      const drift = s.idle && !reduced ? driftAt(idleClock, size) : [0, 0];
+      const drift = s.idle && !reduced ? driftAt(idleClock, size * s.drift) : [0, 0];
       const edge = size * 1.08;
       body.anchorX = clamp(body.x, edge, Math.max(edge, view.width - edge)) - drift[0];
       body.anchorY = clamp(body.y, edge, Math.max(edge, view.height - edge)) - drift[1];
@@ -1028,7 +1034,9 @@ const FluidGlass = ({
         idleClock += dt;
         busy = true;
       }
-      const drift = drifting ? driftAt(idleClock, size) : [0, 0];
+      // LOCAL: `drift` scales the wander, which is otherwise a fixed share of the radius — a lens
+      // large enough to reach across the box would otherwise cross all of it
+      const drift = drifting ? driftAt(idleClock, size * s.drift) : [0, 0];
       let goalX = body.anchorX + drift[0];
       let goalY = body.anchorY + drift[1];
       if (s.interaction === 'follow' && pointer.inside) {

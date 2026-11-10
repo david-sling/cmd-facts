@@ -14,6 +14,10 @@ export type FluidGlassProps = {
   shape?: 'lens' | 'blob' | 'cube' | 'pill' | 'torus' | 'prism' | 'diamond'
   shapes?: readonly FluidGlassProps['shape'][]
   size?: number
+  /** The share of the box's shorter side the shape may take; see the LOCAL note in FluidGlass.jsx. */
+  cap?: number
+  /** Scales the idle wander, which is otherwise a fixed share of the radius. */
+  drift?: number
   refraction?: number
   dispersion?: number
   reflection?: number
