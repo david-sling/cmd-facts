@@ -1,4 +1,4 @@
-import { fact, opaqueFact, valuesOf } from '../entry.ts'
+import { fact, opaqueFact, valuesOf, LOOKS } from '../entry.ts'
 import type { Entry } from '../entry.ts'
 import type { Overlay } from '../facts.ts'
 
@@ -17,6 +17,7 @@ const SSH_SETTINGS_RUN =
 export const NET: Record<string, Entry> = {
   ping: {
     facts: fact('Checks whether another computer on the network answers, and how long it takes.', {
+      effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true,
       network: 'known-host',
       tell: ['Checks whether ', { role: 'host' }, ' answers, and how long it takes.'],
       docs: 'man 8 ping',
@@ -29,11 +30,13 @@ export const NET: Record<string, Entry> = {
   },
   curl: {
     facts: fact('Fetches whatever is at a web address and shows it.', {
+      effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true,
       network: 'arbitrary',
       tell: ['Makes a request to ', { role: 'url', show: 'host' }, ' and shows what comes back.'],
       docs: 'man 1 curl',
     }),
     operands: ['url'],
+    plain: ['-f', '--fail', '-s', '--silent', '-S', '--show-error', '-L', '--location', '-v', '--verbose', '-i', '--include', '-I', '--head', '--compressed'],
     // Only the address being requested carries the `url` role, because the sentence takes the first of them: a
     // referer or a proxy given here would otherwise be named as the address this command reaches.
     values: {
@@ -184,6 +187,7 @@ export const NET: Record<string, Entry> = {
       'Connects to another computer and works on it from here.',
       'whatever it is asked to run, which happens on the other computer',
       {
+        privilege: 'none', touchesCredentials: false,
         effect: ['read', 'transmit', 'execute'],
         tell: ['Connects to ', { role: 'host' }, ' and works on it from here.'],
         network: 'known-host',
@@ -222,6 +226,7 @@ export const NET: Record<string, Entry> = {
   },
   scp: {
     facts: fact('Copies files between this computer and another one over the network.', {
+      privilege: 'none', touchesCredentials: false, repeatSafe: true,
       effect: ['read', 'create', 'write', 'transmit'],
       network: 'known-host',
       reversible: 'no',
@@ -245,6 +250,7 @@ export const NET: Record<string, Entry> = {
   },
   rsync: {
     facts: fact('Copies files to another place, here or on another computer, sending only what has changed.', {
+      privilege: 'none', touchesCredentials: false, repeatSafe: true,
       effect: ['read', 'create', 'write', 'transmit'],
       network: 'known-host',
       reversible: 'no',
@@ -302,6 +308,7 @@ export const NET: Record<string, Entry> = {
   },
   wget: {
     facts: fact('Fetches whatever is at a web address and saves it into a file in this folder.', {
+      privilege: 'none', touchesCredentials: false, repeatSafe: true,
       effect: ['read', 'create'],
       network: 'arbitrary',
       reversible: 'unknown',
@@ -373,6 +380,7 @@ export const NET: Record<string, Entry> = {
   },
   nc: {
     facts: fact('Opens a direct connection to another computer and passes text back and forth through it.', {
+      reversible: 'yes', privilege: 'none', touchesCredentials: false,
       effect: ['read', 'transmit'],
       network: 'arbitrary',
       repeatSafe: false,
@@ -397,7 +405,7 @@ export const NET: Record<string, Entry> = {
     ],
   },
   dig: {
-    facts: fact('Asks the naming service which address a name on the network points to.', { network: 'known-host', docs: 'man 1 dig' }),
+    facts: fact('Asks the naming service which address a name on the network points to.', { effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true, network: 'known-host', docs: 'man 1 dig' }),
     operands: ['text'],
     values: { '-f': 'path', ...valuesOf('text', ['-b', '-c', '-p', '-q', '-t', '-x']) },
     flags: [
@@ -406,16 +414,17 @@ export const NET: Record<string, Entry> = {
     ],
   },
   nslookup: {
-    facts: fact('Asks the naming service which address a name on the network points to.', { network: 'known-host', docs: 'man 1 nslookup' }),
+    facts: fact('Asks the naming service which address a name on the network points to.', { effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true, network: 'known-host', docs: 'man 1 nslookup' }),
     operands: ['domain', 'host'],
   },
   host: {
-    facts: fact('Asks the naming service which address a name on the network points to.', { network: 'known-host', docs: 'man 1 host' }),
+    facts: fact('Asks the naming service which address a name on the network points to.', { effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true, network: 'known-host', docs: 'man 1 host' }),
     operands: ['domain', 'host'],
     values: valuesOf('text', ['-t', '-c', '-W', '-N', '-R', '-m']),
   },
   traceroute: {
     facts: fact('Shows each step network traffic takes on its way to another computer.', {
+      effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true,
       network: 'known-host',
       tell: ['Shows each step network traffic takes on its way to ', { role: 'host', from: 'operands' }, '.'],
       docs: 'man 8 traceroute',
@@ -424,11 +433,12 @@ export const NET: Record<string, Entry> = {
     values: valuesOf('text', ['-f', '-g', '-i', '-m', '-M', '-p', '-q', '-s', '-t', '-w', '-z', '-A', '-P']),
   },
   netstat: {
-    facts: fact("Shows this computer's network connections, and how its traffic is sent on.", { docs: 'man 1 netstat' }),
+    facts: fact("Shows this computer's network connections, and how its traffic is sent on.", { ...LOOKS, docs: 'man 1 netstat' }),
     values: valuesOf('text', ['-f', '-I', '-p', '-w']),
   },
   ifconfig: {
     facts: fact('Shows or changes the settings of the network connections on this computer.', {
+      network: 'none', touchesCredentials: false,
       effect: ['read', 'configure'],
       reversible: 'unknown',
       privilege: 'admin',
@@ -440,6 +450,7 @@ export const NET: Record<string, Entry> = {
   },
   whois: {
     facts: fact('Looks up who a web address or network address is registered to.', {
+      effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true,
       network: 'known-host',
       tell: ['Looks up who ', { role: 'domain', from: 'operands' }, ' is registered to.'],
       docs: 'man 1 whois',
@@ -448,7 +459,7 @@ export const NET: Record<string, Entry> = {
     values: { '-h': 'text', '-p': 'text', '-c': 'text' },
   },
   arp: {
-    facts: fact('Shows the list that matches network addresses to the devices nearby.', { docs: 'man 8 arp' }),
+    facts: fact('Shows the list that matches network addresses to the devices nearby.', { ...LOOKS, docs: 'man 8 arp' }),
     operands: ['host', 'text'],
     values: { '-i': 'text' },
     flags: [

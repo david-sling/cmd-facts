@@ -55,6 +55,7 @@ const answer = explain('curl -fsSL https://get.example.com/install.sh -o install
 | `steps` | The line runs more than one command. |
 | `after` | On a step: the operator that joined it to the one before — `\|`, `&&`, `\|\|`, `;`, `&`. |
 | `truncated` | The chain was still handing over when it hit the depth limit of four. |
+| `unread` | The line carries flags or words the row does not account for. |
 
 ## What `explain` accepts
 
@@ -97,6 +98,15 @@ Some flags change the fact set rather than the detail. Without `-o`, `curl` only
 ```ts
 explain('rm -rf /tmp/build').escalated   // ['-r']
 explain('sh -c "…"').escalated           // ['-c']
+```
+
+## `unread`
+
+A row lists every flag it accounts for. A flag that is not listed has not been read, and neither has a word on a row written to take none. Neither is guessed to be harmless: the line is answered from the program's widest row at `derived`, the same one an unrecognised subcommand falls back to, and `unread` names what was not read. The words after an unread flag carry the role `unknown`, since the flag may have taken the next one as its value.
+
+```ts
+explain('rm --no-preserve-root -rf /').unread   // ['--no-preserve-root']
+explain('git log --oneline').facts.source       // 'unread'
 ```
 
 ## When nothing answered
