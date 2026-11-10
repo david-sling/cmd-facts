@@ -43,6 +43,12 @@ export type FlagRule = {
   facts: Overlay
   takesValue?: boolean
   role?: Role
+  /**
+   * Roles for the positional arguments wherever this flag is on the line, in place of the row's own: `grep -e foo
+   * notes.txt` takes its pattern from the flag, so every operand is a file. Never a `command`, and never on a row
+   * whose operands hold one, because the handover is found while the line is still being read.
+   */
+  operands?: Role[]
 }
 
 export type Rule = {

@@ -152,7 +152,13 @@
         "flags": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^-" } },
         "facts": { "$ref": "#/$defs/overlay" },
         "takesValue": { "type": "boolean" },
-        "role": { "$ref": "#/$defs/role" }
+        "role": { "$ref": "#/$defs/role" },
+        "operands": {
+          "description": "Roles for the positional arguments wherever this flag is on the line, in place of the row's own. Never `command`.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/role" }
+        }
       }
     },
 
