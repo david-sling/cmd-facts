@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import {
-  ArrowUpRight,
   BadgeCheck,
   Check,
-  ChevronDown,
   CornerDownRight,
   Eye,
   EyeOff,
@@ -19,6 +17,7 @@ import {
 } from 'lucide-react'
 import { effectsOf, explain } from 'cmd-facts'
 import type { ArgSlot, Effect, Facts, Part } from 'cmd-facts'
+import { CommandField } from '#/components/command-field'
 import { SlideUpText } from '#/components/slide-up-text'
 
 const EXAMPLES = [
@@ -668,14 +667,40 @@ const FIELD_ORDER = [
   'docs',
 ] as const
 
+/** The answer read top down: what was read, what it says, then what it was answered from. */
+const RETURNED_ORDER = [
+  'program',
+  'name',
+  'key',
+  'origin',
+  'subcommand',
+  'sentence',
+  'facts',
+  'parts',
+  'args',
+  'escalated',
+  'runs',
+  'steps',
+  'truncated',
+  'attribution',
+] as const
+
 /** Braces, quotes and commas are the furniture; only the values are meant to be read. */
 const PUNCT = 'text-ink-3/60'
 
 /** One printed line, hanging-indented so a wrapped sentence stays clear of its own key. */
-function Line({ depth, children }: { depth: number; children: React.ReactNode }) {
+function Line({
+  depth,
+  lit,
+  children,
+}: {
+  depth: number
+  lit?: boolean
+  children: React.ReactNode
+}) {
   return (
     <div
-      className="-mx-2 rounded pr-2"
+      className={`-mx-2 rounded pr-2 transition-colors duration-200 ${lit ? 'bg-white/[0.05]' : ''}`}
       style={{ paddingLeft: `calc(0.5rem + ${depth * 1.6 + 1.6}ch)`, textIndent: '-1.6ch' }}
     >
       {children}
@@ -694,11 +719,7 @@ function JsonValue({ value }: { value: unknown }) {
   if (typeof value === 'boolean') return <span className="text-pink">{String(value)}</span>
 
   if (Array.isArray(value))
-    // a list of plain values reads at a glance; one with a slot in it is folded, because a
-    // sentence cut into pieces costs four lines to say what the line beside it already says
-    return value.some((item) => item && typeof item === 'object') ? (
-      <FoldedArray key={JSON.stringify(value)} value={value} />
-    ) : (
+    return (
       <span className={PUNCT}>
         [
         {value.map((item, index) => (
@@ -711,7 +732,6 @@ function JsonValue({ value }: { value: unknown }) {
       </span>
     )
 
-  // a slot stays on one line: it is a value in a sentence, not a block of its own
   if (value && typeof value === 'object')
     return (
       <span className={PUNCT}>
@@ -729,110 +749,151 @@ function JsonValue({ value }: { value: unknown }) {
   return <span className="text-ink-2">{String(value)}</span>
 }
 
-/** Folded, it is the one word `[…]`; open, it is the list, and clicking it anywhere folds it back. */
-function FoldedArray({ value }: { value: unknown[] }) {
-  const [open, setOpen] = useState(false)
-
+/** The brackets are the handle: the whole of this is here, folded until it is asked for. */
+function Fold({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <button
       type="button"
-      aria-expanded={open}
-      aria-label={open ? 'fold this list' : `unfold this list of ${value.length}`}
-      onClick={() => setOpen((current) => !current)}
-      className={`inline cursor-pointer text-left transition-colors hover:text-ink-2 ${PUNCT}`}
+      onClick={onClick}
+      className={`cursor-pointer transition-colors hover:text-ink-2 ${PUNCT}`}
     >
-      [
-      {open
-        ? value.map((item, index) => (
-            <span key={index}>
-              {index > 0 ? ', ' : ''}
-              <JsonValue value={item} />
-            </span>
-          ))
-        : '\u2026'}
-      ]
+      {children}
     </button>
   )
 }
 
-function Field({
+/** A value with pieces inside it earns a block; anything else is one line. */
+const deep = (value: unknown) =>
+  (Array.isArray(value) && value.some((item) => item && typeof item === 'object')) ||
+  (!!value && typeof value === 'object' && !Array.isArray(value))
+
+const keysOf = (value: object, order?: readonly string[]) => {
+  const present = Object.keys(value).filter(
+    (key) => (value as Record<string, unknown>)[key] !== undefined,
+  )
+  // anything the order does not name is still printed, after the keys it does
+  return order
+    ? [...order.filter((key) => present.includes(key)), ...present.filter((key) => !order.includes(key))]
+    : present
+}
+
+/**
+ * One key of the answer. A string, a flag or a flat list is a line; a list with pieces in it and
+ * an object of its own are folded, so the whole of what came back is here without the column
+ * becoming a wall. `facts` is the one that opens by itself: it is what the page is about.
+ */
+function Node({
   name,
   value,
   depth,
-  lit,
   comma,
+  highlight,
+  start,
 }: {
   name: string
   value: unknown
   depth: number
-  lit: boolean
   comma: boolean
+  highlight: readonly string[]
+  start?: boolean
 }) {
-  return (
-    <div
-      className={`-mx-2 rounded pr-2 transition-colors duration-200 ${lit ? 'bg-white/[0.05]' : ''}`}
-      style={{ paddingLeft: `calc(0.5rem + ${depth * 1.6 + 1.6}ch)`, textIndent: '-1.6ch' }}
-    >
+  const [open, setOpen] = useState(start ?? false)
+  const lit = highlight.includes(name)
+  const key = (
+    <>
       <span className={`transition-colors duration-200 ${lit ? 'text-pink' : 'text-ink-2'}`}>
         {name}
       </span>
       <span className={PUNCT}>: </span>
-      <JsonValue value={value} />
-      {comma ? <span className={PUNCT}>,</span> : null}
-    </div>
+    </>
+  )
+
+  if (!deep(value))
+    return (
+      <Line depth={depth} lit={lit}>
+        {key}
+        <JsonValue value={value} />
+        {comma ? <span className={PUNCT}>,</span> : null}
+      </Line>
+    )
+
+  const list = Array.isArray(value)
+  const [opener, closer] = list ? ['[', ']'] : ['{', '}']
+
+  if (!open)
+    return (
+      <Line depth={depth} lit={lit}>
+        {key}
+        <Fold onClick={() => setOpen(true)}>
+          {opener}
+          {'\u2026'}
+          {closer}
+        </Fold>
+        {comma ? <span className={PUNCT}>,</span> : null}
+      </Line>
+    )
+
+  const rows = list
+    ? value.map((item, index) => (
+        <Line key={index} depth={depth + 1}>
+          <JsonValue value={item} />
+          {index < value.length - 1 ? <span className={PUNCT}>,</span> : null}
+        </Line>
+      ))
+    : keysOf(value as object, name === 'facts' ? FIELD_ORDER : undefined).map((inner, index, all) => (
+        <Node
+          key={inner}
+          name={inner}
+          value={(value as Record<string, unknown>)[inner]}
+          depth={depth + 1}
+          comma={index < all.length - 1}
+          highlight={highlight}
+        />
+      ))
+
+  return (
+    <>
+      <Line depth={depth} lit={lit}>
+        {key}
+        <Fold onClick={() => setOpen(false)}>{opener}</Fold>
+      </Line>
+      {rows}
+      <Line depth={depth}>
+        <Fold onClick={() => setOpen(false)}>{closer}</Fold>
+        {comma ? <span className={PUNCT}>,</span> : null}
+      </Line>
+    </>
   )
 }
 
 /**
- * What `explain()` actually handed back. The line beside this is `sentence`, and `sentence` is
- * `says` with this command's own arguments in it wherever the row carries a `tell` — so the two
- * are shown together, with the fields underneath them that a consumer really builds on.
- * Opening a circle lights the keys it was read from: the halves are one object.
+ * The whole of what `explain()` handed back, nothing left out: the sentence beside this is one
+ * rendering of `facts`, and the rest of the answer says where that came from. Opening a circle
+ * lights the keys it was read from, so the two halves are visibly one object.
  */
 function ReturnedObject({
-  sentence,
-  facts,
+  explanation,
   highlight,
 }: {
-  sentence: string
-  facts: Facts
+  explanation: Record<string, unknown>
   highlight: readonly string[]
 }) {
-  // a row that carries no `tell` or `note` has the key with nothing under it; an absent field is
-  // absent from the object too, rather than printing as `undefined`
-  const rows = FIELD_ORDER.filter(
-    (key) => key in facts && (facts as unknown as Record<string, unknown>)[key] !== undefined,
-  ).map((key) => [key, (facts as unknown as Record<string, unknown>)[key]] as const)
+  const keys = keysOf(explanation, RETURNED_ORDER)
 
   return (
     <div className="font-mono text-[11.5px] leading-[1.75] sm:text-[12px]">
       <span className={PUNCT}>{'{'}</span>
-
-      <Field name="sentence" value={sentence} depth={0} lit={false} comma />
-
-      <Line depth={0}>
-        <span className="text-ink-2">facts</span>
-        <span className={PUNCT}>: {'{'}</span>
-      </Line>
-      {rows.map(([key, value], index) => (
-        <Field
+      {keys.map((key, index) => (
+        <Node
           key={key}
           name={key}
-          value={value}
-          depth={1}
-          lit={highlight.includes(key)}
-          comma={index < rows.length - 1}
+          value={explanation[key]}
+          depth={0}
+          comma={index < keys.length - 1}
+          highlight={highlight}
+          start={key === 'facts'}
         />
       ))}
-      <Line depth={0}>
-        <span className={PUNCT}>{'},'}</span>
-      </Line>
-
-      {/* the rest of the explanation is real and is not hidden, only not printed here */}
-      <Line depth={0}>
-        <span className="text-ink-3/50">// parts, args, program, escalated, attribution</span>
-      </Line>
-
       <span className={PUNCT}>{'}'}</span>
     </div>
   )
@@ -840,13 +901,14 @@ function ReturnedObject({
 
 export function ExplainDemo() {
   const [command, setCommand] = useState(EXAMPLES[0])
-  // the demo plays itself until someone takes the dropdown; after that it stays where it was put
-  const [picked, setPicked] = useState(false)
+  // the page plays itself until the line is taken over; after that it stays where it was put
+  const [taken, setTaken] = useState(false)
   const reduced = useReducedMotion()
-  const playing = !picked && !reduced
+  const playing = !taken && !reduced
   // hover opens a card; focus and tap open the same one, so the fields are reachable without a pointer
   const [open, setOpen] = useState<number | null>(null)
-  const { sentence, parts, args, facts, attribution } = explain(command)
+  const explanation = explain(command)
+  const { sentence, parts, args, facts, attribution } = explanation
   const pack = attribution[0]?.pack
   const pills = pillsFor(facts)
 
@@ -857,8 +919,8 @@ export function ExplainDemo() {
     // one console: the two lines you would type, a rule, and what came back, sharing a
     // gutter of prompt marks the way a devtools scrollback does
     <div className="rounded-2xl border border-line bg-panel">
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 rounded-t-2xl bg-white/[0.015] px-5 pb-4 pt-5 sm:px-7">
-        <div className="min-w-0 font-mono text-[12.5px] leading-relaxed sm:text-[14px]">
+      <div className="rounded-t-2xl bg-white/[0.015] px-5 pb-5 pt-5 sm:px-7">
+        <div className="font-mono text-[12.5px] leading-relaxed sm:text-[14px]">
           <div className="flex gap-3.5">
             <span aria-hidden className="select-none text-ink-3/60">
               &rsaquo;
@@ -870,72 +932,38 @@ export function ExplainDemo() {
             </span>
           </div>
 
-          <div className="mt-3 flex gap-3.5">
+          {/* the line itself: anything can be typed here, and the examples under it are a way in */}
+          <div className="mt-3 flex items-start gap-3.5">
             <span aria-hidden className="select-none text-ink-3/60">
               &rsaquo;
             </span>
-            <span className="flex items-center whitespace-nowrap">
-              <span className="text-pink">explain</span>
-              <span className="text-ink-2">(&quot;</span>
-              {/* the visible text sizes the control; the native select sits invisibly on top of it */}
-              <span className="relative inline-flex items-center border-b border-dashed border-line-2 py-0.5 pr-6 transition-colors hover:border-white/40 focus-within:border-white/65">
-                {/* a phone has no room for the longest command; the picker still shows it whole */}
-                <span className="block max-w-[48vw] overflow-hidden text-ellipsis whitespace-pre text-ink sm:max-w-none">
-                  {command}
-                </span>
-                <ChevronDown
-                  aria-hidden
-                  className="pointer-events-none absolute right-1 size-3.5 text-ink-3"
-                />
-                {/* the dashed rule under the command is also the clock: it fills left to right,
-                    and the example changes where it runs out */}
-                {playing ? (
-                  <motion.span
-                    key={command}
-                    aria-hidden
-                    className="absolute inset-x-0 -bottom-px block h-px origin-left bg-pink"
-                    initial={{ scaleX: 0 }}
-                    animate={{ scaleX: 1 }}
-                    transition={{ duration: DWELL, ease: 'linear' }}
-                    onAnimationComplete={() =>
-                      setCommand(
-                        (current) => EXAMPLES[(EXAMPLES.indexOf(current) + 1) % EXAMPLES.length],
-                      )
-                    }
-                  />
-                ) : null}
-                <select
-                  aria-label="Command to explain"
-                  value={command}
-                  onChange={(event) => {
-                    setPicked(true)
-                    setCommand(event.target.value)
-                  }}
-                  className="absolute inset-0 w-full cursor-pointer opacity-0 outline-none focus:outline-none focus-visible:outline-none"
-                >
-                  {EXAMPLES.map((example) => (
-                    <option key={example} value={example}>
-                      {example}
-                    </option>
-                  ))}
-                </select>
-              </span>
-              <span className="text-ink-2">&quot;)</span>
+            <span className="flex min-w-0 flex-1 items-start">
+              <span className="shrink-0 text-pink">explain</span>
+              <span className="shrink-0 text-ink-2">(&quot;</span>
+              <CommandField
+                value={command}
+                onChange={(next) => {
+                  setTaken(true)
+                  setCommand(next)
+                }}
+                presets={EXAMPLES}
+                onPreset={(next) => {
+                  // a chosen example that turned itself over in seven seconds would be a trick
+                  setTaken(true)
+                  setCommand(next)
+                }}
+                playing={playing}
+                dwell={DWELL}
+                onElapsed={() =>
+                  setCommand(
+                    (current) => EXAMPLES[(EXAMPLES.indexOf(current) + 1) % EXAMPLES.length],
+                  )
+                }
+              />
+              <span className="shrink-0 text-ink-2">&quot;)</span>
             </span>
           </div>
         </div>
-
-        {/* the five examples are a menu; the playground is where you bring your own */}
-        <a
-          href="/playground"
-          className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line-2 px-3.5 py-1.5 font-mono text-[11.5px] text-ink-2 transition-colors hover:border-pink/50 hover:text-ink"
-        >
-          run your own
-          <ArrowUpRight
-            aria-hidden
-            className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-          />
-        </a>
       </div>
 
       <div className="border-t border-line lg:flex lg:items-stretch">
@@ -1004,13 +1032,12 @@ export function ExplainDemo() {
         <aside className="border-t border-line px-5 pb-8 pt-6 sm:px-7 lg:w-[380px] lg:shrink-0 lg:border-l lg:border-t-0 lg:pb-[50px] xl:w-[420px]">
           {/* a console names the source of what it printed; here that is the pack the facts came from */}
           <div className="mb-4 flex items-baseline justify-between gap-4 font-mono text-[11px] text-ink-3/70">
-            <span>the object it returned</span>
+            <span>everything it returned</span>
             {pack ? <span className="shrink-0">{pack}</span> : null}
           </div>
 
           <ReturnedObject
-            sentence={sentence}
-            facts={facts}
+            explanation={explanation as unknown as Record<string, unknown>}
             highlight={open === null ? [] : pills[open].keys}
           />
         </aside>
