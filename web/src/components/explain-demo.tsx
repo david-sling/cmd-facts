@@ -26,10 +26,117 @@ const EXAMPLES = [
 
 type Tone = 'good' | 'bad' | 'neutral'
 
-const TONE_CLASS: Record<Tone, string> = {
-  good: 'border-good/40 text-good',
-  bad: 'border-bad/40 text-bad',
-  neutral: 'border-line-2 text-ink-2',
+const TONE_TEXT: Record<Tone, string> = {
+  good: 'text-good',
+  bad: 'text-bad',
+  neutral: 'text-ink-2',
+}
+
+const TONE_RING: Record<Tone, string> = {
+  good: 'text-good',
+  bad: 'text-bad',
+  neutral: 'text-ink-3',
+}
+
+const SPRING = { type: 'spring', stiffness: 380, damping: 32, mass: 0.85 } as const
+
+/** Collapsed, the body hides inside the circle; open, it is the card below it. */
+const BODY = {
+  closed: { left: 5, width: 28, height: 8 },
+  open: { width: 268, height: 82 },
+}
+const CIRCLE = 38
+const BODY_TOP = 22
+/** Room to the left of the circle for a card that opens that way, inside the filter region. */
+const PAD = 240
+
+/**
+ * A card opens away from the edge it is near: the first circles open to the right, the
+ * middle ones open around themselves, the last ones open back to the left. The side the
+ * circle sits on gets a square corner, because a rounded one there curves back in under
+ * the circle and pinches the silhouette; the open sides keep their radius and the filter
+ * gives them the concave join.
+ */
+type Anchor = 'left' | 'center' | 'right'
+
+const OPEN_LEFT: Record<Anchor, number> = {
+  left: 0,
+  center: (CIRCLE - BODY.open.width) / 2,
+  right: CIRCLE - BODY.open.width,
+}
+
+const OPEN_CORNER: Record<Anchor, React.CSSProperties> = {
+  left: { borderTopLeftRadius: 0 },
+  center: {},
+  right: { borderTopRightRadius: 0 },
+}
+
+function anchorFor(index: number, count: number): Anchor {
+  if (index < count / 3) return 'left'
+  if (index < (count * 2) / 3) return 'center'
+  return 'right'
+}
+
+/**
+ * Circle and body are two shapes, not one box, and the goo filter merges them: where the
+ * body's top edge runs into the circle's side, the blur-and-threshold leaves the concave
+ * fillet a single growing rounded box can never have. Everything inside the filter has to
+ * be opaque — the threshold erases a half-transparent fill — so the ring is a second,
+ * larger copy of the same two shapes, dimmed by opacity outside the filter.
+ */
+function IslandShape({
+  isOpen,
+  anchor,
+  outset,
+  className,
+  style,
+}: {
+  isOpen: boolean
+  anchor: Anchor
+  outset: number
+  className: string
+  style?: React.CSSProperties
+}) {
+  const body = isOpen
+    ? { ...BODY.open, left: OPEN_LEFT[anchor] }
+    : BODY.closed
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute top-0 block h-[130px] ${className}`}
+      style={{
+        left: -PAD,
+        width: PAD + BODY.open.width + 20,
+        filter: 'url(#island-goo)',
+        ...style,
+      }}
+    >
+      <span
+        className="absolute block rounded-full bg-current"
+        style={{
+          left: PAD - outset,
+          top: -outset,
+          width: CIRCLE + outset * 2,
+          height: CIRCLE + outset * 2,
+        }}
+      />
+      <motion.span
+        className="absolute block bg-current"
+        style={{
+          top: BODY_TOP - outset,
+          borderRadius: 19 + outset,
+          ...OPEN_CORNER[anchor],
+        }}
+        initial={false}
+        animate={{
+          left: PAD + body.left - outset,
+          width: body.width + outset * 2,
+          height: body.height + outset * 2,
+        }}
+        transition={SPRING}
+      />
+    </span>
+  )
 }
 
 const EFFECT_WORD: Record<Effect, string> = {
@@ -199,42 +306,71 @@ export function ExplainDemo() {
 
       {/* one circle per field. Opening one grows the circle itself into a card, the way a
           notification unfolds: the icon never moves, so the card reads as the same object. */}
+      <svg aria-hidden className="pointer-events-none absolute size-0">
+        <defs>
+          <filter
+            id="island-goo"
+            x="-12%"
+            y="-12%"
+            width="124%"
+            height="124%"
+            colorInterpolationFilters="sRGB"
+          >
+            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+            <feColorMatrix
+              in="blur"
+              type="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -12"
+            />
+          </filter>
+        </defs>
+      </svg>
+
       <ul className="mt-10 flex flex-wrap gap-2.5">
         {pills.map(({ icon: Icon, field, text, tone }, index) => {
           const isOpen = open === index
+          const anchor = anchorFor(index, pills.length)
           return (
             <li
               key={field}
               className={`relative size-[38px] ${isOpen ? 'z-20' : 'z-10'}`}
             >
-              {/* the card is painted, never pointed at: an open one covers the circles to its
-                  right, and the pointer has to reach them to open theirs. The radius never
-                  animates — it is half the collapsed size, so the same corner reads as a circle
-                  at 38px and as a card at full size, and only width and height move. */}
-              <motion.span
+              {/* the shapes are painted, never pointed at: an open card covers the circles
+                  to its right, and the pointer has to reach them to open theirs */}
+              <IslandShape
+                isOpen={isOpen}
+                anchor={anchor}
+                outset={2}
+                className={TONE_RING[tone]}
+                style={{ opacity: 0.45 }}
+              />
+              <IslandShape
+                isOpen={isOpen}
+                anchor={anchor}
+                outset={0}
+                className="text-panel"
+              />
+
+              <Icon
                 aria-hidden
-                initial={false}
-                animate={{
-                  width: isOpen ? 268 : 38,
-                  height: isOpen ? 104 : 38,
-                }}
-                transition={{ type: 'spring', stiffness: 380, damping: 32, mass: 0.85 }}
-                className={`pointer-events-none absolute left-0 top-0 block overflow-hidden rounded-[19px] border bg-panel ${TONE_CLASS[tone]}`}
+                className={`pointer-events-none absolute left-[10px] top-[10px] size-[17px] ${TONE_TEXT[tone]}`}
+              />
+              <span
+                aria-hidden
+                style={{ left: OPEN_LEFT[anchor] + 14 }}
+                className={`pointer-events-none absolute top-[50px] pr-5 transition-opacity duration-200 ${
+                  isOpen ? 'opacity-100 delay-[90ms]' : 'opacity-0'
+                }`}
               >
-                <Icon className="absolute left-[10px] top-[10px] size-[17px]" />
-                <span
-                  className={`absolute left-[14px] top-[50px] pr-5 transition-opacity duration-200 ${
-                    isOpen ? 'opacity-100 delay-[90ms]' : 'opacity-0'
-                  }`}
-                >
-                  <span className="block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">
-                    {field}
-                  </span>
-                  <span className="mt-1.5 block whitespace-nowrap text-[15px]">
-                    {text}
-                  </span>
+                <span className="block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-3">
+                  {field}
                 </span>
-              </motion.span>
+                <span
+                  className={`mt-1.5 block whitespace-nowrap text-[15px] ${TONE_TEXT[tone]}`}
+                >
+                  {text}
+                </span>
+              </span>
 
               <button
                 type="button"
