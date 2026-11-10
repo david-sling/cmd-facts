@@ -1,4 +1,4 @@
-import { fact, opaqueFact } from '../entry.ts'
+import { fact, opaqueFact, valuesOf } from '../entry.ts'
 import type { Entry } from '../entry.ts'
 
 const GONE = 'Files removed this way do not go to the Bin and cannot be put back.'
@@ -25,6 +25,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 head',
     }),
     operands: ['path'],
+    values: valuesOf('text', ['-n', '--lines', '-c', '--bytes']),
   },
   tail: {
     facts: fact('Shows the last few lines of a file.', {
@@ -32,6 +33,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 tail',
     }),
     operands: ['path'],
+    values: valuesOf('text', ['-n', '--lines', '-c', '--bytes', '-b']),
     flags: [
       {
         flags: ['-f', '-F', '--follow'],
@@ -75,6 +77,16 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 grep',
     }),
     operands: ['pattern', 'path'],
+    // `-e` and `-f` are left out: either one moves the pattern off the line's first operand, which then names a
+    // file, and a row has no way to say so. Declaring them would read `grep -e foo notes.txt` with notes.txt as the
+    // pattern. `--color` is left out because its value is optional.
+    values: {
+      ...valuesOf('pattern', ['--include', '--exclude', '--exclude-dir']),
+      ...valuesOf('text', [
+        '-m', '--max-count', '--label', '-A', '--after-context', '-B', '--before-context', '-C', '--context',
+        '--binary-files', '-D', '--devices', '-d', '--directories',
+      ]),
+    },
     flags: [
       {
         flags: ['-r', '-R', '--recursive'],
@@ -90,7 +102,16 @@ export const FILES: Record<string, Entry> = {
     flagStyle: 'words',
     operands: ['path'],
     nestedHere: true,
-    values: { '-name': 'pattern', '-path': 'pattern', '-newer': 'path' },
+    values: {
+      '-f': 'path',
+      '-newer': 'path',
+      '-user': 'user',
+      ...valuesOf('pattern', ['-name', '-iname', '-path', '-ipath', '-regex', '-iregex', '-wholename', '-iwholename']),
+      ...valuesOf('text', [
+        '-type', '-size', '-perm', '-mtime', '-atime', '-ctime', '-mmin', '-amin', '-cmin', '-maxdepth', '-mindepth',
+        '-group', '-links', '-inum', '-fstype',
+      ]),
+    },
     flags: [
       {
         flags: ['-delete'],
@@ -114,8 +135,12 @@ export const FILES: Record<string, Entry> = {
       },
     ],
   },
-  df: { facts: fact('Shows how much room is left on each disk.', { docs: 'man 1 df' }) },
-  du: { facts: fact('Shows how much room files and folders take up.', { docs: 'man 1 du' }), operands: ['path'] },
+  df: { facts: fact('Shows how much room is left on each disk.', { docs: 'man 1 df' }), values: { '-T': 'text' } },
+  du: {
+    facts: fact('Shows how much room files and folders take up.', { docs: 'man 1 du' }),
+    operands: ['path'],
+    values: { '-d': 'text', '-I': 'pattern' },
+  },
   rm: {
     facts: fact('Removes files from this computer.', {
       effect: ['delete'],
@@ -177,6 +202,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 mkdir',
     }),
     operands: ['path'],
+    values: { '-m': 'mode', '--mode': 'mode' },
   },
   chmod: {
     facts: fact('Changes who is allowed to open or change a file.', {
@@ -218,6 +244,16 @@ export const FILES: Record<string, Entry> = {
     facts: fact('Packs files into one single file, or unpacks a file that was made that way.', { docs: 'man 1 tar' }),
     operands: ['path'],
     bareFlagsFirst: true,
+    values: {
+      ...valuesOf('path', [
+        '-C', '--directory', '-T', '--files-from', '-X', '--exclude-from', '-g', '--listed-incremental', '--index-file',
+      ]),
+      '--exclude': 'pattern',
+      ...valuesOf('text', [
+        '--newer-mtime', '--suffix', '--quoting-style', '--quote-chars', '--no-quote-chars', '--sparse-version',
+        '--xattrs-include', '--xattrs-exclude',
+      ]),
+    },
     flags: [
       {
         flags: ['-c', '--create'],
@@ -270,6 +306,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 unzip',
     }),
     operands: ['path'],
+    values: { '-d': 'path', '-P': 'text' },
   },
   open: {
     facts: opaqueFact(
@@ -278,7 +315,13 @@ export const FILES: Record<string, Entry> = {
       { effect: ['read', 'execute'], docs: 'man 1 open' },
     ),
     operands: ['path'],
-    values: { '-a': 'text', '--application': 'text' },
+    // `--args` is left out: it hands every word after it to the app, which a single value cannot say.
+    values: {
+      '-u': 'url',
+      '--url': 'url',
+      ...valuesOf('path', ['-i', '--stdin', '-o', '--stdout', '--stderr']),
+      ...valuesOf('text', ['-a', '--application', '-b', '-s', '--env']),
+    },
   },
   which: { facts: fact('Shows where a program is kept on this computer.', { docs: 'man 1 which' }), operands: ['text'] },
 }

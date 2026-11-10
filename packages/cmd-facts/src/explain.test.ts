@@ -171,6 +171,42 @@ describe('argument roles', () => {
   it('does not read a role out of the text of an argument', () => {
     expect(roles('ls https://example.com')).toEqual(['https://example.com:path'])
   })
+
+  // Each of these once read a flag's value as the thing the command was pointed at.
+  it('gives a flag its value before counting operands', () => {
+    const said = (line: string) => explain(line).sentence
+    expect(said('ssh -i key.pem -L 8080:db:5432 deploy@bastion')).toBe('Connects to deploy@bastion and works on it from here.')
+    expect(said('ping -c 4 example.com')).toBe('Checks whether example.com answers, and how long it takes.')
+    expect(said('kill -s KILL 4821')).toBe('Stops the program running as 4821.')
+    expect(said('mkdir -m 700 secrets')).toBe('Makes a new, empty folder at secrets.')
+    expect(said('head -n 5 notes.txt')).toBe('Shows the first few lines of notes.txt.')
+    expect(roles('git clone -b main https://example.com/r.git')).toEqual(['main:text', 'https://example.com/r.git:url'])
+    expect(roles('pip install -r requirements.txt')).toEqual(['requirements.txt:path'])
+    expect(roles('docker run -e FOO=1 -v /:/host ubuntu sh')).toEqual(['FOO=1:text', '/:/host:text', 'ubuntu:package', 'sh:command'])
+  })
+
+  it('finds the command handed over past the options that come before it', () => {
+    expect(explain('sudo -g staff rm notes.txt').runs?.name).toBe('rm')
+    expect(explain('xargs -I {} rm {}').runs?.name).toBe('rm')
+    expect(explain('xargs -n 1 rm').runs?.name).toBe('rm')
+  })
+
+  it('reads a value flag inside a bundle as it would on its own', () => {
+    expect(explain('git commit -am "fix the build"').args).toEqual([
+      { index: 3, value: 'fix the build', role: 'text', flag: '-m' },
+    ])
+  })
+
+  it('steps over a package manager option to reach the subcommand', () => {
+    const got = explain('pnpm --filter web install')
+    expect(got.subcommand).toBe('install')
+    expect(got.facts.source).not.toBe('subcommand-miss')
+  })
+
+  // `-e` would move the pattern off the first operand, and a row cannot say that, so it stays undeclared.
+  it('leaves grep reading its first operand as the pattern', () => {
+    expect(roles('grep -e foo notes.txt')).toEqual(['foo:pattern', 'notes.txt:path'])
+  })
 })
 
 describe('opacity', () => {

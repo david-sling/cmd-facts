@@ -53,7 +53,7 @@ const requiresValue = (o: FigOption): boolean => {
   return args.some((a) => !a.isOptional)
 }
 
-type Declared = { takesValue: Set<string>; bare: Set<string> }
+type Declared = { takesValue: Set<string>; bare: Set<string>; bundles: boolean }
 
 /** Every flag spelling a rule declares, split by whether the table says it consumes the next word. */
 function declaredOf(rule: Rule, globals: FlagRule[] = []): Declared {
@@ -62,34 +62,70 @@ function declaredOf(rule: Rule, globals: FlagRule[] = []): Declared {
   for (const r of [...(rule.flags ?? []), ...globals]) {
     for (const f of r.flags) (r.takesValue ? takesValue : bare).add(f)
   }
-  return { takesValue, bare }
+  return { takesValue, bare, bundles: rule.flagStyle !== 'words' }
 }
 
 /**
  * Places where a Fig spec is wrong about its own command, each checked against the command's manual, so a known
- * upstream error does not hold the exit gate red. Keyed `command flag`; drop a line once upstream fixes it.
+ * upstream error does not hold the exit gate red or pad the missing list. Keyed `command [subcommand] flag`; drop a
+ * line once upstream fixes it. Most are a value Fig marks required that is optional, or a switch Fig gives a value.
+ * A key without a subcommand covers the flag on every subcommand of that command.
  */
 const FIG_WRONG = new Set([
   'curl -x', // Fig declares no args, but its own description reads "[protocol://]host[:port] Use this proxy".
+  'curl --tlspassword', // Takes the password; Fig declares no args.
   'node -p', // `node -p "1+1"` evaluates and prints the next word; Fig declares no args.
+  'docker build -t', // `docker build -t name .` names the image; Fig declares no args.
+  'pnpm -w', // `--workspace-root` is a switch; Fig gives it a value.
+  // git: these take a value only after `=`, or are switches whose following word is an operand.
+  'git log --follow',
+  ...['-d', '-D', '-m', '-M', '--edit-description', '--merged', '--no-merged', '--abbrev', '-t', '--no-track'].map((f) => `git branch ${f}`),
+  ...['--local', '--get-regexp', '--get-urlmatch', '--get-colorbool', '--get-color'].map((f) => `git config ${f}`),
+  'grep --color', // `--color[=when]`: optional.
+  'ls --color', // `--color[=when]`: optional.
+  'make -j', // The job count is optional.
+  'make -B', // Switches.
+  'make -e',
+  'make -N',
+  'mkdir -Z', // A switch; only `--context=` takes a value.
+  ...['-f', '-F', '-g', '-i', '-r', '-T', '-x', '-s'].map((f) => `lsof ${f}`), // Optional values; `lsof -i -P` is the usual form.
+  'npm --verbose', // Switches.
+  'npm --audit',
+  // pip: each takes a value in pip's own `--help`; Fig's spec leaves the args off these subcommands.
+  ...['-c', '-r', '--no-binary', '--python-version', '--extra-index-url'].map((f) => `pip download ${f}`),
+  'pip list --format',
+  'pip list --extra-index-url',
+  'pip freeze -r',
+  'pip freeze --path',
+  'ps -a', // A switch on macOS.
+  'top -b', // Not a macOS option; a switch where it exists.
+  'unzip -l', // Switches.
+  'unzip -c',
+  'unzip -0',
 ])
+
+/** A bundle Fig spells out as its own option (`git commit -am`) is covered when its last letter takes a value. */
+const bundled = (declared: Declared, s: string): boolean =>
+  declared.bundles && /^-[A-Za-z0-9]{2,}$/.test(s) && declared.takesValue.has(`-${s.at(-1)}`)
 
 type Findings = { conflicts: string[]; missing: string[]; unlisted: string[] }
 
-function compare(declared: Declared, options: FigOption[], command: string): Findings {
+function compare(declared: Declared, options: FigOption[], where: string): Findings {
   const conflicts: string[] = []
   const missing: string[] = []
   const listed = new Set<string>()
 
   for (const o of options) {
-    const spellings = namesOf(o.name).map(spellingOf)
-    // `--` ends the flags; `parse()` reads it as grammar, never as an option, whatever a spec lists it as.
-    if (spellings.includes('--')) continue
-    if (spellings.some((s) => FIG_WRONG.has(`${command} ${s}`))) continue
+    // `parse()` reads only a word starting with `-` as an option; `dd`'s `if=` and `lsof`'s `+d` are operands to it.
+    const spellings = namesOf(o.name).map(spellingOf).filter((s) => s.startsWith('-'))
     for (const s of spellings) listed.add(s)
+    // `--` ends the flags; `parse()` reads it as grammar, never as an option, whatever a spec lists it as.
+    if (!spellings.length || spellings.includes('--')) continue
+    const command = where.split(' ')[0]
+    if (spellings.some((s) => FIG_WRONG.has(`${where} ${s}`) || FIG_WRONG.has(`${command} ${s}`))) continue
     const label = spellings.join('/')
     const needs = requiresValue(o)
-    const asValue = spellings.some((s) => declared.takesValue.has(s))
+    const asValue = spellings.some((s) => declared.takesValue.has(s) || bundled(declared, s))
     const asBare = spellings.some((s) => declared.bare.has(s))
     if (needs && asBare && !asValue) conflicts.push(`${label} requires a value; the table reads it as bare`)
     else if (!o.args && asValue) conflicts.push(`${label} takes no value; the table consumes the next word`)
@@ -133,7 +169,7 @@ async function main() {
           lines.push(`  [${word}] not a subcommand fig lists`)
           continue
         }
-        report(`[${word}]`, compare(declaredOf(rule), figSub.options ?? [], name))
+        report(`[${word}]`, compare(declaredOf(rule), figSub.options ?? [], `${name} ${word}`))
       }
       const covered = Object.keys(entry.sub).length
       if (figSubs.length) lines.push(`  subcommands: ${covered} covered of ${figSubs.length} in fig`)

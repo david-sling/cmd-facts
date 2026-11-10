@@ -82,6 +82,9 @@ export type Entry = Rule & {
   sub?: Record<string, Rule>
 }
 
+/** A `values` map giving every one of these flags the same role. Only flags whose value is required belong here. */
+export const valuesOf = (role: Role, flags: string[]): Record<string, Role> => Object.fromEntries(flags.map((f) => [f, role]))
+
 const COMMON = {
   reversible: 'yes',
   network: 'none',

@@ -1,8 +1,13 @@
-import { fact, opaqueFact } from '../entry.ts'
-import type { Entry } from '../entry.ts'
+import { fact, opaqueFact, valuesOf } from '../entry.ts'
+import type { Entry, FlagRule, Role } from '../entry.ts'
 
 const GIT = 'man 1 git'
 const SETUP_STEPS = 'the set-up steps the downloaded packages bring with them'
+
+const FETCH_VALUES = valuesOf('text', [
+  '--depth', '--deepen', '--shallow-since', '--shallow-exclude', '--negotiation-tip', '--refmap', '-j', '--jobs',
+  '--submodule-prefix', '--upload-pack', '-o', '--server-option',
+])
 
 export const GIT_ENTRY: Entry = {
   facts: fact('Works with the saved history of a project kept on this computer.', {
@@ -42,10 +47,17 @@ export const GIT_ENTRY: Entry = {
   ],
   sub: {
     status: { facts: fact('Shows which files in a project have changed since its last save point.', { docs: GIT }) },
-    log: { facts: fact('Shows the list of save points a project has, newest first.', { docs: GIT }) },
+    log: {
+      facts: fact('Shows the list of save points a project has, newest first.', { docs: GIT }),
+      values: { '--grep': 'pattern', ...valuesOf('text', ['--author', '-n', '--max-count']) },
+    },
     diff: { facts: fact('Shows exactly what changed in the files of a project since its last save point.', { docs: GIT }) },
     show: { facts: fact('Shows what one save point in a project changed.', { docs: GIT }) },
-    branch: { facts: fact('Lists or sets up the separate lines of work a project keeps.', { effect: ['read', 'write'], docs: GIT }) },
+    branch: {
+      facts: fact('Lists or sets up the separate lines of work a project keeps.', { effect: ['read', 'write'], docs: GIT }),
+      // `--merged`, `--track` and `--abbrev` are left out: each takes its value only after `=`, if at all.
+      values: valuesOf('text', ['--sort', '--format', '--points-at', '-u', '--set-upstream-to']),
+    },
     clone: {
       facts: fact('Copies a project from a server onto this computer.', {
         effect: ['read', 'create'],
@@ -53,6 +65,13 @@ export const GIT_ENTRY: Entry = {
         docs: GIT,
       }),
       operands: ['url', 'path'],
+      values: {
+        ...valuesOf('text', [
+          '-b', '--branch', '-o', '--origin', '--depth', '--shallow-since', '--shallow-exclude', '--filter',
+          '--server-option', '-c', '--config', '-u', '--upload-pack',
+        ]),
+        ...valuesOf('path', ['--reference', '--reference-if-able', '--template', '--separate-git-dir']),
+      },
     },
     fetch: {
       facts: fact('Collects the latest changes from the server without touching the files you see.', {
@@ -60,6 +79,7 @@ export const GIT_ENTRY: Entry = {
         network: 'known-host',
         docs: GIT,
       }),
+      values: FETCH_VALUES,
     },
     pull: {
       facts: fact('Collects the latest changes from the server and puts them into the files you see.', {
@@ -69,6 +89,7 @@ export const GIT_ENTRY: Entry = {
         note: 'Changes made here that were never saved to a save point can be lost.',
         docs: GIT,
       }),
+      values: { ...FETCH_VALUES, ...valuesOf('text', ['--cleanup', '-s', '--strategy', '-X', '--strategy-option']) },
     },
     push: {
       facts: fact('Sends the save points made here up to the server, where other people can see them.', {
@@ -77,14 +98,26 @@ export const GIT_ENTRY: Entry = {
         reversible: 'no',
         docs: GIT,
       }),
+      values: valuesOf('text', ['--repo', '-o', '--push-option', '--receive-pack', '--exec', '--recurse-submodules']),
     },
-    add: { facts: fact('Marks changed files to be included in the next save point.', { effect: ['write'], docs: GIT }), operands: ['path'] },
+    add: {
+      facts: fact('Marks changed files to be included in the next save point.', { effect: ['write'], docs: GIT }),
+      operands: ['path'],
+      values: { '--chmod': 'text', '--pathspec-from-file': 'path' },
+    },
     commit: {
       facts: fact('Makes a new save point from the changes that were marked.', {
         effect: ['create'],
         repeatSafe: false,
         docs: GIT,
       }),
+      values: {
+        ...valuesOf('text', [
+          '-m', '--message', '-C', '--reuse-message', '-c', '--reedit-message', '--fixup', '--squash', '--author',
+          '--date', '--cleanup',
+        ]),
+        ...valuesOf('path', ['-F', '--file', '-t', '--template', '--pathspec-from-file']),
+      },
     },
     checkout: {
       facts: fact('Switches the files you see to another version of the project.', {
@@ -93,6 +126,7 @@ export const GIT_ENTRY: Entry = {
         note: 'Changes that were never saved to a save point can be lost.',
         docs: GIT,
       }),
+      values: { ...valuesOf('text', ['-b', '-B', '--orphan']), '--pathspec-from-file': 'path' },
     },
     restore: {
       facts: fact('Puts files back to the way they were at the last save point.', {
@@ -102,6 +136,7 @@ export const GIT_ENTRY: Entry = {
         docs: GIT,
       }),
       operands: ['path'],
+      values: { ...valuesOf('text', ['-s', '--source', '--conflict']), '--pathspec-from-file': 'path' },
     },
     reset: {
       facts: fact('Moves a project back to an earlier save point.', {
@@ -110,6 +145,7 @@ export const GIT_ENTRY: Entry = {
         note: 'Work that was never saved to a save point cannot be put back.',
         docs: GIT,
       }),
+      values: { '--pathspec-from-file': 'path' },
     },
     clean: {
       facts: fact('Removes files sitting in the project folder that were never added to its history.', {
@@ -118,6 +154,7 @@ export const GIT_ENTRY: Entry = {
         note: 'Those files do not go to the Bin and cannot be put back.',
         docs: GIT,
       }),
+      values: { '-e': 'pattern', '--exclude': 'pattern' },
       flags: [
         {
           flags: ['-x'],
@@ -143,11 +180,12 @@ export const GIT_ENTRY: Entry = {
         reversible: 'unknown',
         docs: GIT,
       }),
+      values: { '-f': 'path', '--file': 'path', '--blob': 'text', '--type': 'text' },
     },
   },
 }
 
-const nodePackager = (docs: string): Entry => ({
+const packagerRows = (docs: string): Entry => ({
   facts: opaqueFact(
     'Works with the ready-made code packages a project is built on.',
     'the steps written inside the project and inside the packages it uses',
@@ -249,12 +287,71 @@ const nodePackager = (docs: string): Entry => ({
   },
 })
 
+/**
+ * npm and pnpm share their rows but not their flags: `-w` names a workspace in npm and is a bare switch in pnpm.
+ * Both read their flags anywhere on the line, so every subcommand takes them, and the ones written before the
+ * subcommand are stepped over to reach it.
+ */
+const nodePackager = (docs: string, values: Record<string, Role>, bare: string[]): Entry => {
+  const rows = packagerRows(docs)
+  const globals: FlagRule[] = [
+    ...Object.entries(values).map(([flag, role]) => ({ flags: [flag], takesValue: true, role, facts: {} })),
+    { flags: bare, facts: {} },
+  ]
+  const sub = Object.fromEntries(Object.entries(rows.sub!).map(([word, rule]) => [word, { ...rule, values: { ...values, ...rule.values } }]))
+  return { ...rows, values, globals, sub }
+}
+
+const NPM_VALUES: Record<string, Role> = {
+  '--registry': 'url',
+  ...valuesOf('path', ['--prefix', '--cache', '--userconfig', '--script-shell']),
+  ...valuesOf('text', ['-w', '--workspace', '--omit', '--include', '--tag', '--access', '--depth', '--audit-level', '--loglevel', '--otp']),
+}
+
+const PNPM_VALUES: Record<string, Role> = {
+  '--registry': 'url',
+  ...valuesOf('path', ['-C', '--dir']),
+  ...valuesOf('text', ['-F', '--filter', '--reporter', '--tag', '--access', '--depth', '--audit-level']),
+}
+
+// Where an app being installed is put, one flag for each kind of thing an app can bring with it.
+const BREW_INSTALL_VALUES: Record<string, Role> = {
+  '--cc': 'text',
+  ...valuesOf('path', [
+    '--appdir', '--colorpickerdir', '--prefpanedir', '--qlplugindir', '--mdimporterdir', '--dictionarydir', '--fontdir',
+    '--servicedir', '--input-methoddir', '--internet-plugindir', '--audio-unit-plugindir', '--vst-plugindir',
+    '--vst3-plugindir', '--screen-saverdir',
+  ]),
+}
+
+// The paths `-v` and `--mount` name are inside the packaged program as well as on this computer, so they stay text.
+const DOCKER_RUN_VALUES: Record<string, Role> = {
+  ...valuesOf('path', ['--cidfile', '--env-file', '--label-file']),
+  ...valuesOf('text', [
+    '--add-host', '-a', '--attach', '--blkio-weight', '--blkio-weight-device', '--cap-add', '--cap-drop', '--cgroup-parent',
+    '--cgroupns', '--cpu-period', '--cpu-quota', '--cpu-rt-period', '--cpu-rt-runtime', '-c', '--cpu-shares', '--cpus',
+    '--cpuset-cpus', '--cpuset-mems', '--detach-keys', '--device', '--device-cgroup-rule', '--device-read-bps',
+    '--device-read-iops', '--device-write-bps', '--device-write-iops', '--dns', '--dns-option', '--dns-search',
+    '--domainname', '--entrypoint', '-e', '--env', '--expose', '--gpus', '--group-add', '--health-cmd',
+    '--health-interval', '--health-retries', '--health-start-period', '--health-timeout', '-h', '--hostname', '--ip',
+    '--ip6', '--ipc', '--isolation', '--kernel-memory', '-l', '--label', '--link', '--link-local-ip', '--log-driver',
+    '--log-opt', '--mac-address', '-m', '--memory', '--memory-reservation', '--memory-swap', '--memory-swappiness',
+    '--mount', '--name', '--network', '--network-alias', '--oom-score-adj', '--pid', '--pids-limit', '--platform', '-p',
+    '--publish', '--pull', '--restart', '--runtime', '--security-opt', '--shm-size', '--stop-signal', '--stop-timeout',
+    '--storage-opt', '--sysctl', '--tmpfs', '--ulimit', '-u', '--user', '--userns', '--uts', '-v', '--volume',
+    '--volume-driver', '--volumes-from', '-w', '--workdir',
+  ]),
+}
+
 const PY = 'https://pip.pypa.io/en/stable/cli/'
+
+// Where pip looks for packages. A link page given to `-f` can be a folder here as well as an address, so it is text.
+const PIP_INDEX_VALUES: Record<string, Role> = valuesOf('text', ['-i', '--index-url', '--extra-index-url', '-f', '--find-links'])
 
 export const DEV: Record<string, Entry> = {
   git: GIT_ENTRY,
-  npm: nodePackager('https://docs.npmjs.com/cli/commands'),
-  pnpm: nodePackager('https://pnpm.io/cli/add'),
+  npm: nodePackager('https://docs.npmjs.com/cli/commands', NPM_VALUES, ['-g', '--global', '--workspaces', '-s', '--silent', '-y', '--yes']),
+  pnpm: nodePackager('https://pnpm.io/cli/add', PNPM_VALUES, ['-r', '--recursive', '-w', '--workspace-root', '-s', '--silent', '-g', '--global']),
   brew: {
     facts: opaqueFact(
       'Works with the programs installed on this computer through Homebrew.',
@@ -269,6 +366,7 @@ export const DEV: Record<string, Entry> = {
           { effect: ['read', 'create', 'write', 'install'], network: 'arbitrary', docs: 'man 1 brew' },
         ),
         operands: ['package'],
+        values: BREW_INSTALL_VALUES,
       },
       reinstall: {
         facts: opaqueFact(
@@ -277,6 +375,7 @@ export const DEV: Record<string, Entry> = {
           { effect: ['read', 'create', 'write', 'delete', 'install'], network: 'arbitrary', docs: 'man 1 brew' },
         ),
         operands: ['package'],
+        values: BREW_INSTALL_VALUES,
       },
       uninstall: {
         facts: fact('Removes a program that was installed through Homebrew.', {
@@ -300,9 +399,13 @@ export const DEV: Record<string, Entry> = {
           { effect: ['read', 'write', 'install'], network: 'arbitrary', docs: 'man 1 brew' },
         ),
         operands: ['package'],
+        values: BREW_INSTALL_VALUES,
       },
       list: { facts: fact('Lists the programs installed through Homebrew.', { docs: 'man 1 brew' }) },
-      info: { facts: fact('Shows what a program is and whether it is installed.', { network: 'arbitrary', docs: 'man 1 brew' }) },
+      info: {
+        facts: fact('Shows what a program is and whether it is installed.', { network: 'arbitrary', docs: 'man 1 brew' }),
+        values: valuesOf('text', ['--days', '--category']),
+      },
       search: { facts: fact('Looks for a program by name among the ones that can be installed.', { network: 'arbitrary', docs: 'man 1 brew' }) },
       doctor: { facts: fact('Checks whether Homebrew itself is set up properly on this computer.', { docs: 'man 1 brew' }) },
       cleanup: {
@@ -337,6 +440,11 @@ export const DEV: Record<string, Entry> = {
           docs: PY,
         }),
         operands: ['package'],
+        values: {
+          ...PIP_INDEX_VALUES,
+          ...valuesOf('path', ['-r', '--requirement', '-c', '--constraint', '-e', '--editable', '-t', '--target', '--prefix', '--root', '--src']),
+          ...valuesOf('text', ['--upgrade-strategy', '--platform', '--python-version', '--implementation', '--abi', '--only-binary', '--no-binary', '--progress-bar']),
+        },
       },
       uninstall: {
         facts: fact('Removes a ready-made Python code package from this computer.', {
@@ -353,10 +461,21 @@ export const DEV: Record<string, Entry> = {
           docs: PY,
         }),
         operands: ['package'],
+        values: {
+          ...PIP_INDEX_VALUES,
+          ...valuesOf('path', ['-d', '--dest', '-r', '--requirement', '-c', '--constraint', '--src']),
+          ...valuesOf('text', ['--platform', '--python-version', '--implementation', '--abi', '--only-binary', '--no-binary', '--progress-bar']),
+        },
       },
-      list: { facts: fact('Lists the ready-made Python code packages installed here.', { docs: PY }) },
+      list: {
+        facts: fact('Lists the ready-made Python code packages installed here.', { docs: PY }),
+        values: { ...PIP_INDEX_VALUES, '--path': 'path', '--exclude': 'package', '--format': 'text' },
+      },
       show: { facts: fact('Shows the details of one installed Python code package.', { docs: PY }), operands: ['package'] },
-      freeze: { facts: fact('Lists the installed Python code packages and their exact versions.', { docs: PY }) },
+      freeze: {
+        facts: fact('Lists the installed Python code packages and their exact versions.', { docs: PY }),
+        values: { '--path': 'path', '-r': 'path', '--requirement': 'path', '--exclude': 'package' },
+      },
     },
   },
   node: {
@@ -366,7 +485,16 @@ export const DEV: Record<string, Entry> = {
       { effect: ['execute'], network: 'arbitrary', docs: 'man 1 node' },
     ),
     operands: ['path'],
-    values: { '-e': 'command', '--eval': 'command', '-p': 'command' },
+    values: {
+      '-e': 'command',
+      '--eval': 'command',
+      '-p': 'command',
+      '-r': 'package',
+      '--require': 'package',
+      '--import': 'package',
+      '--env-file': 'path',
+      '--watch-path': 'path',
+    },
   },
   python: {
     versioned: true,
@@ -385,6 +513,7 @@ export const DEV: Record<string, Entry> = {
       },
       { flags: ['-m'], takesValue: true, role: 'package', facts: { says: 'Runs an installed Python package as if it were a program.' } },
     ],
+    values: valuesOf('text', ['-W', '-X', '--check-hash-based-pycs']),
   },
   sh: {
     facts: opaqueFact(
@@ -415,7 +544,12 @@ export const DEV: Record<string, Entry> = {
       },
     ),
     operands: ['command'],
-    values: { '-u': 'user', '--user': 'user' },
+    // `-h` is left out: on its own it asks for help, and only `--host=` gives it a value.
+    values: {
+      ...valuesOf('user', ['-u', '--user', '-U', '--other-user']),
+      ...valuesOf('path', ['-D', '--chdir', '-R', '--chroot']),
+      ...valuesOf('text', ['-g', '--group', '-p', '--prompt', '-C', '--close-from', '-r', '--role', '-t', '--type', '-T', '--command-timeout']),
+    },
     nestedHere: true,
   },
   xargs: {
@@ -425,6 +559,7 @@ export const DEV: Record<string, Entry> = {
       { effect: ['execute'], network: 'arbitrary', docs: 'man 1 xargs' },
     ),
     operands: ['command'],
+    values: valuesOf('text', ['-E', '-I', '-J', '-L', '-n', '-P', '-R', '-S', '-s']),
     nestedHere: true,
   },
   make: {
@@ -434,6 +569,11 @@ export const DEV: Record<string, Entry> = {
       { effect: ['read', 'create', 'write', 'execute'], network: 'arbitrary', docs: 'man 1 make' },
     ),
     operands: ['text'],
+    // `-j` is left out: the number of jobs is optional, and `make -j build` names a target, not a count.
+    values: valuesOf('path', [
+      '-C', '--directory', '-f', '--file', '--makefile', '-I', '--include-dir', '-o', '--old-file', '--assume-old',
+      '-W', '--what-if', '--new-file', '--assume-new',
+    ]),
   },
   sqlite3: {
     facts: opaqueFact(
@@ -446,6 +586,10 @@ export const DEV: Record<string, Entry> = {
       },
     ),
     operands: ['path', 'command'],
+    values: {
+      '-init': 'path',
+      ...valuesOf('text', ['-cmd', '-separator', '-nullvalue', '-newline', '-vfs', '-lookaside', '-mmap', '-pagecache']),
+    },
   },
   docker: {
     facts: opaqueFact(
@@ -454,9 +598,19 @@ export const DEV: Record<string, Entry> = {
       { effect: ['read', 'write', 'execute'], network: 'arbitrary', repeatSafe: false, docs: 'https://docs.docker.com/reference/cli/docker/' },
     ),
     sub: {
-      ps: { facts: fact('Lists the packaged programs running right now.', { docs: 'https://docs.docker.com/reference/cli/docker/' }) },
-      images: { facts: fact('Lists the packaged programs stored on this computer.', { docs: 'https://docs.docker.com/reference/cli/docker/' }) },
-      logs: { facts: fact('Shows what a packaged program has written as it ran.', { docs: 'https://docs.docker.com/reference/cli/docker/' }), operands: ['text'] },
+      ps: {
+        facts: fact('Lists the packaged programs running right now.', { docs: 'https://docs.docker.com/reference/cli/docker/' }),
+        values: valuesOf('text', ['-f', '--filter', '--format', '-n', '--last']),
+      },
+      images: {
+        facts: fact('Lists the packaged programs stored on this computer.', { docs: 'https://docs.docker.com/reference/cli/docker/' }),
+        values: valuesOf('text', ['-f', '--filter', '--format']),
+      },
+      logs: {
+        facts: fact('Shows what a packaged program has written as it ran.', { docs: 'https://docs.docker.com/reference/cli/docker/' }),
+        operands: ['text'],
+        values: valuesOf('text', ['--since', '-n', '--tail', '--until']),
+      },
       run: {
         facts: opaqueFact(
           'Starts a packaged program in its own sealed-off copy of a system.',
@@ -464,6 +618,7 @@ export const DEV: Record<string, Entry> = {
           { effect: ['create', 'execute'], network: 'arbitrary', docs: 'https://docs.docker.com/reference/cli/docker/' },
         ),
         operands: ['package', 'command'],
+        values: DOCKER_RUN_VALUES,
       },
       exec: {
         facts: opaqueFact(
@@ -472,6 +627,7 @@ export const DEV: Record<string, Entry> = {
           { effect: ['execute'], network: 'arbitrary', docs: 'https://docs.docker.com/reference/cli/docker/' },
         ),
         operands: ['text', 'command'],
+        values: { '--env-file': 'path', ...valuesOf('text', ['--detach-keys', '-e', '--env', '-u', '--user', '-w', '--workdir']) },
       },
       build: {
         facts: opaqueFact(
@@ -480,6 +636,13 @@ export const DEV: Record<string, Entry> = {
           { effect: ['read', 'create', 'write', 'execute'], network: 'arbitrary', docs: 'https://docs.docker.com/reference/cli/docker/' },
         ),
         operands: ['path'],
+        values: {
+          ...valuesOf('path', ['-f', '--file', '--iidfile']),
+          ...valuesOf('text', [
+            '-t', '--tag', '--add-host', '--build-arg', '--cache-from', '--isolation', '--label', '--network', '-o', '--output',
+            '--platform', '--progress', '--secret', '--ssh', '--target',
+          ]),
+        },
       },
       pull: {
         facts: fact('Downloads a packaged program from the internet onto this computer.', {
@@ -488,6 +651,7 @@ export const DEV: Record<string, Entry> = {
           docs: 'https://docs.docker.com/reference/cli/docker/',
         }),
         operands: ['package'],
+        values: { '--platform': 'text' },
       },
       push: {
         facts: fact('Sends a packaged program from this computer up to a service other people can reach.', {
@@ -505,6 +669,7 @@ export const DEV: Record<string, Entry> = {
           docs: 'https://docs.docker.com/reference/cli/docker/',
         }),
         operands: ['text'],
+        values: valuesOf('text', ['-t', '--time', '--timeout', '-s', '--signal']),
       },
       rm: {
         facts: fact('Removes a stopped packaged program and anything it had kept.', {

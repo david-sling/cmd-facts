@@ -43,6 +43,12 @@ jobs:
       - name: Typecheck
         run: pnpm -r typecheck
 
+      # Fails only where the table and Fig's specs disagree on whether a flag takes a value. Flags the table has
+      # not declared yet are reported, not failed on.
+      - name: Cross-check flag grammar against Fig
+        working-directory: packages/cmd-facts
+        run: pnpm figcheck
+
   # 0.1.0 shipped TypeScript source and could not be imported by plain Node at all: type
   # stripping is refused for anything under node_modules, on every version. The tests did
   # not catch it, because vitest transforms the sources itself. This installs the real
