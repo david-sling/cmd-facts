@@ -4,6 +4,7 @@ import type { Entry } from '../entry.ts'
 export const NET: Record<string, Entry> = {
   ping: {
     facts: fact('Checks whether another computer on the network answers, and how long it takes.', {
+      effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true,
       network: 'known-host',
       tell: ['Checks whether ', { role: 'host' }, ' answers, and how long it takes.'],
       docs: 'man 8 ping',
@@ -16,11 +17,13 @@ export const NET: Record<string, Entry> = {
   },
   curl: {
     facts: fact('Fetches whatever is at a web address and shows it.', {
+      effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true,
       network: 'arbitrary',
       tell: ['Makes a request to ', { role: 'url', show: 'host' }, ' and shows what comes back.'],
       docs: 'man 1 curl',
     }),
     operands: ['url'],
+    plain: ['-f', '--fail', '-s', '--silent', '-S', '--show-error', '-L', '--location', '-v', '--verbose', '-i', '--include', '-I', '--head', '--compressed'],
     // Only the address being requested carries the `url` role, because the sentence takes the first of them: a
     // referer or a proxy given here would otherwise be named as the address this command reaches.
     values: {
@@ -160,6 +163,7 @@ export const NET: Record<string, Entry> = {
       'Connects to another computer and works on it from here.',
       'whatever it is asked to run, which happens on the other computer',
       {
+        privilege: 'none', touchesCredentials: false,
         effect: ['read', 'transmit', 'execute'],
         tell: ['Connects to ', { role: 'host' }, ' and works on it from here.'],
         network: 'known-host',
