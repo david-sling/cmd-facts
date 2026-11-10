@@ -38,10 +38,12 @@
     "build": "tsc -p tsconfig.build.json",
     "prepack": "cp ../../README.md README.md && npm run build",
     "test": "vitest run",
+    "figcheck": "node scripts/figcheck.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@withfig/autocomplete": "^2.692.3",
     "typescript": "^6.0.2",
     "vitest": "^4.1.11"
   }
