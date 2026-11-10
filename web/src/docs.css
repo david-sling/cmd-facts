@@ -90,6 +90,12 @@ html:has(.docs) { scroll-padding-top: 88px; }
 .docs-side { display: grid; gap: 26px; }
 .docs-side-foot { margin-top: auto; padding-left: 12px; }
 .docs-version { margin: 0; font: 400 12px/1.4 var(--mono); color: var(--ink-3); }
+.docs-report {
+  display: block; margin-bottom: 10px;
+  font: 400 12.5px/1.4 var(--sans); color: var(--ink-2); text-decoration: none;
+  transition: color 0.15s ease;
+}
+.docs-report:hover { color: var(--accent); }
 .docs-side-title {
   margin: 0 0 8px; padding-left: 12px;
   font: 500 10.5px/1.2 var(--mono); letter-spacing: 0.17em; text-transform: uppercase; color: var(--ink-3);

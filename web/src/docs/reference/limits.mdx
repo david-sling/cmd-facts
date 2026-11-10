@@ -40,3 +40,11 @@ This library will not tell you whether to allow something. It tells you what you
 - **Gating on `confidence`.** Nothing stops you showing a `derived` answer; show it as one.
 - **Rendering values apart from prose.** `parts` makes it possible; only the consumer can do it. See [Showing it to a person](/docs/sentence).
 - **Standing grants.** Do not offer one where `repeatSafe` is false.
+
+## And one thing that is not on purpose
+
+Everything above is a refusal. This is not one: the table is early and thin, and it will sometimes be wrong. A sentence that misses what a flag does, a fact set narrower than what the command can really reach, an argument read as the wrong kind of thing — all of those are bugs, and all of them land in the one place a bug here does the most damage.
+
+So the reports worth filing are the ones about a specific line. [Report an inaccurate explanation](https://github.com/david-sling/cmd-facts/issues/new?template=inaccurate-explanation.yml) with the command you ran, what came back and what it should have said; [report a command nothing answers for](https://github.com/david-sling/cmd-facts/issues/new?template=missing-command.yml) with what it does to the computer. Both carry the `inaccurate-explanation` label.
+
+Reports about the four refusals above are a different matter, and the answer to those is on this page.

@@ -7,6 +7,14 @@ description: A library that answers what a command does in typed fields, for the
 
 It is not a man-page browser and not a linter. It will not tell you that `-a` does not ignore entries starting with a dot, and it will not tell you your command could be written better. Everything here answers one question: if this runs, what happens to this computer?
 
+## This is early
+
+The rows are hand-written, one command at a time, and there are not many of them yet. A command nothing answers for comes back as the widest floor with a `says` that admits it, which is working as intended. A command that is answered confidently and answered wrong is not, and it is the worst failure this library has.
+
+Until the table settles, gate on `confidence`. `verified` is a row written by hand for that exact command, from a pack you vouched for, and it is the only tier that should feed an automatic decision. Everything else is a floor, and the point of showing it is that a person gets to look at it.
+
+> Found an answer that reads wrong? [Report it](https://github.com/david-sling/cmd-facts/issues/new?template=inaccurate-explanation.yml), or [report a command nothing answers for](https://github.com/david-sling/cmd-facts/issues/new?template=missing-command.yml). Both carry the `inaccurate-explanation` label, which is where the accuracy backlog is kept. Say what you ran, what came back, and what it should have said.
+
 ## Where it is used
 
 - A remote support session where a customer clicks **Allow**.
