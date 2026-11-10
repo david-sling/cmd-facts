@@ -73,7 +73,7 @@ export const FILES: Record<string, Entry> = {
   },
   grep: {
     facts: fact('Searches files for the lines that contain a piece of text.', {
-      tell: ['Searches ', { role: 'path', which: 'all' }, ' for the lines that contain ', { role: 'pattern' }, '.'],
+      tell: ['Searches ', { role: 'path', which: 'all', from: 'operands' }, ' for the lines that contain ', { role: 'pattern' }, '.'],
       docs: 'man 1 grep',
     }),
     operands: ['pattern', 'path'],
@@ -93,7 +93,7 @@ export const FILES: Record<string, Entry> = {
         flags: ['-r', '-R', '--recursive'],
         facts: {
           says: 'Searches every file kept in one place, and in everything inside it, for a piece of text.',
-          tell: ['Searches everything kept inside ', { role: 'path', which: 'all' }, ' for the lines that contain ', { role: 'pattern' }, '.'],
+          tell: ['Searches everything kept inside ', { role: 'path', which: 'all', from: 'operands' }, ' for the lines that contain ', { role: 'pattern' }, '.'],
         },
       },
     ],

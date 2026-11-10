@@ -94,7 +94,7 @@ export const NET: Record<string, Entry> = {
             'Makes a request to ',
             { role: 'url', show: 'host' },
             ' and saves what comes back into ',
-            { role: 'path' },
+            { role: 'path', from: '-o' },
             '.',
           ],
           note: 'A file already in that place with the same name is replaced by what is downloaded.',
@@ -131,7 +131,7 @@ export const NET: Record<string, Entry> = {
           effect: ['read', 'transmit'],
           repeatSafe: false,
           says: 'Sends a file from this computer to a web address, and shows what comes back.',
-          tell: ['Sends ', { role: 'path' }, ' from this computer to ', { role: 'url', show: 'host' }, '.'],
+          tell: ['Sends ', { role: 'path', from: '-T' }, ' from this computer to ', { role: 'url', show: 'host' }, '.'],
         },
       },
       {

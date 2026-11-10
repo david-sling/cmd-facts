@@ -26,7 +26,7 @@ A row may also carry `tell`: the same claim, with slots for the arguments.
 ["Removes ", { "role": "path", "which": "all" }, " from this computer, along with everything inside."]
 ```
 
-A slot names a role and which arguments of it to take — `first` by default, or `all`, `last`, `all-but-last`, or an index. `show: 'host'` is the one reduction a slot may ask for. Reductions are a closed list on purpose: each one is a way to read an argument wrong.
+A slot names a role and which arguments of it to take — `first` by default, or `all`, `last`, `all-but-last`, or an index. `from` narrows where they come from: `operands` for the positions the command was pointed at, or a flag's first spelling for that flag's value, so `sort -o out.txt in.txt` sorts in.txt. `show: 'host'` is the one reduction a slot may ask for. Reductions are a closed list on purpose: each one is a way to read an argument wrong.
 
 | Line | Sentence |
 |---|---|

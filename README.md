@@ -262,7 +262,9 @@ matched against whatever it knows about this computer, or counted, so forty file
 forty names.
 
 A slot names a role and which arguments of it to take — `first` by default, or `all`, `last`, `all-but-last`, or an
-index. `show: 'host'` is the one reduction a slot may ask for. Reductions are a closed list on purpose: each one is
+index. `from` narrows where they come from: `operands` for the positions the command was pointed at, or a flag's
+first spelling for that flag's value, so `sort -o out.txt in.txt` sorts in.txt. `show: 'host'` is the one reduction a
+slot may ask for. Reductions are a closed list on purpose: each one is
 a way to read an argument wrong. A slot for a role the row never gives an argument is a lint failure, not a silent
 fallback for ever.
 

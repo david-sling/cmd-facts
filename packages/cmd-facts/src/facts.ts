@@ -39,6 +39,12 @@ export type Slot = {
    * each one is a way to read an argument wrong, and a slot shows what was written unless a row asks otherwise.
    */
   show?: 'host'
+  /**
+   * Where the value comes from: `operands` for the positions the command was pointed at, or a flag as the row declares
+   * it (`-o`) for that flag's value. Left out, any argument of the role will do, which reads wrong as soon as a flag
+   * gives the same role: `sort -o out.txt in.txt` would sort out.txt.
+   */
+  from?: string
 }
 
 export type Segment = string | Slot

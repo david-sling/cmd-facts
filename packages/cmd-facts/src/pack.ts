@@ -124,7 +124,7 @@ const WHICH = ['first', 'last', 'all', 'all-but-last']
  * A slotted sentence is only worth having if it can be filled. The check that matters is the last one: a slot for a
  * role this row never gives an argument would fall back to `says` on every line forever, and silently.
  */
-function checkTell(bad: Bad, where: string, tell: Segment[] | undefined, gives: Set<Role>) {
+function checkTell(bad: Bad, where: string, tell: Segment[] | undefined, gives: Set<Role>, takers: Map<string, Role>) {
   if (tell === undefined) return
   if (!Array.isArray(tell) || !tell.length) return bad(where, '`tell` is a list of words and slots.')
   if (typeof tell[0] !== 'string') bad(where, '`tell` opens the sentence with the row\'s own words, never with a value off the command line.')
@@ -146,6 +146,10 @@ function checkTell(bad: Bad, where: string, tell: Segment[] | undefined, gives: 
       bad(where, '`which` is first, last, all, all-but-last, or a number.')
     }
     if (slot.show !== undefined && slot.show !== 'host') bad(where, '`show` is `host`, or left out.')
+    // An argument reports its flag as the first spelling of the rule it matched, so that is the spelling named here.
+    if (slot.from !== undefined && slot.from !== 'operands' && takers.get(slot.from) !== slot.role) {
+      bad(where, `\`from\` names \`${slot.from}\`, which has to be the first spelling of a flag rule here that takes a \`${slot.role}\`.`)
+    }
   }
 }
 
@@ -157,8 +161,11 @@ function checkRule(bad: Bad, where: string, rule: Rule) {
     ...Object.values(rule.values ?? {}),
     ...(rule.flags ?? []).flatMap((f) => [...(f.role ? [f.role] : []), ...(f.operands ?? [])]),
   ])
-  checkTell(bad, where, rule.facts?.tell, gives)
-  for (const f of rule.flags ?? []) checkTell(bad, `${where} ${f.flags?.[0] ?? '(unnamed flag)'}`, f.facts?.tell, gives)
+  const takers = new Map<string, Role>(
+    (rule.flags ?? []).flatMap((f) => (f.takesValue && f.role && f.flags?.[0] ? [[f.flags[0], f.role] as [string, Role]] : [])),
+  )
+  checkTell(bad, where, rule.facts?.tell, gives, takers)
+  for (const f of rule.flags ?? []) checkTell(bad, `${where} ${f.flags?.[0] ?? '(unnamed flag)'}`, f.facts?.tell, gives, takers)
 
   const named: Array<[string, Role]> = [
     ...(rule.operands ?? []).map((r, i): [string, Role] => [`operand ${i}`, r]),
