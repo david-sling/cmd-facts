@@ -195,6 +195,20 @@ function readFlag(rule: Rule, spelled: string): FlagRead {
   return { matched, owner: head }
 }
 
+type Spoken = { word: string; at: number }
+
+/** The longest run of the words read so far that the table holds as a subcommand, and how many words it took. */
+function longestRow(sub: Record<string, Rule>, steps: Spoken[]): { key: string; words: number } | undefined {
+  for (let k = steps.length; k > 0; k--) {
+    const key = steps
+      .slice(0, k)
+      .map((s) => s.word)
+      .join(' ')
+    if (Object.hasOwn(sub, key)) return { key, words: k }
+  }
+  return undefined
+}
+
 function roleAt(operands: Role[] | undefined, n: number): Role {
   if (!operands?.length) return 'unknown'
   return operands[Math.min(n, operands.length - 1)] ?? 'unknown'
@@ -301,32 +315,62 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
 
   const word = argv[cursor]
   const wantsSub = entry.sub !== undefined && word !== undefined && !isFlag(word)
-  // A subcommand can run to several words (`gh pr create`), and the longest one the table holds answers. The words
-  // are looked up as the table's own keys only, so `git constructor` is a subcommand the table does not hold.
-  let spoken = wantsSub ? 1 : 0
-  let subKey: string | undefined
+  // A subcommand can run to several words (`gh pr create`), and the longest one the table holds answers. An option
+  // the subcommand read so far declares can sit between its words (`docker compose -f prod.yml down`), and is read on
+  // the way, as a global is. The words are looked up as the table's own keys only, so `git constructor` is a
+  // subcommand the table does not hold.
+  const steps: Spoken[] = []
+  const between: { at: number; args: ArgSlot[]; rules: FlagRule[] }[] = []
+  let unread = false
   if (wantsSub) {
-    const words: string[] = []
-    for (let i = cursor; i < argv.length && !isFlag(argv[i]!); i++) words.push(argv[i]!)
-    for (let k = words.length; k > 0 && subKey === undefined; k--) {
-      const candidate = words.slice(0, k).join(' ')
-      if (Object.hasOwn(entry.sub!, candidate)) [subKey, spoken] = [candidate, k]
+    let i = cursor
+    while (i < argv.length) {
+      const token = argv[i]!
+      if (!isFlag(token)) {
+        steps.push({ word: token, at: i++ })
+        continue
+      }
+      const sofar = longestRow(entry.sub!, steps)
+      if (!sofar) break
+      const read = readFlag(entry.sub![sofar.key]!, token)
+      if (!read.matched.length && !read.role) {
+        unread = true
+        break
+      }
+      const rules = read.matched.filter((m) => Object.keys(m.facts).length)
+      const owes = read.role !== undefined && read.inline === undefined && !read.attachedOnly && i + 1 < argv.length
+      const value = read.inline !== undefined ? { index: i, value: read.inline } : owes ? { index: i + 1, value: argv[i + 1]! } : undefined
+      const args: ArgSlot[] = read.role && value ? [{ ...value, role: read.role, flag: read.owner }] : []
+      between.push({ at: i, args, rules })
+      i += owes ? 2 : 1
     }
   }
+  const held = wantsSub ? longestRow(entry.sub!, steps) : undefined
+  const subKey = held?.key
+  const spoken = held?.words ?? 0
   const sub = subKey !== undefined ? entry.sub![subKey] : undefined
   const rule: Rule = sub ?? entry
   // Where the table holds longer subcommands under the one that answered (`s3 cp` under `s3`), the word after it is
   // one more step of the subcommand, and one the table does not hold.
-  const after = argv[cursor + spoken]
-  const deeper =
-    subKey !== undefined && after !== undefined && !isFlag(after) && Object.keys(entry.sub!).some((k) => k.startsWith(`${subKey} `))
-  const start = cursor + spoken + (deeper ? 1 : 0)
+  const next = steps[spoken]
+  const longer = subKey !== undefined && Object.keys(entry.sub!).some((k) => k.startsWith(`${subKey} `))
+  const deeper = longer && next !== undefined
+  // An option the subcommand does not declare may be hiding the rest of it, as one before the subcommand can.
+  const hidden = longer && !deeper && unread
+  const after = next?.word
+  // The last word of the subcommand: what the line says after it is read as usual, options stepped over included.
+  const end = deeper ? next!.at : subKey !== undefined ? steps[spoken - 1]!.at : wantsSub ? cursor : cursor - 1
+  const start = end + 1
+  for (const b of between.filter((b) => b.at < end)) {
+    preArgs.push(...b.args)
+    preRules.push(...b.rules)
+  }
   // A word the table holds no row for, and a leading option it does not declare, both leave the exact subcommand
   // unresolved, so the base row (or the shorter subcommand) answers at `derived` either way.
   const missed = entry.sub !== undefined && word !== undefined && !sub
   const derived = { confidence: 'derived', source: 'subcommand-miss' } as const
   const base: Facts = sub
-    ? deeper
+    ? deeper || hidden
       ? merge(sub.facts, derived)
       : sub.facts
     : missed

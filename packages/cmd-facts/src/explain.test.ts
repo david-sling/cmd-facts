@@ -309,6 +309,10 @@ describe('tools that act on another service', () => {
   it('reads compose options only where compose reads them', () => {
     expect(roles('docker compose logs -f web')).toEqual(['web:text'])
     expect(roles('docker-compose -f prod.yml up')).toEqual(['prod.yml:path'])
+    const down = run('docker compose -f prod.yml down -v')
+    expect(down.subcommand).toBe('compose down')
+    expect(down.facts.note).toMatch(/stores of data/)
+    expect(run('docker compose --env-file .env.prod up').facts.touchesCredentials).toBe(true)
   })
 
   it('answers for the programs that work the same as one it holds', () => {
@@ -330,7 +334,12 @@ describe('subcommands of more than one word', () => {
   const entry = {
     facts: opaqueFact('Works with a cluster.', 'the cluster', { reversible: 'no', network: 'arbitrary', repeatSafe: false, docs: 'x' }),
     sub: {
-      pods: { facts: fact('Works with the pods.', { reversible: 'no', network: 'arbitrary', docs: 'x' }), operands: ['text' as const] },
+      pods: {
+        facts: fact('Works with the pods.', { reversible: 'no', network: 'arbitrary', docs: 'x' }),
+        operands: ['text' as const],
+        values: { '-n': 'text' as const },
+        flags: [{ flags: ['--key'], takesValue: true, role: 'text' as const, facts: { touchesCredentials: true } }],
+      },
       'pods delete': {
         facts: fact('Removes a pod.', { effect: ['delete'], reversible: 'no', network: 'arbitrary', docs: 'x' }),
         operands: ['text' as const],
@@ -356,8 +365,28 @@ describe('subcommands of more than one word', () => {
     expect(got.args).toEqual([{ index: 3, value: 'web-1', role: 'text' }])
   })
 
-  it('reads a flag as the end of the subcommand', () => {
+  it('reads a flag the shorter subcommand does not declare as the end of the subcommand', () => {
     expect(read('kc pods -w delete').subcommand).toBe('pods')
+  })
+
+  it('steps over an option the shorter subcommand declares, and reads it on the way', () => {
+    const got = read('kc pods -n web delete web-1')
+    expect(got.subcommand).toBe('pods delete')
+    expect(got.facts.says).toBe('Removes a pod.')
+    expect(got.args).toEqual([
+      { index: 3, value: 'web', role: 'text', flag: '-n' },
+      { index: 5, value: 'web-1', role: 'text' },
+    ])
+    const keyed = read('kc pods --key s3cret delete web-1')
+    expect(keyed.subcommand).toBe('pods delete')
+    expect(keyed.facts.touchesCredentials).toBe(true)
+    expect(keyed.escalated).toContain('--key')
+  })
+
+  it('answers at derived where an option it does not know may be hiding the rest of the subcommand', () => {
+    const got = read('kc pods -w delete')
+    expect(got.facts.says).toBe('Works with the pods.')
+    expect(got.facts.confidence).toBe('derived')
   })
 
   it('never takes a name from the object machinery for a subcommand', () => {
