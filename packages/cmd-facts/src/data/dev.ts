@@ -5,14 +5,20 @@ const GIT = 'man 1 git'
 const SETUP_STEPS = 'the set-up steps the downloaded packages bring with them'
 
 export const GIT_ENTRY: Entry = {
-  facts: fact('Works with the saved history of a project kept on this computer.', {
-    privilege: 'none', touchesCredentials: false,
-    effect: ['read', 'write'],
-    network: 'known-host',
-    reversible: 'unknown',
-    repeatSafe: false,
-    docs: GIT,
-  }),
+  // A word git has no command of its own for can still be an alias the settings define, or a `git-<word>` program
+  // installed beside it, so a subcommand this table does not hold can run anything.
+  facts: opaqueFact(
+    'Works with the saved history of a project kept on this computer.',
+    'the aliases and add-on commands set up for it, which can run any program',
+    {
+      privilege: 'none',
+      touchesCredentials: false,
+      effect: ['read', 'write', 'create', 'delete', 'configure', 'transmit', 'execute'],
+      network: 'arbitrary',
+      reversible: 'no',
+      docs: GIT,
+    },
+  ),
   globals: [
     { flags: ['-C'], takesValue: true, role: 'path', facts: {} },
     {

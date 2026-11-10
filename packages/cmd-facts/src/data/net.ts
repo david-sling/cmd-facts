@@ -19,6 +19,7 @@ export const NET: Record<string, Entry> = {
       docs: 'man 1 curl',
     }),
     operands: ['url'],
+    plain: ['-f', '--fail', '-s', '--silent', '-S', '--show-error', '-L', '--location', '-v', '--verbose', '-i', '--include', '-I', '--head', '--compressed'],
     // Only the address being requested carries the `url` role, because the sentence takes the first of them: a
     // referer or a proxy given here would otherwise be named as the address this command reaches.
     values: {

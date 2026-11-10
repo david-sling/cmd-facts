@@ -4,9 +4,9 @@ import type { Entry } from '../entry.ts'
 export const SECRETS: Record<string, Entry> = {
   security: {
     facts: fact('Works with the passwords, keys and certificates this computer keeps locked away.', {
-      effect: ['read'], network: 'none', privilege: 'none',
+      effect: ['read', 'create', 'delete', 'configure'], network: 'none', privilege: 'none',
       touchesCredentials: true,
-      reversible: 'unknown',
+      reversible: 'no',
       repeatSafe: false,
       docs: 'man 1 security',
     }),
@@ -250,7 +250,7 @@ export const SECRETS: Record<string, Entry> = {
   tccutil: {
     facts: fact('Changes which apps are allowed to reach private parts of this computer, like the camera or the screen.', {
       ...LOCAL,
-      effect: ['configure'],
+      effect: ['delete', 'configure'],
       reversible: 'no',
       repeatSafe: false,
       docs: 'man 1 tccutil',

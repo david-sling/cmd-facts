@@ -1,4 +1,4 @@
-import { sortEffects } from './facts.ts'
+import { merge, sortEffects } from './facts.ts'
 import type { Effect, Facts, Overlay } from './facts.ts'
 
 // What an argv position is, so a consumer can resolve and show the thing rather than parse it out of a string.
@@ -54,6 +54,12 @@ export type Rule = {
   operands?: Role[]
   /** Flags that take a value, where the value's role matters but the flag changes nothing else. */
   values?: Record<string, Role>
+  /**
+   * Flags that were looked at and found to change nothing the fields carry, and to take no value: `ls -l`, `rm -v`.
+   * The table is closed: a flag that is in none of `flags`, `values` or here has not been read, and the line it is on
+   * is answered from the program's widest row at `derived`, with the flag named in `unread`.
+   */
+  plain?: string[]
   /**
    * The command this one hands over to runs on this computer, and is carried as separate words on this same line,
    * so it can be looked up with the same tables. Off by default, and deliberately so: a nested command held in one
@@ -128,3 +134,17 @@ export const opaqueFact = (says: string, handsOverTo: string, over: OpaqueOver):
   handsOverTo,
   says,
 })
+
+/**
+ * Everything a row can reach with the flags the table knows for it: its own facts widened by every flag rule's. The
+ * sentence stays the row's own. This is what a line is answered from where it carries something the table has not
+ * read, so it has to be at least as wide as anything the row was written to say.
+ */
+export function reach(rule: Rule): Facts {
+  let out = rule.facts
+  for (const f of rule.flags ?? []) {
+    const { says: _says, tell: _tell, note: _note, docs: _docs, ...widen } = f.facts
+    out = merge(out, widen)
+  }
+  return out
+}

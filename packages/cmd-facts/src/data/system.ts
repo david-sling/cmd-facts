@@ -90,8 +90,8 @@ export const SYSTEM: Record<string, Entry> = {
   log: {
     facts: fact('Reads or clears the record macOS keeps of what programs on this computer have been doing.', {
       network: 'none', touchesCredentials: false,
-      effect: ['read', 'delete'],
-      reversible: 'unknown',
+      effect: ['read', 'create', 'delete'],
+      reversible: 'no',
       privilege: 'admin',
       repeatSafe: false,
       docs: 'man 1 log',
@@ -137,8 +137,8 @@ export const SYSTEM: Record<string, Entry> = {
   defaults: {
     facts: fact('Reads or changes the settings that apps and macOS have saved on this computer.', {
       ...LOCAL,
-      effect: ['read', 'configure'],
-      reversible: 'unknown',
+      effect: ['read', 'create', 'delete', 'configure'],
+      reversible: 'no',
       repeatSafe: false,
       docs: 'man 1 defaults',
     }),
@@ -190,7 +190,7 @@ export const SYSTEM: Record<string, Entry> = {
   launchctl: {
     facts: fact('Looks at or changes the background programs macOS starts and keeps running.', {
       ...LOCAL,
-      effect: ['read', 'configure'],
+      effect: ['read', 'terminate', 'configure', 'execute'],
       reversible: 'unknown',
       repeatSafe: false,
       docs: 'man 1 launchctl',
@@ -358,8 +358,8 @@ export const SYSTEM: Record<string, Entry> = {
   diskutil: {
     facts: fact('Looks at or changes the disks and storage attached to this computer.', {
       network: 'none', touchesCredentials: false,
-      effect: ['read', 'configure'],
-      reversible: 'unknown',
+      effect: ['read', 'write', 'delete', 'terminate', 'configure'],
+      reversible: 'no',
       privilege: 'admin',
       repeatSafe: false,
       docs: 'man 8 diskutil',

@@ -23,5 +23,6 @@ describe('the published schema and the exported vocabularies agree', () => {
   it('carries every source a consumer can be handed', () => {
     expect(defs['source']?.enum).toContain('plugin')
     expect(defs['source']?.enum).toContain('unknown')
+    expect(defs['source']?.enum).toContain('unread')
   })
 })

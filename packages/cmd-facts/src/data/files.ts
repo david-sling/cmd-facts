@@ -133,6 +133,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 rm',
     }),
     operands: ['path'],
+    plain: ['-f', '--force', '-i', '-I', '-v', '--verbose', '-d', '--dir', '-P', '-x', '--one-file-system'],
     flags: [
       {
         flags: ['-r', '-R', '--recursive'],
@@ -231,6 +232,8 @@ export const FILES: Record<string, Entry> = {
     facts: fact('Packs files into one single file, or unpacks a file that was made that way.', { ...LOOKS, docs: 'man 1 tar' }),
     operands: ['path'],
     bareFlagsFirst: true,
+    plain: ['-z', '--gzip', '--gunzip', '-j', '--bzip2', '-J', '--xz', '-v', '--verbose', '-t', '--list'],
+    values: { '-C': 'path', '--cd': 'path', '--directory': 'path' },
     flags: [
       {
         flags: ['-c', '--create'],

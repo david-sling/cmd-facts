@@ -22,7 +22,7 @@ const KUBE: Pack = {
   version: '2.4.0',
   commands: {
     kubectl: {
-      facts: fact('Asks a cluster what is running on it.', { effect: ['read'], privilege: 'none', touchesCredentials: false, repeatSafe: true, reversible: 'unknown', network: 'known-host' }),
+      facts: fact('Asks a cluster what is running on it, or removes things from it.', { effect: ['read', 'delete'], privilege: 'none', touchesCredentials: false, repeatSafe: true, reversible: 'no', network: 'known-host' }),
       sub: {
         delete: {
           facts: fact('Removes something from a cluster.', { privilege: 'none', touchesCredentials: false, repeatSafe: true, effect: ['delete'], reversible: 'no', network: 'known-host' }),

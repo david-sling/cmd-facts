@@ -107,14 +107,55 @@ describe('a base row stands in for its subcommands', () => {
       facts: fact('Talks to a cluster.', { ...LOOKS }),
       sub: { delete: { facts: fact('Removes something.', { ...LOCAL, repeatSafe: true, effect: ['delete'], reversible: 'no' }) } },
     }
-    expect(says(packOf({ k: entry }))).toContainEqual(expect.stringContaining('says it can be put back'))
+    expect(says(packOf({ k: entry }))).toEqual([
+      'The base row says it is yes to put back, and this subcommand is no.',
+      'The base row does not name delete, which this subcommand does.',
+    ])
+  })
+
+  it('reads a subcommand together with its flags, since a line it cannot read falls back to the base row', () => {
+    const entry: Entry = {
+      facts: fact('Talks to a cluster.', { ...LOCAL, effect: ['read', 'write'], reversible: 'no', repeatSafe: false }),
+      sub: {
+        apply: {
+          facts: fact('Changes something.', { ...LOCAL, effect: ['write'], reversible: 'no', repeatSafe: false }),
+          flags: [{ flags: ['--prune'], facts: { effect: ['delete'] } }],
+        },
+      },
+    }
+    expect(says(packOf({ k: entry }))).toEqual(['The base row does not name delete, which this subcommand does.'])
+  })
+
+  it('lets an opaque base row keep its effects as a floor', () => {
+    const entry: Entry = {
+      facts: opaqueFact('Talks to a cluster.', 'the plugins it loads', { ...LOCAL }),
+      sub: { delete: { facts: fact('Removes something.', { ...LOCAL, repeatSafe: true, effect: ['delete'], reversible: 'no' }) } },
+    }
+    expect(says(packOf({ k: entry }))).toEqual([])
   })
 
   it('accepts a base row cautious enough to cover them', () => {
     const entry: Entry = {
-      facts: fact('Talks to a cluster.', { effect: ['read'], privilege: 'none', touchesCredentials: false, repeatSafe: true, reversible: 'unknown', network: 'known-host' }),
+      facts: fact('Talks to a cluster.', { effect: ['read', 'delete'], privilege: 'none', touchesCredentials: false, repeatSafe: true, reversible: 'no', network: 'known-host' }),
       sub: { delete: { facts: fact('Removes something.', { privilege: 'none', touchesCredentials: false, repeatSafe: true, effect: ['delete'], reversible: 'no', network: 'known-host' }) } },
     }
     expect(says(packOf({ k: entry }))).toEqual([])
+  })
+})
+
+describe('the flags a row has read', () => {
+  it('takes a plain flag only with its dash', () => {
+    const entry: Entry = { facts: fact('Shows a file.', { ...LOOKS }), operands: ['path'], plain: ['v'] }
+    expect(says(packOf({ k: entry }))).toEqual(['`v` in `plain` has to be declared with its dash.'])
+  })
+
+  it('refuses a flag that is plain and also does something', () => {
+    const entry: Entry = {
+      facts: fact('Shows a file.', { ...LOOKS }),
+      operands: ['path'],
+      plain: ['-o'],
+      values: { '-o': 'path' },
+    }
+    expect(says(packOf({ k: entry }))).toEqual(['`-o` is declared as plain and as something it does, which cannot both be true.'])
   })
 })
