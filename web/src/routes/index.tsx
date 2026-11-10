@@ -1,12 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowUpRight, Github } from 'lucide-react'
+import { ArrowDown, Github } from 'lucide-react'
 import AnimatedGradient from '#/components/animated-gradient'
 import { ExplainDemo } from '#/components/explain-demo'
 import { InstallCommand } from '#/components/install-command'
 
 export const Route = createFileRoute('/')({ component: Home })
-
-const NAV = ['Fields', 'Packs', 'Schema']
 
 function Home() {
   return (
@@ -16,13 +14,6 @@ function Home() {
         <a href="/" className="font-mono text-[15px] tracking-[0.04em] text-ink">
           cmd-facts
         </a>
-        <nav className="hidden items-center gap-8 text-sm text-ink-2 md:flex">
-          {NAV.map((item) => (
-            <a key={item} href={`/${item.toLowerCase()}`} className="transition-colors hover:text-ink">
-              {item}
-            </a>
-          ))}
-        </nav>
         <a
           href="https://github.com/david-sling/cmd-facts"
           aria-label="cmd-facts on GitHub"
@@ -50,17 +41,17 @@ function Home() {
           <div className="mt-14 flex flex-col items-start gap-8 lg:flex-row lg:items-end lg:justify-between">
             <InstallCommand />
             <a
-              href="/playground"
+              href="#try"
               className="group flex items-center gap-2.5 border-b border-white/25 pb-1.5 text-[15px] font-medium text-white/85 transition-colors hover:border-pink hover:text-white"
             >
-              Try any command in the playground
-              <ArrowUpRight className="size-[18px] transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              Try any command below
+              <ArrowDown className="size-[18px] transition-transform group-hover:translate-y-0.5" />
             </a>
           </div>
         </div>
       </section>
 
-      <section className="mx-4 mt-24 sm:mx-8 lg:mx-14">
+      <section id="try" className="mx-4 mt-24 scroll-mt-8 sm:mx-8 lg:mx-14">
         <ExplainDemo />
       </section>
 
