@@ -129,6 +129,7 @@ Splitting a line into words is the one piece of reading-meaning-out-of-text this
 | `steps` | The commands a line runs, where it runs more than one, each answered in full. |
 | `after` | On a step: the operator that joined it to the one before — `\|`, `&&`, `\|\|`, `;`, `&`. |
 | `args` | What each argv position is: `path` `host` `url` `pid` `package` `domain` `user` `mode` `service` `signal` `device` `pattern` `command` `text`. |
+| `unread` | Flags and words on the line the row does not account for. Where there are any, `facts` is the program's widest row at `derived`. |
 
 ### `opaque` is in the type, not in a footnote
 
@@ -321,9 +322,33 @@ is recorded: the command keeps its own row. `>|` overwrites even where the shell
 
 `verified` is a row written for that exact command, from a pack the consumer vouched for. `derived` is a row
 that was not written for this command, or was not vouched for: a subcommand the table does not hold, falling back to
-the deliberately cautious base row; a fact set that absorbed a nested command's reach; a row from a pack that was not
-named in `trust`. `unknown` means there is no entry at all: the fields are then the widest ones, a floor rather than a
-measurement, and `says` admits it.
+the deliberately cautious base row; a line carrying a flag or a word the row does not account for; a fact set that
+absorbed a nested command's reach; a row from a pack that was not named in `trust`. `unknown` means there is no entry
+at all: the fields are then the widest ones, a floor rather than a measurement, and `says` admits it.
+
+### What the table has not read
+
+A row lists every flag it was written to account for: the ones that widen the answer, the ones that take a value, and
+the ones that were looked at and change nothing. Anything else on the line has not been read, and what it does is not
+known. `explain` does not guess that it is harmless. The line is answered from the program's widest row, the same one
+an unrecognised subcommand falls back to, at `confidence: derived`, and `unread` names what was not read:
+
+```ts
+explain('rm --no-preserve-root -rf /')
+```
+
+```json
+{
+  "facts": { "effect": ["delete"], "reversible": "no", "confidence": "derived", "source": "unread" },
+  "args": [{ "index": 3, "value": "/", "role": "unknown" }],
+  "unread": ["--no-preserve-root"]
+}
+```
+
+The same goes for a word on a row written to take none, as in `whoami alice`. After a flag nobody has
+read, the words that follow carry no role: the flag may have taken the next one as its value, so none of them can be
+named as a path. A base row has to reach at least as far as every subcommand under it does with every flag it knows,
+which `validate()` checks, so falling back never narrows an answer.
 
 A nested line is always `derived` at the top, built-in or not. The outer fact set there was computed rather than
 written, and the inner program was never resolved to a path.
@@ -405,7 +430,7 @@ A pack is a `Pack`: the envelope borrows its field names from schema.org's `Soft
 the rows, built with the same `fact()` and `opaqueFact()` the built-in table uses.
 
 ```ts
-import { fact, opaqueFact } from 'cmd-facts'
+import { fact } from 'cmd-facts'
 import type { Pack } from 'cmd-facts'
 
 export const pack: Pack = {
@@ -415,14 +440,26 @@ export const pack: Pack = {
   codeRepository: 'https://github.com/acme/cmd-facts-kube',
   commands: {
     kubectl: {
-      facts: fact('Asks a cluster what is running on it.', { reversible: 'unknown', network: 'known-host' }),
+      facts: fact('Asks a cluster what is running on it, or removes things from it.', {
+        effect: ['read', 'delete'],
+        reversible: 'no',
+        network: 'known-host',
+        privilege: 'none',
+        touchesCredentials: true,
+        repeatSafe: true,
+      }),
       sub: {
         delete: {
           facts: fact('Removes something from a cluster.', {
             effect: ['delete'],
             reversible: 'no',
             network: 'known-host',
+            privilege: 'none',
+            touchesCredentials: true,
+            repeatSafe: true,
           }),
+          operands: ['text'],
+          plain: ['--ignore-not-found'],
         },
       },
     },
@@ -430,10 +467,15 @@ export const pack: Pack = {
 }
 ```
 
+Every field that says how far a command reaches is written on the row: `fact()` has no defaults, because a field
+left out would quietly read as the narrowest answer. `LOCAL` and `LOOKS` are there for rows where those values were
+checked, not as a default to reach for. A row is closed over its flags too. A flag in none of `flags`, `values` or
+`plain` is one the row has not read, and a line carrying it is answered from the program's widest row at `derived`.
+
 `validate(pack)` returns the problems, and `createExplainer` refuses a pack that has any. It checks the shape of a
 fact set, the consistency the built-in table holds itself to (a row that deletes cannot say it can be put back; a row
-that transmits cannot claim it touches no network; a base row may not promise what one of its subcommands breaks),
-and the grammar that decides where parsing recurses. It does not check register or jargon: those are editorial, and a
+that transmits cannot claim it touches no network; a base row has to reach as far as each of its subcommands does
+with its flags), and the grammar that decides where parsing recurses. It does not check register or jargon: those are editorial, and a
 pack should not fail to load over a sentence that reads badly. `rows(pack)` gives a pack author the same flat list
 the copy lints here run over.
 
@@ -484,7 +526,9 @@ A landing page will live alongside it. The library stays free of anything the pa
 ## Adding a command
 
 Rows live in `packages/cmd-facts/src/data/`. `fact()` builds a row for a command the library can account for in full; `opaqueFact()`
-builds one for a command that hands over, and requires you to name what it hands over to.
+builds one for a command that hands over, and requires you to name what it hands over to. Neither fills in a field
+you leave out. List every flag the row accounts for, including the ones that change nothing (`plain`): a flag that is
+not listed is one the row has not read, and the line falls back to the program's widest row.
 
 The register is enforced by tests, not by review alone. `pnpm test` checks that every sentence is one sentence, ends
 in a full stop, stays under 150 characters, avoids a list of terms that assume the reader already knows what a command

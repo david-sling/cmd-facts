@@ -1,4 +1,4 @@
-import { fact, opaqueFact, valuesOf } from '../entry.ts'
+import { fact, opaqueFact, valuesOf, LOCAL, LOOKS } from '../entry.ts'
 import type { Entry, FlagRule, Role, Rule } from '../entry.ts'
 
 // Every program here runs code the line does not show: a file, a project's own build steps, or the set-up steps a
@@ -10,6 +10,7 @@ const PROJECT_STEPS = 'the steps written inside the project and inside the packa
 /** A program that runs a file written in one language, and can be handed the code on the line instead. */
 const runtime = (language: string, docs: string, inline: string[] = [], extra: Partial<Entry> = {}): Entry => ({
   facts: opaqueFact(`Runs a program written in ${language}.`, `the ${language} file it was given, whose contents are not shown here`, {
+    privilege: 'none', touchesCredentials: false,
     effect: ['execute'],
     network: 'arbitrary',
     docs,
@@ -56,27 +57,29 @@ const everywhere = (
 })
 
 /** The base row of a tool that works with a project's packages: it can reach anything its subcommands can. */
+// A package manager's base row stands in for its publish and sign-in commands, which use the registry sign-in it keeps.
 const manager = (says: string, docs: string): Rule['facts'] =>
-  opaqueFact(says, PROJECT_STEPS, { effect: ['read', 'write', 'execute'], network: 'arbitrary', repeatSafe: false, docs })
+  opaqueFact(says, PROJECT_STEPS, { privilege: 'none', touchesCredentials: true, effect: ['read', 'write', 'execute'], network: 'arbitrary', repeatSafe: false, docs })
 
 const installs = (says: string, docs: string): Rule => ({
-  facts: opaqueFact(says, SETUP, { effect: ['read', 'create', 'write', 'install'], network: 'arbitrary', docs }),
+  facts: opaqueFact(says, SETUP, { privilege: 'none', touchesCredentials: false, effect: ['read', 'create', 'write', 'install'], network: 'arbitrary', docs }),
   operands: ['package'],
 })
 
 const removes = (says: string, docs: string): Rule => ({
-  facts: fact(says, { effect: ['delete', 'write'], reversible: 'unknown', docs }),
+  facts: fact(says, { ...LOCAL, repeatSafe: true, effect: ['delete', 'write'], reversible: 'unknown', docs }),
   operands: ['package'],
 })
 
 const script = (says: string, handsOverTo: string, docs: string): Rule => ({
-  facts: opaqueFact(says, handsOverTo, { effect: ['execute'], network: 'arbitrary', docs }),
+  facts: opaqueFact(says, handsOverTo, { privilege: 'none', touchesCredentials: false, effect: ['execute'], network: 'arbitrary', docs }),
   operands: ['text'],
 })
 
 /** A subcommand that runs another command, carried as separate words on this line, with the project's packages. */
 const execs = (says: string, docs: string): Rule => ({
   facts: opaqueFact(says, 'the command it was given, which runs with the packages the project uses', {
+    privilege: 'none', touchesCredentials: false,
     effect: ['execute'],
     network: 'arbitrary',
     docs,
@@ -87,6 +90,7 @@ const execs = (says: string, docs: string): Rule => ({
 
 const builds = (says: string, docs: string): Rule => ({
   facts: opaqueFact(says, 'the build steps written in the project, which are not shown here', {
+    privilege: 'none', touchesCredentials: false,
     effect: ['read', 'create', 'write', 'execute'],
     network: 'arbitrary',
     docs,
@@ -95,6 +99,7 @@ const builds = (says: string, docs: string): Rule => ({
 
 const publishes = (says: string, docs: string): Rule => ({
   facts: opaqueFact(says, 'the steps the project runs for itself before sending', {
+    privilege: 'none', touchesCredentials: false,
     effect: ['read', 'transmit'],
     network: 'arbitrary',
     reversible: 'no',
@@ -107,7 +112,7 @@ const fetchesAndRuns = (docs: string): Entry => ({
   facts: opaqueFact(
     'Downloads a ready-made code package if it is not here already, and runs it.',
     'the package it runs, which can do anything a program on this computer can',
-    { effect: ['read', 'create', 'execute', 'install'], network: 'arbitrary', docs },
+    { privilege: 'none', touchesCredentials: false, effect: ['read', 'create', 'execute', 'install'], network: 'arbitrary', docs },
   ),
   operands: ['package', 'text'],
   values: { '-p': 'package', '--package': 'package' },
@@ -197,15 +202,15 @@ export const LANG: Record<string, Entry> = {
       exec: execs('Runs another command with the packages the project uses.', YARN),
       dlx: fetchesAndRuns(YARN),
       publish: publishes('Sends the code in this folder to a public package service, where anyone can download it.', YARN),
-      info: { facts: fact('Shows the details of a ready-made code package.', { network: 'arbitrary', docs: YARN }), operands: ['package'] },
-      why: { facts: fact('Shows why the project needs a given ready-made code package.', { docs: YARN }), operands: ['package'] },
+      info: { facts: fact('Shows the details of a ready-made code package.', { effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true, network: 'arbitrary', docs: YARN }), operands: ['package'] },
+      why: { facts: fact('Shows why the project needs a given ready-made code package.', { ...LOOKS, docs: YARN }), operands: ['package'] },
     },
   }, YARN_VALUES, [YARN_OTP]),
   bun: everywhere({
     facts: opaqueFact(
       'Runs a program written in JavaScript or TypeScript, or works with the code packages a project uses.',
       PROJECT_STEPS,
-      { effect: ['read', 'write', 'execute'], network: 'arbitrary', repeatSafe: false, docs: BUN },
+      { privilege: 'none', touchesCredentials: true, effect: ['read', 'write', 'execute'], network: 'arbitrary', repeatSafe: false, docs: BUN },
     ),
     operands: ['path'],
     sub: {
@@ -247,7 +252,7 @@ export const LANG: Record<string, Entry> = {
     facts: opaqueFact(
       'Runs a program written in JavaScript or TypeScript.',
       'the file it was given, whose contents are not shown here',
-      { effect: ['execute'], network: 'arbitrary', repeatSafe: false, docs: 'https://docs.deno.com/runtime/reference/cli/' },
+      { privilege: 'none', touchesCredentials: false, effect: ['execute'], network: 'arbitrary', repeatSafe: false, docs: 'https://docs.deno.com/runtime/reference/cli/' },
     ),
     operands: ['path'],
     sub: {
@@ -257,6 +262,7 @@ export const LANG: Record<string, Entry> = {
       install: installs('Downloads a ready-made code package and installs it, here or as a program anyone on this computer can run.', 'https://docs.deno.com/runtime/reference/cli/install/'),
       fmt: {
         facts: fact('Tidies the layout of the code in a project, rewriting the files in place.', {
+          ...LOCAL, repeatSafe: true,
           effect: ['read', 'write'],
           reversible: 'no',
           docs: 'https://docs.deno.com/runtime/reference/cli/fmt/',
@@ -290,7 +296,7 @@ export const LANG: Record<string, Entry> = {
       },
       remove: removes('Takes a ready-made code package out of the project.', CARGO),
       fmt: {
-        facts: fact('Tidies the layout of the code in a project, rewriting the files in place.', { effect: ['read', 'write'], reversible: 'no', docs: CARGO }),
+        facts: fact('Tidies the layout of the code in a project, rewriting the files in place.', { ...LOCAL, repeatSafe: true, effect: ['read', 'write'], reversible: 'no', docs: CARGO }),
       },
       publish: {
         ...publishes('Sends the code in this folder to a public package service, where anyone can download it.', CARGO),
@@ -309,12 +315,12 @@ export const LANG: Record<string, Entry> = {
       get: installs('Adds a ready-made code package from the internet to the project.', GO),
       generate: script('Runs the steps a project has written into its code for making more code.', 'the commands written into the project for making code', GO),
       fmt: {
-        facts: fact('Tidies the layout of the code in a project, rewriting the files in place.', { effect: ['read', 'write'], reversible: 'no', docs: GO }),
+        facts: fact('Tidies the layout of the code in a project, rewriting the files in place.', { ...LOCAL, repeatSafe: true, effect: ['read', 'write'], reversible: 'no', docs: GO }),
         operands: ['path'],
       },
       vet: builds('Checks a project written in Go for likely mistakes.', GO),
-      version: { facts: fact('Shows which version of the Go tools is installed.', { docs: GO }) },
-      env: { facts: fact('Shows the settings the Go tools are using.', { docs: GO }) },
+      version: { facts: fact('Shows which version of the Go tools is installed.', { ...LOOKS, docs: GO }) },
+      env: { facts: fact('Shows the settings the Go tools are using.', { ...LOOKS, docs: GO }) },
     },
   }, GO_RUNS),
   ruby: runtime('Ruby', 'man 1 ruby', ['-e'], {
@@ -337,7 +343,7 @@ export const LANG: Record<string, Entry> = {
       update: { ...installs('Downloads newer versions of the installed Ruby code packages.', GEM), values: GEM_INSTALL_VALUES },
       uninstall: { ...removes('Removes a ready-made Ruby code package from this computer.', GEM), values: GEM_INSTALL_VALUES },
       // Here `-i` asks whether a package is installed, so it stands alone.
-      list: { facts: fact('Lists the ready-made Ruby code packages installed here.', { docs: GEM }), values: valuesOf('text', ['-v', '--version', '-B', '--bulk-threshold', '-s', '--source']) },
+      list: { facts: fact('Lists the ready-made Ruby code packages installed here.', { ...LOOKS, docs: GEM }), values: valuesOf('text', ['-v', '--version', '-B', '--bulk-threshold', '-s', '--source']) },
     },
   },
   bundle: {
@@ -374,13 +380,13 @@ export const LANG: Record<string, Entry> = {
     facts: opaqueFact(
       'Installs a program written in Python into a space of its own, or runs one without installing it.',
       SETUP,
-      { effect: ['read', 'create', 'write', 'install', 'execute'], network: 'arbitrary', repeatSafe: false, docs: 'https://pipx.pypa.io/stable/docs/' },
+      { privilege: 'none', touchesCredentials: false, effect: ['read', 'create', 'write', 'install', 'execute'], network: 'arbitrary', repeatSafe: false, docs: 'https://pipx.pypa.io/stable/docs/' },
     ),
     sub: {
       install: installs('Downloads a program written in Python and installs it into a space of its own.', 'https://pipx.pypa.io/stable/docs/'),
       run: { ...fetchesAndRuns('https://pipx.pypa.io/stable/docs/'), values: { '--spec': 'package' } },
       uninstall: removes('Removes a program written in Python that was installed into a space of its own.', 'https://pipx.pypa.io/stable/docs/'),
-      list: { facts: fact('Lists the programs written in Python installed into spaces of their own.', { docs: 'https://pipx.pypa.io/stable/docs/' }) },
+      list: { facts: fact('Lists the programs written in Python installed into spaces of their own.', { ...LOOKS, docs: 'https://pipx.pypa.io/stable/docs/' }) },
     },
   }, PIPX_VALUES),
   poetry: everywhere({
@@ -403,12 +409,13 @@ export const LANG: Record<string, Entry> = {
       update: installs('Downloads newer versions of installed code packages.', CONDA),
       create: installs('Makes a new separate space and installs ready-made code packages into it.', CONDA),
       remove: removes('Removes ready-made code packages, or a whole separate space of them.', CONDA),
-      list: { facts: fact('Lists the ready-made code packages installed in a space.', { docs: CONDA }) },
+      list: { facts: fact('Lists the ready-made code packages installed in a space.', { ...LOOKS, docs: CONDA }) },
       run: execs('Runs another command inside one of the separate spaces of code packages.', CONDA),
     },
   }, CONDA_VALUES, [], { list: ['-c', '--canonical'] }),
   xcodebuild: {
     facts: opaqueFact('Builds an app project made with Xcode.', 'the build steps written in the project, which are not shown here', {
+      privilege: 'none', touchesCredentials: false,
       effect: ['read', 'create', 'write', 'execute'],
       network: 'arbitrary',
       docs: 'man 1 xcodebuild',
@@ -432,6 +439,7 @@ export const LANG: Record<string, Entry> = {
   },
   xcrun: {
     facts: opaqueFact('Finds one of the developer tools that come with Xcode and runs it.', 'the developer tool it was given, and what that tool is asked to do', {
+      privilege: 'none', touchesCredentials: false,
       effect: ['execute'],
       network: 'arbitrary',
       docs: 'man 1 xcrun',

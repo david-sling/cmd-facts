@@ -55,8 +55,10 @@ See [Showing it to a person](/docs/sentence).
 |---|---|
 | `BUILTIN` | The curated table as a pack. `BUILTIN.name` is `@cmd-facts/builtin`. |
 | `COMMANDS` | The rows of that table, keyed by command name. |
-| `fact` | `(says: string, over?) => Facts` |
-| `opaqueFact` | `(says: string, handsOverTo: string, over?) => Facts` |
+| `fact` | `(says: string, over) => Facts` — `over` names every field that says how far it reaches. |
+| `opaqueFact` | `(says: string, handsOverTo: string, over) => Facts` — `over` names `network`, `privilege` and `touchesCredentials`. |
+| `LOCAL` / `LOOKS` | Field sets to spread into `over` where they were checked: no network, privilege or secrets; and that, read only. |
+| `reach` | `(rule: Rule) => Facts` — a row widened by every flag rule it knows, which is what `validate` holds a base row to. |
 | `validate` | `(pack: Pack) => Problem[]` — empty means loadable. |
 | `rows` | `(pack: Pack) => Row[]` — every fact set a pack can produce, for lints. |
 | `buildRegistry` | `(opts: RegistryOptions) => Registry` — what `createExplainer` builds on. |
