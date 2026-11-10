@@ -60,6 +60,7 @@ function declaredOf(rule: Rule, globals: FlagRule[] = []): Declared {
   const takesValue = new Set<string>(Object.keys(rule.values ?? {}))
   const bare = new Set<string>()
   for (const r of [...(rule.flags ?? []), ...globals]) {
+    // A value that only counts attached never takes the next word, so to this check the flag stands alone.
     for (const f of r.flags) (r.takesValue ? takesValue : bare).add(f)
   }
   return { takesValue, bare, bundles: rule.flagStyle !== 'words' }
@@ -97,6 +98,12 @@ const FIG_WRONG = new Set([
   'pip list --extra-index-url',
   'pip freeze -r',
   'pip freeze --path',
+  ...['-f', '-s', '-F', '-i'].map((f) => `ln ${f}`), // Switches.
+  'readlink -f', // A switch.
+  // BSD sed requires a backup ending after these, GNU sed takes one only attached; the row reads neither as a value.
+  'sed -i',
+  'sed -I',
+  'zip -d', // A switch: the entries to remove are the operands after the packed file.
   'ps -a', // A switch on macOS.
   'top -b', // Not a macOS option; a switch where it exists.
   'unzip -l', // Switches.

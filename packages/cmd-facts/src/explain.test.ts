@@ -18,7 +18,7 @@ describe('lookup', () => {
     const py = run('python3 run.py', '/usr/bin/python3')
     expect(py.key).toBe('python')
     expect(py.facts.source).toBe('name-fallback')
-    expect(run('base64 -d', '/usr/bin/base64').key).toBeNull()
+    expect(run('git2 status', '/usr/bin/git2').key).toBeNull()
   })
 
   it('says plainly when it has no entry, and claims nothing it cannot support', () => {
@@ -305,6 +305,26 @@ describe('flags that reach past what the row describes', () => {
     for (const line of ['ssh -L 8080:db:5432 deploy@bastion', 'ssh -D 1080 deploy@bastion']) {
       expect(explain(line).facts.network, line).toBe('listens')
     }
+  })
+
+  it('reads an edit in place, a removed label and a replaced name as changes that stay', () => {
+    const sed = explain("sed -i.bak s/http/https/ site.conf")
+    expect(effectsOf(sed.facts)).toContain('write')
+    expect(sed.facts.reversible).toBe('no')
+    expect(explain('sed s/http/https/ site.conf').facts.opaque).toBe(true)
+
+    const unquarantined = explain('xattr -d com.apple.quarantine /Applications/Tool.app')
+    expect(effectsOf(unquarantined.facts)).toEqual(expect.arrayContaining(['configure', 'delete']))
+    expect(unquarantined.args.map((a) => `${a.value}:${a.role}`)).toEqual(['com.apple.quarantine:text', '/Applications/Tool.app:path'])
+
+    expect(explain('ln -s a b').facts.reversible).toBe('yes')
+    expect(explain('ln -sf a b').facts.reversible).toBe('no')
+  })
+
+  it('names the program a packing tool is told to run', () => {
+    expect(explain("zip -T -TT 'sh -c id' out.zip notes.txt").facts.opaque).toBe(true)
+    expect(explain('sort --compress-program gzip big.txt').facts.opaque).toBe(true)
+    expect(explain('zip out.zip notes.txt').facts.opaque).toBe(false)
   })
 
   it('reads a curl settings file as able to send and save', () => {

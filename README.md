@@ -468,6 +468,11 @@ arrives at `confidence: derived`, so a consumer gating on `verified` never auto-
 was used that way. No prose was copied or adapted from it, so no CC-BY attribution obligation is incurred. Its writing
 is developer-voiced and would be the wrong register here anyway.
 
+**Fig's completion specs are a grammar check only.** `pnpm figcheck` compares which flags take a value against
+`@withfig/autocomplete` (MIT), a dev dependency, and reports how many of the commands Fig completes have a row here.
+Nothing from a spec reaches the table: a spec knows that `-o` takes a file, not that the file is replaced. Where a
+spec is wrong about its own command, the script records it with the manual as witness rather than copying the error.
+
 ## This repository
 
 ```
