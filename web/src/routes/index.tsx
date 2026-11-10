@@ -48,7 +48,9 @@ function Home() {
             <div data-no-glass>
               <InstallCommand />
             </div>
+            {/* a control, like the card: the glass passes behind it and leaves it alone */}
             <a
+              data-no-glass
               href="#try"
               className="group flex items-center gap-2.5 border-b border-white/25 pb-1.5 text-[15px] font-medium text-white/85 transition-colors hover:border-pink hover:text-white"
             >
