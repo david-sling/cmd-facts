@@ -82,6 +82,21 @@ describe('escalating flags', () => {
     expect(got.args).toEqual([{ index: 2, value: 'backup.tgz', role: 'path', flag: '-f' }])
   })
 
+  // `-X` is declared in `values`, not as a flag rule; inside a bundle its value must still not read as the address.
+  it('hands the next word to a value flag at the end of a bundle', () => {
+    expect(run('curl -sX POST https://example.com').sentence).toBe('Makes a request to example.com and shows what comes back.')
+    expect(roles('curl -sX POST https://example.com')).toEqual(['POST:text', 'https://example.com:url'])
+  })
+
+  it('reads the rest of a bundle as the value once a letter takes one', () => {
+    expect(run('curl -XPOST https://example.com').args[0]).toEqual({ index: 1, value: 'POST', role: 'text', flag: '-X' })
+    // The letters after `-X` are its value, so the `-T` and `-E` in `DELETE` do not widen anything.
+    const del = run('curl -XDELETE https://example.com')
+    expect(del.escalated).toEqual([])
+    expect(effectsOf(del.facts)).not.toContain('transmit')
+    expect(del.facts.touchesCredentials).toBe(false)
+  })
+
   // `tar xf a.tar` carries its flags as a bare first word, which must not read as a file the command was pointed at.
   it('reads an old-style mode word as the flags it bundles', () => {
     const got = run('tar xf a.tar')
