@@ -1,17 +1,19 @@
-import { fact } from '../entry.ts'
+import { fact, LOCAL, LOOKS } from '../entry.ts'
 import type { Entry } from '../entry.ts'
 
 export const SECRETS: Record<string, Entry> = {
   security: {
     facts: fact('Works with the passwords, keys and certificates this computer keeps locked away.', {
+      effect: ['read', 'create', 'delete', 'configure'], network: 'none', privilege: 'none',
       touchesCredentials: true,
-      reversible: 'unknown',
+      reversible: 'no',
       repeatSafe: false,
       docs: 'man 1 security',
     }),
     sub: {
       'find-generic-password': {
         facts: fact('Looks up a saved password for an app or service.', {
+          effect: ['read'], reversible: 'yes', network: 'none', privilege: 'none', repeatSafe: true,
           touchesCredentials: true,
           docs: 'man 1 security',
         }),
@@ -30,6 +32,7 @@ export const SECRETS: Record<string, Entry> = {
       },
       'find-internet-password': {
         facts: fact('Looks up a saved password for a website or server.', {
+          effect: ['read'], reversible: 'yes', network: 'none', privilege: 'none', repeatSafe: true,
           touchesCredentials: true,
           docs: 'man 1 security',
         }),
@@ -48,16 +51,18 @@ export const SECRETS: Record<string, Entry> = {
       },
       'dump-keychain': {
         facts: fact('Shows everything held in one of the saved-password stores on this computer.', {
+          effect: ['read'], reversible: 'yes', network: 'none', privilege: 'none', repeatSafe: true,
           touchesCredentials: true,
           docs: 'man 1 security',
         }),
         operands: ['path'],
       },
       'list-keychains': {
-        facts: fact('Lists the saved-password stores this computer knows about.', { docs: 'man 1 security' }),
+        facts: fact('Lists the saved-password stores this computer knows about.', { ...LOOKS, docs: 'man 1 security' }),
       },
       'unlock-keychain': {
         facts: fact('Unlocks a saved-password store, so saved passwords can be read without asking again.', {
+          network: 'none', privilege: 'none', repeatSafe: true,
           effect: ['configure'],
           touchesCredentials: true,
           reversible: 'yes',
@@ -67,6 +72,7 @@ export const SECRETS: Record<string, Entry> = {
       },
       'add-generic-password': {
         facts: fact('Saves a new password into the locked store on this computer.', {
+          reversible: 'yes', network: 'none', privilege: 'none', repeatSafe: true,
           effect: ['create'],
           touchesCredentials: true,
           docs: 'man 1 security',
@@ -74,6 +80,7 @@ export const SECRETS: Record<string, Entry> = {
       },
       'delete-generic-password': {
         facts: fact('Removes a saved password from the locked store on this computer.', {
+          network: 'none', privilege: 'none', repeatSafe: true,
           effect: ['delete'],
           touchesCredentials: true,
           reversible: 'no',
@@ -84,6 +91,7 @@ export const SECRETS: Record<string, Entry> = {
   },
   csrutil: {
     facts: fact('Looks at or changes the protection macOS puts around its own files.', {
+      network: 'none', touchesCredentials: false,
       effect: ['read', 'configure'],
       reversible: 'unknown',
       privilege: 'admin',
@@ -92,10 +100,11 @@ export const SECRETS: Record<string, Entry> = {
     }),
     sub: {
       status: {
-        facts: fact('Shows whether the protection macOS puts around its own files is on.', { docs: 'man 8 csrutil' }),
+        facts: fact('Shows whether the protection macOS puts around its own files is on.', { ...LOOKS, docs: 'man 8 csrutil' }),
       },
       disable: {
         facts: fact('Turns off the protection macOS puts around its own files.', {
+          reversible: 'yes', network: 'none', touchesCredentials: false, repeatSafe: true,
           effect: ['configure'],
           privilege: 'admin',
           note: 'Until it is turned back on, parts of macOS that are normally kept from being changed can be changed.',
@@ -103,12 +112,13 @@ export const SECRETS: Record<string, Entry> = {
         }),
       },
       enable: {
-        facts: fact('Turns on the protection macOS puts around its own files.', { effect: ['configure'], privilege: 'admin', docs: 'man 8 csrutil' }),
+        facts: fact('Turns on the protection macOS puts around its own files.', { reversible: 'yes', network: 'none', touchesCredentials: false, repeatSafe: true, effect: ['configure'], privilege: 'admin', docs: 'man 8 csrutil' }),
       },
     },
   },
   fdesetup: {
     facts: fact('Looks at or changes whether the disk on this computer can be read without the password.', {
+      network: 'none',
       effect: ['read', 'configure'],
       reversible: 'unknown',
       privilege: 'admin',
@@ -119,12 +129,14 @@ export const SECRETS: Record<string, Entry> = {
     sub: {
       status: {
         facts: fact('Shows whether the disk on this computer can be read without the password.', {
+          effect: ['read'], reversible: 'yes', network: 'none', privilege: 'none', repeatSafe: true,
           touchesCredentials: true,
           docs: 'man 8 fdesetup',
         }),
       },
       enable: {
         facts: fact('Locks the disk on this computer so it cannot be read without the password.', {
+          reversible: 'yes', network: 'none', repeatSafe: true,
           effect: ['configure'],
           privilege: 'admin',
           touchesCredentials: true,
@@ -134,6 +146,7 @@ export const SECRETS: Record<string, Entry> = {
       },
       disable: {
         facts: fact('Unlocks the disk on this computer, so it can be read without the password.', {
+          reversible: 'yes', network: 'none', repeatSafe: true,
           effect: ['configure'],
           privilege: 'admin',
           touchesCredentials: true,
@@ -145,6 +158,7 @@ export const SECRETS: Record<string, Entry> = {
   },
   socketfilterfw: {
     facts: fact('Looks at or changes which programs may accept connections coming in from the network.', {
+      ...LOCAL,
       effect: ['read', 'configure'],
       reversible: 'unknown',
       repeatSafe: false,
@@ -193,6 +207,7 @@ export const SECRETS: Record<string, Entry> = {
   },
   spctl: {
     facts: fact('Looks at or changes the check macOS makes before opening programs downloaded from the internet.', {
+      ...LOCAL,
       effect: ['read', 'configure'],
       reversible: 'unknown',
       repeatSafe: false,
@@ -234,7 +249,8 @@ export const SECRETS: Record<string, Entry> = {
   },
   tccutil: {
     facts: fact('Changes which apps are allowed to reach private parts of this computer, like the camera or the screen.', {
-      effect: ['configure'],
+      ...LOCAL,
+      effect: ['delete', 'configure'],
       reversible: 'no',
       repeatSafe: false,
       docs: 'man 1 tccutil',
@@ -242,6 +258,7 @@ export const SECRETS: Record<string, Entry> = {
     sub: {
       reset: {
         facts: fact('Takes away the permissions apps were given for one private feature, so each app has to ask again.', {
+          ...LOCAL, repeatSafe: true,
           effect: ['configure', 'delete'],
           reversible: 'no',
           docs: 'man 1 tccutil',

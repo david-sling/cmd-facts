@@ -56,7 +56,7 @@
     "confidence": { "type": "string", "enum": ["verified", "derived", "unknown"] },
     "source": {
       "type": "string",
-      "enum": ["curated", "curated+flags", "name-fallback", "subcommand-miss", "nested", "plugin", "unknown"]
+      "enum": ["curated", "curated+flags", "name-fallback", "subcommand-miss", "unread", "nested", "plugin", "unknown"]
     },
 
     "common": {
@@ -182,6 +182,11 @@
           "type": "object",
           "propertyNames": { "pattern": "^-" },
           "additionalProperties": { "$ref": "#/$defs/role" }
+        },
+        "plain": {
+          "description": "Flags that were looked at and change nothing the fields carry, and take no value. The table is closed: a flag in none of `flags`, `values` or `plain` has not been read, and a line carrying one is answered from the program's widest row at `derived`.",
+          "type": "array",
+          "items": { "type": "string", "pattern": "^-" }
         },
         "nestedHere": {
           "description": "The command it hands over to runs on this computer and is carried as separate words on this same line.",

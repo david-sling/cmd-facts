@@ -1,6 +1,6 @@
 import { CONFIDENCE, EFFECTS, NETWORK, PRIVILEGE, RANK, REVERSIBLE, effectsOf } from './facts.ts'
 import type { Facts, Segment } from './facts.ts'
-import { ROLES } from './entry.ts'
+import { ROLES, reach } from './entry.ts'
 import type { Entry, Role, Rule } from './entry.ts'
 
 /**
@@ -61,7 +61,7 @@ export function validate(pack: Pack): Problem[] {
     checkGlobals(bad, name, entry)
     for (const [word, sub] of Object.entries(entry.sub ?? {})) {
       checkRule(bad, `${name} ${word}`, sub)
-      checkStandIn(bad, `${name} ${word}`, entry.facts, sub.facts)
+      checkStandIn(bad, `${name} ${word}`, reach(entry), reach(sub))
     }
   }
   return problems
@@ -166,6 +166,12 @@ function checkRule(bad: Bad, where: string, rule: Rule) {
   ]
   for (const [at, role] of named) if (!has(ROLES, role)) bad(where, `\`${role}\` at ${at} is not a known role.`)
   for (const flag of Object.keys(rule.values ?? {})) if (!flag.startsWith('-')) bad(where, `\`${flag}\` has to be declared with its dash.`)
+  for (const flag of rule.plain ?? []) {
+    if (typeof flag !== 'string' || !flag.startsWith('-')) bad(where, `\`${flag}\` in \`plain\` has to be declared with its dash.`)
+    else if (rule.values?.[flag] !== undefined || (rule.flags ?? []).some((f) => f.flags?.includes(flag))) {
+      bad(where, `\`${flag}\` is declared as plain and as something it does, which cannot both be true.`)
+    }
+  }
 
   // A position that holds another command is the handover itself, so a row that can produce one has to be opaque.
   const fixed: Role[] = [...(rule.operands ?? []), ...Object.values(rule.values ?? {})]
@@ -187,7 +193,7 @@ function checkRule(bad: Bad, where: string, rule: Rule) {
       if (Array.isArray(f.operands) && f.operands.includes('command')) bad(at, 'A flag cannot move another command into a position.')
       if (rule.operands?.includes('command')) bad(at, 'A flag cannot change the operands of a row whose operands hold a command.')
     }
-    if (!Object.keys(f.facts ?? {}).length && !f.takesValue) bad(at, 'A flag that changes nothing and takes no value does not belong in the table.')
+    if (!Object.keys(f.facts ?? {}).length && !f.takesValue) bad(at, 'A flag that changes nothing and takes no value belongs in `plain`.')
     if (f.role === 'command' && !(rule.facts?.opaque || f.facts?.opaque === true)) {
       bad(at, 'A flag that holds another command has to leave the row opaque.')
     }
@@ -205,10 +211,21 @@ function checkRule(bad: Bad, where: string, rule: Rule) {
   if (rule.assignmentsFirst && !rule.nestedHere) bad(where, '`assignmentsFirst` only means something where a nested command is followed.')
 }
 
-/** The base row is what an unrecognised subcommand falls back to, so it may not promise anything a known one breaks. */
+/**
+ * The base row is what a line falls back to wherever the table has not read all of it: an unrecognised subcommand, or
+ * a flag nobody has looked at. So with its flags it has to reach at least as far as every subcommand does with theirs.
+ */
 function checkStandIn(bad: Bad, where: string, base: Facts, sub: Facts) {
   if (!base || !sub) return
-  if (sub.reversible !== 'yes' && base.reversible === 'yes') bad(where, 'The base row says it can be put back, and this subcommand cannot.')
+  // An opaque base row already admits it can do more than it names, and that nothing it does can be promised back,
+  // so its effects stay a floor. A clear one claims a complete list, and that list has to hold for every subcommand.
+  if (!base.opaque) {
+    if (RANK.reversible[base.reversible] < RANK.reversible[sub.reversible]) {
+      bad(where, `The base row says it is ${base.reversible} to put back, and this subcommand is ${sub.reversible}.`)
+    }
+    const missing = effectsOf(sub).filter((e) => !effectsOf(base).includes(e))
+    if (missing.length) bad(where, `The base row does not name ${missing.join(', ')}, which this subcommand does.`)
+  }
   if (!sub.repeatSafe && base.repeatSafe) bad(where, 'The base row says it is safe to repeat, and this subcommand is not.')
   if (sub.touchesCredentials && !base.touchesCredentials) bad(where, 'The base row does not reach secrets, and this subcommand does.')
   if (sub.opaque && !base.opaque) bad(where, 'The base row is clear, and this subcommand hands over.')
