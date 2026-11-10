@@ -14,7 +14,7 @@ export type Op = '|' | '&&' | '||' | ';' | '&'
 export type Redirect = {
   op: '>' | '>>' | '<'
   path: string
-  /** The stream, where the line named one: `2> log` carries `'2'`. */
+  /** The stream, where the line named one: `2> log` carries `'2'`, and `&> log` carries `'&'`, both streams at once. */
   fd?: string
 }
 
@@ -39,7 +39,7 @@ export function tokenize(line: string): Tokens {
   let word = ''
   let started = false
   let quote: '"' | "'" | null = null
-  let pending: { op: Redirect['op']; fd?: string } | null = null
+  let pending: { op: Redirect['op']; at: number; fd?: string } | null = null
 
   const endWord = () => {
     if (!started) return
@@ -115,10 +115,24 @@ export function tokenize(line: string): Tokens {
       continue
     }
     if (c === '&') {
-      // `&>` sends both streams to a file; it is a redirection, not a command boundary.
+      // `2>&1` and `>&2` point one stream at another that is already open. Nothing new lands on disk, so there is
+      // no redirection to record; the duplication is read so the command keeps its own row. `2>&-` closes a stream.
+      if (pending && i === pending.at + 1 && next !== undefined && (DIGITS.test(next) || next === '-')) {
+        let j = i + 2
+        if (next !== '-') while (j < line.length && DIGITS.test(line[j]!)) j++
+        const boundary = line[j] === undefined || ' \t\n;|&<>'.includes(line[j]!)
+        if (boundary) {
+          pending = null
+          i = j - 1
+          continue
+        }
+      }
+      // `&>` sends both streams to a file; it is a redirection, not a command boundary. `&>>` appends them.
       if (next === '>') {
         endWord()
-        pending = { op: '>' }
+        const double: boolean = line[i + 2] === '>'
+        if (double) i++
+        pending = { op: double ? '>>' : '>', at: i + 1, fd: '&' }
         i++
         continue
       }
@@ -137,7 +151,9 @@ export function tokenize(line: string): Tokens {
       }
       const double = c === '>' && next === '>'
       if (double) i++
-      pending = { op: double ? '>>' : (c as Redirect['op']), ...(fd !== undefined ? { fd } : {}) }
+      // `>|` overwrites even where the shell was set not to; it reads as `>`.
+      else if (c === '>' && next === '|') i++
+      pending = { op: double ? '>>' : (c as Redirect['op']), at: i, ...(fd !== undefined ? { fd } : {}) }
       continue
     }
 
