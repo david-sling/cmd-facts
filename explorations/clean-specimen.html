@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cmd-facts clean sans</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Be+Vietnam+Pro:wght@400;500;600&family=Public+Sans:wght@400;500;600&family=Golos+Text:wght@400;500;600&family=Manrope:wght@400;500;600&family=Sora:wght@400;500;600&family=Spline+Sans+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #ffffff;
+    --ink: #111317;
+    --ink-2: #5b606b;
+    --ink-3: #8c919c;
+    --line: #ebebe8;
+    --surface: #f6f6f3;
+    --amber: #a2650b;
+    --mono: "Spline Sans Mono", monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: "Public Sans", sans-serif; -webkit-font-smoothing: antialiased; }
+  .page { max-width: 720px; margin: 0 auto; padding: 64px 28px 120px; }
+
+  .pagehead { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 10px; }
+  .pagesub { margin: 0 0 64px; color: var(--ink-2); font-size: 15px; line-height: 1.6; max-width: 52ch; }
+
+  .spec { border-top: 1px solid var(--line); padding: 36px 0 0; }
+  .spec + .spec { margin-top: 56px; }
+  .tag { margin: 0 0 24px; font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.05em; color: var(--ink-3); text-transform: uppercase; }
+  .tag b { color: var(--amber); font-weight: 400; }
+
+  h2 { margin: 0 0 16px; font-family: var(--f); font-weight: 600; font-size: clamp(1.9rem, 4.2vw, 2.6rem); line-height: 1.08; letter-spacing: -0.028em; text-wrap: balance; }
+  .lead { margin: 0 0 10px; font-family: var(--f); font-weight: 400; font-size: 17px; line-height: 1.6; color: var(--ink-2); max-width: 44ch; text-wrap: pretty; }
+  .says { margin: 0 0 20px; font-family: var(--f); font-weight: 500; font-size: 15px; line-height: 1.55; color: var(--ink); max-width: 48ch; }
+  .meta { margin: 14px 0 0; font-family: var(--f); font-weight: 400; font-size: 13.5px; color: var(--ink-3); }
+  .meta b { font-weight: 500; color: var(--ink-2); }
+  .meta .warn { color: var(--amber); font-weight: 500; }
+
+  .cmd { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; }
+  .cmd code { font: 400 12.5px/1.6 var(--mono); white-space: pre; color: var(--ink); }
+  .cmd .sig { color: var(--ink-3); }
+
+  .f1 { --f: "Figtree", sans-serif; }
+  .f2 { --f: "Be Vietnam Pro", sans-serif; }
+  .f3 { --f: "Public Sans", sans-serif; }
+  .f4 { --f: "Golos Text", sans-serif; }
+  .f5 { --f: "Manrope", sans-serif; }
+  .f6 { --f: "Sora", sans-serif; }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="pagehead">cmd-facts — clean sans — one family each</p>
+  <p class="pagesub">Neutral workhorse faces, no display quirks. Each row uses a single family at three weights, with Spline Sans Mono for the command. Less to look at, so the type is the only thing talking.</p>
+
+  <section class="spec f1">
+    <p class="tag"><b>1</b> &nbsp;Figtree</p>
+    <h2>What happens if this runs?</h2>
+    <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+    <div class="cmd"><code><span class="sig">$</span> curl -fsSL https://get.example.com/install.sh -o install.sh</code></div>
+    <p class="meta"><b>Fetches whatever is at a web address and saves it into a file on this computer.</b></p>
+    <p class="meta">read · write · create &nbsp;·&nbsp; reversible <span class="warn">no</span> &nbsp;·&nbsp; network <span class="warn">arbitrary</span> &nbsp;·&nbsp; privilege none</p>
+  </section>
+
+  <section class="spec f2">
+    <p class="tag"><b>2</b> &nbsp;Be Vietnam Pro</p>
+    <h2>What happens if this runs?</h2>
+    <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+    <div class="cmd"><code><span class="sig">$</span> curl -fsSL https://get.example.com/install.sh -o install.sh</code></div>
+    <p class="meta"><b>Fetches whatever is at a web address and saves it into a file on this computer.</b></p>
+    <p class="meta">read · write · create &nbsp;·&nbsp; reversible <span class="warn">no</span> &nbsp;·&nbsp; network <span class="warn">arbitrary</span> &nbsp;·&nbsp; privilege none</p>
+  </section>
+
+  <section class="spec f3">
+    <p class="tag"><b>3</b> &nbsp;Public Sans</p>
+    <h2>What happens if this runs?</h2>
+    <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+    <div class="cmd"><code><span class="sig">$</span> curl -fsSL https://get.example.com/install.sh -o install.sh</code></div>
+    <p class="meta"><b>Fetches whatever is at a web address and saves it into a file on this computer.</b></p>
+    <p class="meta">read · write · create &nbsp;·&nbsp; reversible <span class="warn">no</span> &nbsp;·&nbsp; network <span class="warn">arbitrary</span> &nbsp;·&nbsp; privilege none</p>
+  </section>
+
+  <section class="spec f4">
+    <p class="tag"><b>4</b> &nbsp;Golos Text</p>
+    <h2>What happens if this runs?</h2>
+    <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+    <div class="cmd"><code><span class="sig">$</span> curl -fsSL https://get.example.com/install.sh -o install.sh</code></div>
+    <p class="meta"><b>Fetches whatever is at a web address and saves it into a file on this computer.</b></p>
+    <p class="meta">read · write · create &nbsp;·&nbsp; reversible <span class="warn">no</span> &nbsp;·&nbsp; network <span class="warn">arbitrary</span> &nbsp;·&nbsp; privilege none</p>
+  </section>
+
+  <section class="spec f5">
+    <p class="tag"><b>5</b> &nbsp;Manrope</p>
+    <h2>What happens if this runs?</h2>
+    <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+    <div class="cmd"><code><span class="sig">$</span> curl -fsSL https://get.example.com/install.sh -o install.sh</code></div>
+    <p class="meta"><b>Fetches whatever is at a web address and saves it into a file on this computer.</b></p>
+    <p class="meta">read · write · create &nbsp;·&nbsp; reversible <span class="warn">no</span> &nbsp;·&nbsp; network <span class="warn">arbitrary</span> &nbsp;·&nbsp; privilege none</p>
+  </section>
+
+  <section class="spec f6">
+    <p class="tag"><b>6</b> &nbsp;Sora</p>
+    <h2>What happens if this runs?</h2>
+    <p class="lead">Structured facts about what a command does, for the person who has to approve it and did not write it.</p>
+    <div class="cmd"><code><span class="sig">$</span> curl -fsSL https://get.example.com/install.sh -o install.sh</code></div>
+    <p class="meta"><b>Fetches whatever is at a web address and saves it into a file on this computer.</b></p>
+    <p class="meta">read · write · create &nbsp;·&nbsp; reversible <span class="warn">no</span> &nbsp;·&nbsp; network <span class="warn">arbitrary</span> &nbsp;·&nbsp; privilege none</p>
+  </section>
+</div>
+</body>
+</html>

@@ -8,3 +8,11 @@ node_modules
 packages/cmd-facts/README.md
 *.tgz
 dist
+
+# Installed by the impeccable.style installer, including an 18MB platform binary
+.claude/skills/
+.claude/agents/
+.claude/settings.local.json
+
+# Sketches from the design pass, superseded by the built page
+.impeccable/mocks/
