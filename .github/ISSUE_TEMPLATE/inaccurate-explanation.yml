@@ -1,0 +1,58 @@
+name: Inaccurate explanation
+description: A command this library answered for, answered wrongly.
+title: '[inaccurate] '
+labels: ['inaccurate-explanation']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Coverage is still small, so explanations can be wrong. Thanks for reporting one.
+
+        For a command with no row at all, use the **Command with no row** form instead.
+  - type: input
+    id: command
+    attributes:
+      label: The command line
+      description: Exactly what was passed to `explain()`. Replace anything private with a stand-in.
+      placeholder: curl -fsSL https://get.example.com/install.sh -o install.sh
+    validations:
+      required: true
+  - type: textarea
+    id: returned
+    attributes:
+      label: What came back
+      description: The sentence, or the fields that are wrong. Paste the whole answer if it is to hand.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What it should have said
+      description: >-
+        What the command actually does to the computer. A link to the man page or official docs
+        helps when the row is rewritten.
+    validations:
+      required: true
+  - type: checkboxes
+    id: kind
+    attributes:
+      label: What is wrong
+      options:
+        - label: The sentence says something the command does not do
+        - label: A fact field is wrong (`effect`, `reversible`, `network`, `privilege`, …)
+        - label: The answer is narrower than what the command can actually reach
+        - label: An argument was read as the wrong kind of thing
+        - label: '`confidence` or `source` overstates where the answer came from'
+        - label: Something else
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The `cmd-facts` version, or `site` if you saw it on the landing page.
+      placeholder: 0.1.0
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Where you hit it, what you were building, and what you expected to be able to gate on.

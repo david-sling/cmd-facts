@@ -18,3 +18,13 @@ export const DESCRIPTION =
   'A library that answers what a command does in typed fields — effect, reversibility, network reach, privilege — for the surface that has to ask a person to approve it. No risk score, no model at run time.'
 
 export const OG_IMAGE = `${SITE}/og.png`
+
+export const REPO_URL = 'https://github.com/david-sling/cmd-facts'
+
+/**
+ * The two issue forms for a wrong or missing explanation. Both carry the `inaccurate-explanation`
+ * label, so the accuracy backlog is one label rather than a search.
+ */
+export const REPORT_URL = `${REPO_URL}/issues/new?template=inaccurate-explanation.yml`
+export const MISSING_URL = `${REPO_URL}/issues/new?template=missing-command.yml`
+export const REPORTS_URL = `${REPO_URL}/issues?q=is%3Aissue+label%3Ainaccurate-explanation`

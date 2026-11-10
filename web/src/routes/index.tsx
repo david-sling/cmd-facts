@@ -1,9 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowDown, Github } from 'lucide-react'
+import { ArrowDown, ArrowUpRight, Github } from 'lucide-react'
 import AnimatedGradient from '#/components/animated-gradient'
 import { ExplainDemo } from '#/components/explain-demo'
 import { HeroGlass } from '#/components/hero-glass'
 import { InstallCommand } from '#/components/install-command'
+import { MISSING_URL, REPORT_URL, REPO_URL } from '#/site'
 
 export const Route = createFileRoute('/')({ component: Home })
 
@@ -20,7 +21,7 @@ function Home() {
             Docs
           </a>
           <a
-            href="https://github.com/david-sling/cmd-facts"
+            href={REPO_URL}
             aria-label="cmd-facts on GitHub"
             className="text-ink-2 transition-colors hover:text-ink"
           >
@@ -68,6 +69,19 @@ function Home() {
 
       <section id="try" className="mx-4 mt-24 scroll-mt-8 sm:mx-8 lg:mx-14">
         <ExplainDemo />
+        {/* the demo answers any line typed into it, so the page has to say how complete the table is */}
+        <p className="mt-5 max-w-[78ch] text-[14px] leading-relaxed text-ink-3">
+          The table is still small, so an answer here can be incomplete or wrong.{' '}
+          <a
+            href={REPORT_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-baseline gap-0.5 border-b border-ink-3/40 text-ink-2 transition-colors hover:border-pink hover:text-ink"
+          >
+            Report an inaccurate explanation
+            <ArrowUpRight aria-hidden className="size-[13px] translate-y-px" />
+          </a>
+        </p>
       </section>
 
       <section className="mx-4 mt-24 grid gap-10 sm:mx-8 lg:mx-14 lg:grid-cols-2 lg:gap-16">
@@ -87,6 +101,30 @@ function Home() {
           </p>
         </div>
       </section>
+
+      <footer className="mx-4 mt-24 border-t border-line pt-8 sm:mx-8 lg:mx-14">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <p className="max-w-[46ch] text-[14px] leading-relaxed text-ink-3">
+            Early stage. The table is still small, so an explanation can be incomplete or wrong.
+            Reports are what fix a row.
+          </p>
+          <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[14px] text-ink-2">
+            <a href="/docs" className="transition-colors hover:text-ink">
+              Docs
+            </a>
+            <a href={REPO_URL} target="_blank" rel="noreferrer" className="transition-colors hover:text-ink">
+              GitHub
+            </a>
+            <a href={REPORT_URL} target="_blank" rel="noreferrer" className="transition-colors hover:text-pink">
+              Report an inaccurate explanation
+            </a>
+            <a href={MISSING_URL} target="_blank" rel="noreferrer" className="transition-colors hover:text-pink">
+              Report a command with no row
+            </a>
+          </nav>
+        </div>
+        <p className="mt-8 pb-2 font-mono text-[12px] text-ink-3/70">MIT · no runtime dependencies</p>
+      </footer>
     </main>
   )
 }

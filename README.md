@@ -8,6 +8,22 @@ assumed never to have opened a terminal. **It is not a man-page browser and not 
 `-a` does not ignore entries starting with a dot, and it will not tell you that your command could be written better.
 Everything here answers one question: if this runs, what happens to this computer?
 
+## Early stage
+
+cmd-facts is early and the table is still small, so an explanation can be incomplete or wrong: a sentence that
+misses what a flag does, a fact set narrower than what the command can actually reach, an argument read as the wrong
+kind of thing. A command with no row at all comes back as the widest floor, with a `says` that admits it.
+
+Report anything that reads wrong — the command you ran, what came back, and what it should have said:
+
+- [Inaccurate explanation](https://github.com/david-sling/cmd-facts/issues/new?template=inaccurate-explanation.yml)
+- [Command with no row](https://github.com/david-sling/cmd-facts/issues/new?template=missing-command.yml)
+
+Both are labelled [`inaccurate-explanation`](https://github.com/david-sling/cmd-facts/issues?q=is%3Aissue+label%3Ainaccurate-explanation).
+
+Gate on `confidence` until coverage settles. `verified` means a row exists for that exact command, from a pack you
+trust, and it is the only tier that should feed an automatic decision.
+
 ## The schema is the deliverable
 
 `explain()` returns fields. The plain-English sentence is one rendering of those fields, not the product. A consumer
@@ -299,7 +315,7 @@ read too, and the stream comes back as `fd`.
 
 ### `confidence` and `source`
 
-`verified` is a hand-written row for that exact command, from a pack the consumer vouched for. `derived` is a row
+`verified` is a row written for that exact command, from a pack the consumer vouched for. `derived` is a row
 that was not written for this command, or was not vouched for: a subcommand the table does not hold, falling back to
 the deliberately cautious base row; a fact set that absorbed a nested command's reach; a row from a pack that was not
 named in `trust`. `unknown` means there is no entry at all: the fields are then the widest ones, a floor rather than a

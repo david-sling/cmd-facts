@@ -40,3 +40,9 @@ This library will not tell you whether to allow something. It tells you what you
 - **Gating on `confidence`.** Nothing stops you showing a `derived` answer; show it as one.
 - **Rendering values apart from prose.** `parts` makes it possible; only the consumer can do it. See [Showing it to a person](/docs/sentence).
 - **Standing grants.** Do not offer one where `repeatSafe` is false.
+
+## Accuracy
+
+The table is still small. An explanation can miss what a flag does, come back narrower than what the command can really reach, or read an argument as the wrong kind of thing. Report those as bugs.
+
+[Report an inaccurate explanation](https://github.com/david-sling/cmd-facts/issues/new?template=inaccurate-explanation.yml) with the command, what came back and what it should have said. [Report a command with no row](https://github.com/david-sling/cmd-facts/issues/new?template=missing-command.yml) with what it does to the computer. Both are labelled `inaccurate-explanation`.

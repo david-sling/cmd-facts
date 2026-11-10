@@ -7,6 +7,14 @@ description: A library that answers what a command does in typed fields, for the
 
 It is not a man-page browser and not a linter. It will not tell you that `-a` does not ignore entries starting with a dot, and it will not tell you your command could be written better. Everything here answers one question: if this runs, what happens to this computer?
 
+## Early stage
+
+cmd-facts is early and the table is still small, so an explanation can be incomplete or wrong. A command with no row comes back as the widest floor, with a `says` that admits it.
+
+Gate on `confidence` until coverage settles. `verified` means a row exists for that exact command, from a pack you trust, and it is the only tier that should feed an automatic decision.
+
+> [Report an inaccurate explanation](https://github.com/david-sling/cmd-facts/issues/new?template=inaccurate-explanation.yml), or [a command with no row](https://github.com/david-sling/cmd-facts/issues/new?template=missing-command.yml). Both are labelled `inaccurate-explanation`. Include the command you ran, what came back, and what it should have said.
+
 ## Where it is used
 
 - A remote support session where a customer clicks **Allow**.
@@ -43,7 +51,7 @@ facts.privilege   // 'none'
 ## Words used in these docs
 
 - **Consumer:** the program calling this library — the approval prompt, the gate, the console.
-- **Row:** one command's entry in a table, written by hand.
+- **Row:** one command's entry in a table.
 - **Pack:** a set of rows shipped under one name. The curated table is itself a pack.
 - **Fact set:** the `facts` object on an answer, whether it came from one row or several merged.
 - **Opaque:** the command hands over to something this library cannot see, so every field is a floor rather than a measurement.

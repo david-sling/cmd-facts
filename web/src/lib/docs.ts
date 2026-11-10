@@ -2,7 +2,7 @@ import type { ComponentType } from 'react'
 import type { MDXComponents } from 'mdx/types'
 import GithubSlugger from 'github-slugger'
 
-export const REPO_URL = 'https://github.com/david-sling/cmd-facts'
+export { REPO_URL } from '#/site'
 
 type Frontmatter = { title: string; description: string }
 type Module = { default: ComponentType<{ components?: MDXComponents }>; frontmatter: Frontmatter }

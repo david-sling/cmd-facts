@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router'
 import type { MDXComponents } from 'mdx/types'
 import { Check, Copy, Github, SquareCode } from 'lucide-react'
 import { REPO_URL, SECTIONS, absolutise, getDoc, neighbours } from '#/lib/docs'
+import { REPORT_URL } from '#/site'
 import type { Doc, Heading } from '#/lib/docs'
 
 function useCopy() {
@@ -219,6 +220,10 @@ export function DocsPage({ doc }: { doc: Doc }) {
         <div id="docs-side" className="docs-side-wrap">
           <Sidebar current={doc.slug} />
           <div className="docs-side-foot">
+            {/* the table is still small, so the way to report a wrong row sits on every page */}
+            <a className="docs-report" href={REPORT_URL} target="_blank" rel="noreferrer">
+              Report an inaccurate explanation
+            </a>
             <p className="docs-version">MIT · no runtime dependencies</p>
           </div>
         </div>

@@ -1,0 +1,29 @@
+name: Command with no row
+description: A command the table does not answer for yet.
+title: '[missing] '
+labels: ['inaccurate-explanation', 'coverage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A command with no row returns the widest floor and a `says` that admits it. Describe what the
+        command does and the row can be written.
+  - type: input
+    id: command
+    attributes:
+      label: The command line
+      placeholder: kubectl delete pod web-7f9
+    validations:
+      required: true
+  - type: textarea
+    id: does
+    attributes:
+      label: What it does to the computer
+      description: In plain terms, for someone who has never opened a terminal. A link to the official docs helps.
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Where it comes up
+      description: The approval surface or workflow this showed up in, if you can say.
