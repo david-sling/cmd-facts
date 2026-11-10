@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createExplainer } from './explain.ts'
 import { BUILTIN } from './data/index.ts'
-import { fact, opaqueFact } from './entry.ts'
+import { fact, opaqueFact, LOCAL, LOOKS } from './entry.ts'
 import { effectsOf } from './facts.ts'
 import type { Pack } from './pack.ts'
 
@@ -10,7 +10,7 @@ const TOOLS: Pack = {
   version: '1.2.0',
   commands: {
     flowctl: {
-      facts: opaqueFact('Runs one step of a saved flow.', 'the command that step names', { effect: ['execute'] }),
+      facts: opaqueFact('Runs one step of a saved flow.', 'the command that step names', { ...LOCAL, effect: ['execute'] }),
       operands: ['command'],
       nestedHere: true,
     },
@@ -22,10 +22,10 @@ const KUBE: Pack = {
   version: '2.4.0',
   commands: {
     kubectl: {
-      facts: fact('Asks a cluster what is running on it.', { reversible: 'unknown', network: 'known-host' }),
+      facts: fact('Asks a cluster what is running on it.', { effect: ['read'], privilege: 'none', touchesCredentials: false, repeatSafe: true, reversible: 'unknown', network: 'known-host' }),
       sub: {
         delete: {
-          facts: fact('Removes something from a cluster.', { effect: ['delete'], reversible: 'no', network: 'known-host' }),
+          facts: fact('Removes something from a cluster.', { privilege: 'none', touchesCredentials: false, repeatSafe: true, effect: ['delete'], reversible: 'no', network: 'known-host' }),
           operands: ['text'],
         },
       },
@@ -49,7 +49,7 @@ describe('a registry is settled before anything is explained', () => {
   })
 
   it('refuses a pack that does not validate', () => {
-    const broken: Pack = { name: '@acme/broken', version: '1.0.0', commands: { k: { facts: fact('') } } }
+    const broken: Pack = { name: '@acme/broken', version: '1.0.0', commands: { k: { facts: fact('', { ...LOOKS }) } } }
     expect(() => createExplainer({ packs: [broken] })).toThrow(/is not a pack this library will load/)
   })
 })

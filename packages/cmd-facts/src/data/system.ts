@@ -1,37 +1,39 @@
-import { fact, opaqueFact } from '../entry.ts'
+import { fact, opaqueFact, LOCAL, LOOKS } from '../entry.ts'
 import type { Entry } from '../entry.ts'
 
 export const SYSTEM: Record<string, Entry> = {
   // `echo` and `printf` are given no slotted sentence: the words they are handed are one message, and listing them
   // with commas would read as though each were a separate thing.
   echo: {
-    facts: fact('Shows a line of text.', { docs: 'man 1 echo' }),
+    facts: fact('Shows a line of text.', { ...LOOKS, docs: 'man 1 echo' }),
     operands: ['text'],
   },
   printf: {
-    facts: fact('Shows text, laid out to a pattern.', { docs: 'man 1 printf' }),
+    facts: fact('Shows text, laid out to a pattern.', { ...LOOKS, docs: 'man 1 printf' }),
     operands: ['pattern', 'text'],
   },
   uname: {
-    facts: fact('Shows which kind of computer and system this is.', { docs: 'man 1 uname' }),
+    facts: fact('Shows which kind of computer and system this is.', { ...LOOKS, docs: 'man 1 uname' }),
   },
   pwd: {
-    facts: fact('Shows which folder this is working in.', { docs: 'man 1 pwd' }),
+    facts: fact('Shows which folder this is working in.', { ...LOOKS, docs: 'man 1 pwd' }),
   },
   whoami: {
-    facts: fact('Shows which account on this computer is being used.', { docs: 'man 1 whoami' }),
+    facts: fact('Shows which account on this computer is being used.', { ...LOOKS, docs: 'man 1 whoami' }),
   },
   date: {
-    facts: fact('Shows what day and time it is now.', { docs: 'man 1 date' }),
+    facts: fact('Shows what day and time it is now.', { ...LOOKS, docs: 'man 1 date' }),
   },
-  ps: { facts: fact('Lists the programs running on this computer.', { docs: 'man 1 ps' }) },
+  ps: { facts: fact('Lists the programs running on this computer.', { ...LOOKS, docs: 'man 1 ps' }) },
   top: {
     facts: fact('Shows the programs running right now, and how much of the computer each one is using.', {
+      ...LOOKS,
       docs: 'man 1 top',
     }),
   },
   kill: {
     facts: fact('Stops a running program.', {
+      ...LOCAL, repeatSafe: true,
       effect: ['terminate'],
       reversible: 'no',
       tell: ['Stops the program running as ', { role: 'pid', which: 'all' }, '.'],
@@ -55,6 +57,7 @@ export const SYSTEM: Record<string, Entry> = {
   },
   lsof: {
     facts: fact('Lists which running programs have which files open.', {
+      ...LOOKS,
       note: 'The list also shows which programs are connected to the network, and where.',
       docs: 'man 1 lsof',
     }),
@@ -64,6 +67,7 @@ export const SYSTEM: Record<string, Entry> = {
       'Shows the hidden settings that programs on this computer are started with, or starts a program with different ones.',
       'the command it was given, if it was given one',
       {
+        network: 'none', privilege: 'none',
         effect: ['read', 'execute'],
         touchesCredentials: true,
         note: 'These hidden settings often hold passwords and access keys for other services.',
@@ -74,9 +78,10 @@ export const SYSTEM: Record<string, Entry> = {
     nestedHere: true,
     assignmentsFirst: true,
   },
-  sw_vers: { facts: fact('Shows which version of macOS this computer is running.', { docs: 'man 1 sw_vers' }) },
+  sw_vers: { facts: fact('Shows which version of macOS this computer is running.', { ...LOOKS, docs: 'man 1 sw_vers' }) },
   system_profiler: {
     facts: fact('Puts together a report about this computer, covering its parts and the software on it.', {
+      ...LOOKS,
       note: 'The report can include the serial number of this computer and the names of networks it has joined.',
       docs: 'man 8 system_profiler',
     }),
@@ -84,6 +89,7 @@ export const SYSTEM: Record<string, Entry> = {
   },
   log: {
     facts: fact('Reads or clears the record macOS keeps of what programs on this computer have been doing.', {
+      network: 'none', touchesCredentials: false,
       effect: ['read', 'delete'],
       reversible: 'unknown',
       privilege: 'admin',
@@ -94,18 +100,21 @@ export const SYSTEM: Record<string, Entry> = {
     sub: {
       show: {
         facts: fact('Shows past entries from the record macOS keeps of what programs have been doing.', {
+          ...LOOKS,
           docs: 'man 1 log',
         }),
         flagStyle: 'words',
       },
       stream: {
         facts: fact('Shows what programs are doing as macOS records it, and keeps going until it is stopped.', {
+          ...LOOKS,
           docs: 'man 1 log',
         }),
         flagStyle: 'words',
       },
       collect: {
         facts: fact('Saves a copy of the computer activity record into a file.', {
+          ...LOCAL, reversible: 'yes', repeatSafe: true,
           effect: ['read', 'create'],
           note: 'That record can mention the names of files, apps and networks this computer has used.',
           docs: 'man 1 log',
@@ -115,6 +124,7 @@ export const SYSTEM: Record<string, Entry> = {
       },
       erase: {
         facts: fact('Removes the record macOS keeps of what programs have been doing.', {
+          network: 'none', touchesCredentials: false, repeatSafe: true,
           effect: ['delete'],
           reversible: 'no',
           privilege: 'admin',
@@ -126,6 +136,7 @@ export const SYSTEM: Record<string, Entry> = {
   },
   defaults: {
     facts: fact('Reads or changes the settings that apps and macOS have saved on this computer.', {
+      ...LOCAL,
       effect: ['read', 'configure'],
       reversible: 'unknown',
       repeatSafe: false,
@@ -135,14 +146,16 @@ export const SYSTEM: Record<string, Entry> = {
     sub: {
       read: {
         facts: fact('Shows the settings an app or macOS has saved.', {
+          ...LOOKS,
           note: 'With no app named, it shows every saved setting on this computer, and some apps keep account details there.',
           docs: 'man 1 defaults',
         }),
         operands: ['domain', 'text'],
       },
-      'read-type': { facts: fact('Shows what kind of value a saved setting holds.', { docs: 'man 1 defaults' }), operands: ['domain', 'text'] },
+      'read-type': { facts: fact('Shows what kind of value a saved setting holds.', { ...LOOKS, docs: 'man 1 defaults' }), operands: ['domain', 'text'] },
       write: {
         facts: fact('Changes a saved setting for an app or for macOS.', {
+          ...LOCAL, repeatSafe: true,
           effect: ['configure'],
           reversible: 'unknown',
           docs: 'man 1 defaults',
@@ -151,19 +164,21 @@ export const SYSTEM: Record<string, Entry> = {
       },
       delete: {
         facts: fact('Removes a setting an app or macOS had saved, so it goes back to its starting value.', {
+          ...LOCAL, repeatSafe: true,
           effect: ['configure', 'delete'],
           reversible: 'no',
           docs: 'man 1 defaults',
         }),
         operands: ['domain', 'text'],
       },
-      domains: { facts: fact('Lists the apps and parts of macOS that have saved settings.', { docs: 'man 1 defaults' }) },
+      domains: { facts: fact('Lists the apps and parts of macOS that have saved settings.', { ...LOOKS, docs: 'man 1 defaults' }) },
       export: {
-        facts: fact('Writes the saved settings of an app into a file.', { effect: ['read', 'create'], docs: 'man 1 defaults' }),
+        facts: fact('Writes the saved settings of an app into a file.', { ...LOCAL, reversible: 'yes', repeatSafe: true, effect: ['read', 'create'], docs: 'man 1 defaults' }),
         operands: ['domain', 'path'],
       },
       import: {
         facts: fact('Replaces the saved settings of an app with the ones held in a file.', {
+          ...LOCAL, repeatSafe: true,
           effect: ['configure'],
           reversible: 'no',
           docs: 'man 1 defaults',
@@ -174,16 +189,18 @@ export const SYSTEM: Record<string, Entry> = {
   },
   launchctl: {
     facts: fact('Looks at or changes the background programs macOS starts and keeps running.', {
+      ...LOCAL,
       effect: ['read', 'configure'],
       reversible: 'unknown',
       repeatSafe: false,
       docs: 'man 1 launchctl',
     }),
     sub: {
-      list: { facts: fact('Lists the background programs macOS is keeping running.', { docs: 'man 1 launchctl' }) },
-      print: { facts: fact('Shows how one background program is set up and whether it is running.', { docs: 'man 1 launchctl' }) },
+      list: { facts: fact('Lists the background programs macOS is keeping running.', { ...LOOKS, docs: 'man 1 launchctl' }) },
+      print: { facts: fact('Shows how one background program is set up and whether it is running.', { ...LOOKS, docs: 'man 1 launchctl' }) },
       load: {
         facts: fact('Tells macOS to run a background program, and to keep starting it from now on.', {
+          ...LOCAL, repeatSafe: true,
           effect: ['configure', 'execute'],
           reversible: 'yes',
           docs: 'man 1 launchctl',
@@ -192,6 +209,7 @@ export const SYSTEM: Record<string, Entry> = {
       },
       unload: {
         facts: fact('Tells macOS to stop a background program and to stop starting it.', {
+          ...LOCAL, repeatSafe: true,
           effect: ['terminate', 'configure'],
           reversible: 'yes',
           docs: 'man 1 launchctl',
@@ -200,6 +218,7 @@ export const SYSTEM: Record<string, Entry> = {
       },
       bootstrap: {
         facts: fact('Starts a background program and sets macOS up to keep it running.', {
+          ...LOCAL, repeatSafe: true,
           effect: ['configure', 'execute'],
           reversible: 'yes',
           docs: 'man 1 launchctl',
@@ -208,6 +227,7 @@ export const SYSTEM: Record<string, Entry> = {
       },
       bootout: {
         facts: fact('Stops a background program and takes it off the list macOS keeps running.', {
+          ...LOCAL, repeatSafe: true,
           effect: ['terminate', 'configure'],
           reversible: 'yes',
           docs: 'man 1 launchctl',
@@ -216,6 +236,7 @@ export const SYSTEM: Record<string, Entry> = {
       },
       start: {
         facts: fact('Starts one of the background programs macOS knows about.', {
+          ...LOCAL, reversible: 'yes', repeatSafe: true,
           effect: ['execute'],
           docs: 'man 1 launchctl',
         }),
@@ -223,6 +244,7 @@ export const SYSTEM: Record<string, Entry> = {
       },
       stop: {
         facts: fact('Stops one of the background programs macOS is running.', {
+          ...LOCAL, repeatSafe: true,
           effect: ['terminate'],
           reversible: 'yes',
           docs: 'man 1 launchctl',
@@ -231,6 +253,7 @@ export const SYSTEM: Record<string, Entry> = {
       },
       kickstart: {
         facts: fact('Starts a background program again straight away, whether or not it was running.', {
+          ...LOCAL, reversible: 'yes', repeatSafe: true,
           effect: ['terminate', 'execute'],
           docs: 'man 1 launchctl',
         }),
@@ -238,6 +261,7 @@ export const SYSTEM: Record<string, Entry> = {
       },
       enable: {
         facts: fact('Allows a background program to be started on this computer.', {
+          ...LOCAL, repeatSafe: true,
           effect: ['configure'],
           reversible: 'yes',
           docs: 'man 1 launchctl',
@@ -246,6 +270,7 @@ export const SYSTEM: Record<string, Entry> = {
       },
       disable: {
         facts: fact('Stops a background program from being started on this computer.', {
+          ...LOCAL, repeatSafe: true,
           effect: ['configure'],
           reversible: 'yes',
           docs: 'man 1 launchctl',
@@ -256,6 +281,7 @@ export const SYSTEM: Record<string, Entry> = {
   },
   networksetup: {
     facts: fact('Looks at or changes how this computer connects to networks.', {
+      ...LOCAL,
       effect: ['read', 'configure'],
       reversible: 'unknown',
       repeatSafe: false,
@@ -308,7 +334,7 @@ export const SYSTEM: Record<string, Entry> = {
     ],
   },
   softwareupdate: {
-    facts: fact('Asks Apple which updates are available for macOS.', { network: 'known-host', docs: 'man 8 softwareupdate' }),
+    facts: fact('Asks Apple which updates are available for macOS.', { effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true, network: 'known-host', docs: 'man 8 softwareupdate' }),
     flags: [
       {
         // Left without `takesValue` on purpose: the name of an update is optional here, and `-i -a` is the common
@@ -331,6 +357,7 @@ export const SYSTEM: Record<string, Entry> = {
   },
   diskutil: {
     facts: fact('Looks at or changes the disks and storage attached to this computer.', {
+      network: 'none', touchesCredentials: false,
       effect: ['read', 'configure'],
       reversible: 'unknown',
       privilege: 'admin',
@@ -338,25 +365,27 @@ export const SYSTEM: Record<string, Entry> = {
       docs: 'man 8 diskutil',
     }),
     sub: {
-      list: { facts: fact('Lists the disks and storage attached to this computer.', { docs: 'man 8 diskutil' }), operands: ['device'] },
-      info: { facts: fact('Shows the details of one disk attached to this computer.', { docs: 'man 8 diskutil' }), operands: ['device'] },
+      list: { facts: fact('Lists the disks and storage attached to this computer.', { ...LOOKS, docs: 'man 8 diskutil' }), operands: ['device'] },
+      info: { facts: fact('Shows the details of one disk attached to this computer.', { ...LOOKS, docs: 'man 8 diskutil' }), operands: ['device'] },
       mount: {
-        facts: fact('Makes a disk available so its files can be opened.', { effect: ['configure'], docs: 'man 8 diskutil' }),
+        facts: fact('Makes a disk available so its files can be opened.', { ...LOCAL, reversible: 'yes', repeatSafe: true, effect: ['configure'], docs: 'man 8 diskutil' }),
         operands: ['device'],
       },
       unmount: {
         facts: fact('Disconnects a disk so that it can be unplugged.', {
+          ...LOCAL, reversible: 'yes', repeatSafe: true,
           effect: ['terminate', 'configure'],
           docs: 'man 8 diskutil',
         }),
         operands: ['device'],
       },
       verifyVolume: {
-        facts: fact('Checks a disk for faults without changing anything on it.', { docs: 'man 8 diskutil' }),
+        facts: fact('Checks a disk for faults without changing anything on it.', { ...LOOKS, docs: 'man 8 diskutil' }),
         operands: ['device'],
       },
       repairVolume: {
         facts: fact('Tries to put right faults found on a disk.', {
+          network: 'none', touchesCredentials: false, repeatSafe: true,
           effect: ['write'],
           reversible: 'unknown',
           privilege: 'admin',
@@ -366,6 +395,7 @@ export const SYSTEM: Record<string, Entry> = {
       },
       eraseDisk: {
         facts: fact('Wipes a whole disk and sets it up again as empty.', {
+          network: 'none', touchesCredentials: false, repeatSafe: true,
           effect: ['delete', 'write'],
           reversible: 'no',
           privilege: 'admin',
@@ -376,6 +406,7 @@ export const SYSTEM: Record<string, Entry> = {
       },
       eraseVolume: {
         facts: fact('Wipes one part of a disk and sets it up again as empty.', {
+          network: 'none', touchesCredentials: false, repeatSafe: true,
           effect: ['delete', 'write'],
           reversible: 'no',
           privilege: 'admin',

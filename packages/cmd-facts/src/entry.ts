@@ -82,33 +82,44 @@ export type Entry = Rule & {
   sub?: Record<string, Rule>
 }
 
-const COMMON = {
-  reversible: 'yes',
-  network: 'none',
-  privilege: 'none',
-  touchesCredentials: false,
-  repeatSafe: true,
-  confidence: 'verified',
-  source: 'curated',
-} as const
+const WRITTEN = { confidence: 'verified', source: 'curated' } as const
 
-type Over = Partial<Omit<Facts, 'opaque' | 'effect' | 'effectAtLeast' | 'handsOverTo' | 'says'>> & { effect?: Effect[] }
+type Optional = Partial<Omit<Facts, 'opaque' | 'effect' | 'effectAtLeast' | 'handsOverTo' | 'says'>>
+
+// Every field that says how far a command reaches is written on the row. None of them has a default: a field left
+// out would quietly read as the narrowest answer, and a row that forgot a field is not a row that measured it.
+type Over = Optional & Pick<Facts, 'reversible' | 'network' | 'privilege' | 'touchesCredentials' | 'repeatSafe'> & {
+  effect: Effect[]
+}
+
+/**
+ * Runs on this computer alone, as the account that started it, and reaches no secrets. A row spreads this only where
+ * all three were checked: it is a claim about the command, not a default for it.
+ */
+export const LOCAL = { network: 'none', privilege: 'none', touchesCredentials: false } as const
+
+/** Only looks: reads something on this computer and changes nothing, so there is nothing to undo or repeat. */
+export const LOOKS = { ...LOCAL, effect: ['read'] as Effect[], reversible: 'yes', repeatSafe: true } as const
 
 /** A row for a command this library can account for in full. */
-export const fact = (says: string, over: Over = {}): Facts => ({
-  ...COMMON,
+export const fact = (says: string, over: Over): Facts => ({
+  ...WRITTEN,
   ...over,
-  effect: sortEffects(over.effect ?? ['read']),
+  effect: sortEffects(over.effect),
   opaque: false,
   says,
 })
+
+// An opaque row is never reversible or safe to repeat, so those two are not asked for. Its effects are a floor, and
+// running the program it hands over to is the least of them.
+type OpaqueOver = Optional & Pick<Facts, 'network' | 'privilege' | 'touchesCredentials'> & { effect?: Effect[] }
 
 /**
  * A row for a command that hands over to something this library cannot see. `handsOverTo` names what that is, in the
  * same plain register as `says`. Such a row can never claim to be reversible or safe to repeat.
  */
-export const opaqueFact = (says: string, handsOverTo: string, over: Over = {}): Facts => ({
-  ...COMMON,
+export const opaqueFact = (says: string, handsOverTo: string, over: OpaqueOver): Facts => ({
+  ...WRITTEN,
   ...over,
   reversible: over.reversible === 'no' ? 'no' : 'unknown',
   repeatSafe: false,
