@@ -35,32 +35,35 @@ const EXAMPLES = [
   'ls -Z ~/Documents',
 ] as const
 
-// The page styles the components the way a consumer would: by the attributes they render, and nothing else. It is
-// the same text the "Styling" section prints, so what is shown is what is running.
-const CSS = `.line [data-kind='program'] { color: var(--ink); font-weight: 500 }
-.line [data-nested] { text-decoration: underline dotted }
-.line [data-kind='subcommand'] { color: var(--ink) }
-.line [data-kind='flag'] { color: var(--pink) }
-.line [data-escalated] {
-  background: rgb(255 102 184 / 0.14);
-  border-radius: 3px;
-}
-.line [data-kind='value'] { color: #9fc7ff }
-.line [data-kind='operator'],
-.line [data-kind='redirect'] { color: var(--ink-3) }
-.line [data-unread] {
-  color: var(--bad);
-  text-decoration: underline wavy;
-}
-
-.said code {
-  font-family: var(--font-mono);
-  font-size: 0.82em;
-  color: var(--pink);
-  background: rgb(255 102 184 / 0.08);
-  border-radius: 4px;
-  padding: 0.05em 0.3em;
-}`
+// The components ship no styles. These are the Tailwind classes this page gives them, and the same lists are printed
+// in the playground's code, so what is shown is what is running. `*:` reaches each piece the component renders, and
+// `data-[kind=…]` / `data-escalated` pick which ones a class applies to.
+const LINE_CLASSES = [
+  'text-zinc-300',
+  '*:data-[kind=program]:font-medium',
+  '*:data-[kind=program]:text-white',
+  '*:data-nested:underline',
+  '*:data-nested:decoration-dotted',
+  '*:data-[kind=flag]:text-pink-400',
+  '*:data-escalated:rounded',
+  '*:data-escalated:bg-pink-400/15',
+  '*:data-[kind=value]:text-sky-300',
+  '*:data-[kind=operator]:text-zinc-500',
+  '*:data-[kind=redirect]:text-zinc-500',
+  '*:data-unread:text-red-400',
+  '*:data-unread:underline',
+  '*:data-unread:decoration-wavy',
+]
+const SENTENCE_CLASSES = [
+  '*:rounded',
+  '*:bg-pink-400/10',
+  '*:px-1',
+  '*:font-mono',
+  '*:text-[0.85em]',
+  '*:text-pink-400',
+]
+const LINE = LINE_CLASSES.join(' ')
+const SAID = SENTENCE_CLASSES.join(' ')
 
 const KINDS: { kind: string; line: string; says: string }[] = [
   { kind: 'program', line: 'git', says: 'The program a command runs. `data-nested` where another command hands over to it, as rm in sudo rm.' },
@@ -92,7 +95,7 @@ const ticks = (text: string) =>
 
 // Enough of TSX and CSS to tell the parts of a short snippet apart; not a parser, and only ever fed the page's own code.
 const TOKEN =
-  /(\/\/[^\n]*)|('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`)|\b(import|from|function|const|return|export)\b|(<\/?[A-Z][A-Za-z]*|<\/?>|\/>)/g
+  /(\/\/[^\n]*)|('(?:[^'\\\n]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)|\b(import|from|function|const|return|export)\b|(<\/?[A-Z][A-Za-z]*|<\/?>|\/>)/g
 const TONE = ['text-ink-3', 'text-[#9fc7ff]', 'text-pink', 'text-ink']
 
 function highlight(code: string) {
@@ -101,6 +104,26 @@ function highlight(code: string) {
   for (const m of code.matchAll(TOKEN)) {
     if (m.index > at) out.push(code.slice(at, m.index))
     const group = [m[1], m[2], m[3], m[4]].findIndex((g) => g !== undefined)
+    // a class list: each variant prefix dimmed, so the utility that does the work is what stands out
+    if (group === 1 && code.slice(0, m.index).endsWith('className=')) {
+      out.push(
+        <span key={m.index} className={TONE[1]}>
+          {m[0].split(/(\s+)/).map((word, i) => {
+            const cut = word.lastIndexOf(':') + 1
+            return cut > 0 ? (
+              <span key={i}>
+                <span className="text-ink-3">{word.slice(0, cut)}</span>
+                {word.slice(cut)}
+              </span>
+            ) : (
+              word
+            )
+          })}
+        </span>,
+      )
+      at = m.index + m[0].length
+      continue
+    }
     out.push(
       <span key={m.index} className={TONE[group]}>
         {m[0]}
@@ -139,11 +162,11 @@ function Approve() {
       <CommandLine
         line={line}
         of={explanation}
-        className="line"
+        className="${LINE_CLASSES.join('\n          ')}"
       />
       <Sentence
         of={explanation}
-        className="said"
+        className="${SENTENCE_CLASSES.join('\n          ')}"
       />
     </>
   )
@@ -217,13 +240,13 @@ function Playground() {
         <div className="min-w-0 px-5 py-6 sm:px-7">
           <p className="eyebrow normal-case tracking-[0.04em]">&lt;CommandLine line={'{line}'} /&gt;</p>
           <div className="mt-4 font-mono text-[15px] leading-relaxed break-words whitespace-pre-wrap sm:text-[18px]">
-            <CommandLine line={line} of={explanation} className="line" />
+            <CommandLine line={line} of={explanation} className={LINE} />
           </div>
         </div>
         <div className="min-w-0 border-t border-line px-5 py-6 sm:px-7">
           <p className="eyebrow normal-case tracking-[0.04em]">&lt;Sentence of={'{explanation}'} /&gt;</p>
           <p className="mt-4 text-[19px] font-light leading-snug text-ink sm:text-[22px]">
-            <Sentence of={explanation} className="said" />
+            <Sentence of={explanation} className={SAID} />
           </p>
         </div>
         </div>
@@ -247,8 +270,8 @@ function Spoof() {
       </figure>
       <figure className="rounded-xl border border-pink/30 bg-panel px-5 py-4">
         <figcaption className="eyebrow normal-case tracking-[0.04em]">&lt;Sentence /&gt;</figcaption>
-        <p className="said mt-3 text-[17px] font-light leading-snug text-ink">
-          <Sentence of={e} />
+        <p className="mt-3 text-[17px] font-light leading-snug text-ink">
+          <Sentence of={e} className={SAID} />
         </p>
       </figure>
     </div>
@@ -258,8 +281,6 @@ function Spoof() {
 function ReactPage() {
   return (
     <main className="mx-auto min-h-screen max-w-[1600px] bg-bg pb-32">
-      <style>{CSS}</style>
-
       <header className="flex items-center justify-between px-6 py-5 sm:px-10 lg:px-14">
         <a href="/" className="font-mono text-[15px] tracking-[0.04em] text-ink">
           cmd-facts
@@ -323,7 +344,7 @@ function ReactPage() {
             <div key={kind} className="grid gap-1 px-5 py-4 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-6">
               <dt className="font-mono text-[13px]">
                 <span className="text-ink">{kind}</span>
-                <span className="line ml-3">
+                <span className={`${LINE} ml-3`}>
                   <span data-kind={kind} {...(kind === 'flag' ? { 'data-escalated': '' } : {})}>
                     {line}
                   </span>
@@ -336,8 +357,17 @@ function ReactPage() {
       </Section>
 
       <Section eyebrow="Styling" title="Style the attributes, or render it yourself.">
-        <p>Nothing ships with a stylesheet. This page is styled by these rules and nothing else:</p>
-        <Code>{CSS}</Code>
+        <p>
+          Nothing ships with a stylesheet. Every piece carries attributes saying what it is, and this page colours them
+          with nothing but the Tailwind classes in the playground’s code:{' '}
+          <span className="font-mono text-[0.9em] text-ink">*:</span> reaches each piece, and{' '}
+          <span className="font-mono text-[0.9em] text-ink">data-[kind=flag]</span> or{' '}
+          <span className="font-mono text-[0.9em] text-ink">data-escalated</span> picks which. Plain CSS works on the
+          same attributes:
+        </p>
+        <Code>{`[data-kind='flag'] { color: hotpink }
+[data-escalated] { background: rgb(255 105 180 / 0.15) }
+[data-kind='value'][data-role='url'] { color: skyblue }`}</Code>
         <p>
           Where a value needs to be more than text — a chip, a link to the file, a count instead of forty names — take
           over the drawing. Keep it looking like a value, not like prose.
