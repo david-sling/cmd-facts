@@ -50,6 +50,7 @@ export const SYSTEM: Record<string, Entry> = {
   echo: {
     facts: fact('Shows a line of text.', { ...LOOKS, docs: 'man 1 echo' }),
     operands: ['text'],
+    plain: ['-n', '-e', '-E'],
   },
   printf: {
     facts: fact('Shows text, laid out to a pattern.', { ...LOOKS, docs: 'man 1 printf' }),
@@ -57,6 +58,10 @@ export const SYSTEM: Record<string, Entry> = {
   },
   uname: {
     facts: fact('Shows which kind of computer and system this is.', { ...LOOKS, docs: 'man 1 uname' }),
+    plain: [
+      '-a', '--all', '-i', '--hardware-platform', '-m', '--machine', '-n', '--nodename', '-o', '--operating-system', '-p',
+      '--processor', '-r', '--kernel-release', '-s', '--kernel-name', '-v', '--kernel-version',
+    ],
   },
   pwd: {
     facts: fact('Shows which folder this is working in.', { ...LOOKS, docs: 'man 1 pwd' }),
@@ -66,11 +71,20 @@ export const SYSTEM: Record<string, Entry> = {
   },
   date: {
     facts: fact('Shows what day and time it is now.', { ...LOOKS, docs: 'man 1 date' }),
+    plain: ['-j', '-n', '-R', '--rfc-email', '-u', '--utc', '--universal'],
     values: valuesOf('text', ['-d', '-f', '-r', '-t', '-v', '-z']),
   },
   ps: {
     facts: fact('Lists the programs running on this computer.', { ...LOOKS, docs: 'man 1 ps' }),
-    // The long options are the Linux `ps`; they are declared so a line written for it still reads its values.
+    // The long options are the Linux `ps`; they are declared so a line written for it still reads its values. `-C` is
+    // left out: it takes a command name on Linux, and takes nothing on macOS. So is `-n`, which takes a file on Linux
+    // only, and `-g`, which macOS reads either way depending on how it was started. `ps aux` is not read either: macOS
+    // takes the old option word without a dash, but `ps -aux` there hands `x` to `-u` as an account name.
+    plain: [
+      '-A', '-a', '-c', '-d', '-E', '-e', '-F', '-f', '-H', '-h', '-j', '-L', '-l', '-M', '-m', '-N', '--deselect', '-r', '-S',
+      '-T', '-v', '-w', '-X', '-x', '-y', '--context', '--cumulative', '--forest', '--headers', '--no-headers',
+      '--no-heading', '--info', '--help', '--version',
+    ],
     values: {
       ...valuesOf('pid', ['-p', '--pid', '--ppid']),
       ...valuesOf('user', ['-U', '-u', '--User', '--user']),
@@ -141,7 +155,8 @@ export const SYSTEM: Record<string, Entry> = {
     ),
     operands: ['command'],
     // `-S` carries a whole command line in one word, which is not split here, so its value stays text.
-    values: { '-u': 'text', '-P': 'path', '-S': 'text', '-C': 'path', '--chdir': 'path' },
+    values: { '-u': 'text', '--unset': 'text', '-P': 'path', '-S': 'text', '--split-string': 'text', '-C': 'path', '--chdir': 'path' },
+    plain: ['-0', '--null', '-i', '--ignore-environment', '-v', '--debug'],
     nestedHere: true,
     assignmentsFirst: true,
   },

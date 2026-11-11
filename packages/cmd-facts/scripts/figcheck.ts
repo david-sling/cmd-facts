@@ -90,6 +90,7 @@ const FIG_WRONG = new Set([
   'pnpm -w', // `--workspace-root` is a switch; Fig gives it a value.
   // git: these take a value only after `=`, or are switches whose following word is an operand.
   'git log --follow',
+  'git push --force-with-lease', // `--force-with-lease[=<refname>[:<expect>]]`: optional, so a value only counts after `=`.
   ...['-d', '-D', '-m', '-M', '--edit-description', '--merged', '--no-merged', '--abbrev', '-t', '--no-track'].map((f) => `git branch ${f}`),
   ...['--local', '--get-regexp', '--get-urlmatch', '--get-colorbool', '--get-color'].map((f) => `git config ${f}`),
   'grep --color', // `--color[=when]`: optional.

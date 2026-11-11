@@ -41,6 +41,15 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 ls',
     }),
     operands: ['path'],
+    // Every option only changes how the list is shown. `-D`, `-I`, `-T` and `-w` are left out: each takes a value on
+    // one of macOS and Linux and nothing on the other.
+    plain: [
+      '-@', '-1', '-A', '-a', '-B', '-b', '-C', '-c', '-d', '-e', '-F', '-f', '-G', '-g', '-H', '-h', '-i', '-k', '-L', '-l',
+      '-m', '-n', '-O', '-o', '-P', '-p', '-q', '-R', '-r', '-S', '-s', '-t', '-U', '-u', '-v', '-W', '-X', '-x', '-%', '-,',
+      '--all', '--almost-all', '--classify', '--color', '--dereference', '--directory', '--full-time', '--group-directories-first',
+      '--human-readable', '--inode', '--recursive', '--reverse', '--si', '--size',
+    ],
+    values: valuesOf('text', ['--sort', '--time', '--time-style', '--format', '--block-size', '--indicator-style', '--quoting-style']),
   },
   cat: {
     facts: fact('Shows everything written inside a file.', {
@@ -49,6 +58,10 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 cat',
     }),
     operands: ['path'],
+    plain: [
+      '-A', '-b', '-E', '-e', '-l', '-n', '-s', '-T', '-t', '-u', '-v',
+      '--number', '--number-nonblank', '--show-all', '--show-ends', '--show-nonprinting', '--show-tabs', '--squeeze-blank',
+    ],
   },
   head: {
     facts: fact('Shows the first few lines of a file.', {
@@ -57,6 +70,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 head',
     }),
     operands: ['path'],
+    plain: ['-q', '--quiet', '--silent', '-v', '--verbose'],
     values: valuesOf('text', ['-n', '--lines', '-c', '--bytes']),
   },
   tail: {
@@ -66,6 +80,8 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 tail',
     }),
     operands: ['path'],
+    // `-s` is left out: it takes the time to wait on Linux, and macOS has no such option.
+    plain: ['-r', '-q', '--quiet', '--silent', '-v', '--verbose'],
     values: valuesOf('text', ['-n', '--lines', '-c', '--bytes', '-b']),
     flags: [
       {
@@ -84,6 +100,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 wc',
     }),
     operands: ['path'],
+    plain: ['-c', '--bytes', '-L', '--max-line-length', '-l', '--lines', '-m', '--chars', '-w', '--words'],
   },
   tee: {
     facts: fact('Saves what it is given into a file, and shows it as well.', {
@@ -113,9 +130,21 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 grep',
     }),
     operands: ['pattern', 'path'],
-    // `--color` is left out because its value is optional.
+    // `--color` takes a value only after `=`, so it is a switch to the line. `-X` is left out: it chooses a matcher by
+    // name on Linux, and takes nothing on macOS, where it reads packed files.
+    plain: [
+      '-a', '--text', '-b', '--byte-offset', '-c', '--count', '--color', '--colour', '-E', '--extended-regexp', '-F',
+      '--fixed-strings', '-G', '--basic-regexp', '-H', '--with-filename', '-h', '--no-filename', '-I', '-i', '-y',
+      '--ignore-case', '--no-ignore-case', '-J', '--bz2decompress', '-L', '--files-without-match', '-l',
+      '--files-with-matches', '--line-buffered', '-M', '--lzma', '-n', '--line-number', '--null', '-o', '--only-matching',
+      '-P', '--perl-regexp', '-q', '--quiet', '--silent', '-s', '--no-messages', '-T', '--initial-tab', '-U', '--binary',
+      '-u', '-V', '--version', '--help', '-v', '--invert-match', '-w', '--word-regexp', '-x', '--line-regexp', '-Z',
+      '-z', '--null-data', '--no-group-separator',
+    ],
     values: {
-      ...valuesOf('pattern', ['--include', '--exclude', '--exclude-dir']),
+      ...valuesOf('pattern', ['--include', '--exclude', '--exclude-dir', '--include-dir']),
+      '--exclude-from': 'path',
+      '--group-separator': 'text',
       ...valuesOf('text', [
         '-m', '--max-count', '--label', '-A', '--after-context', '-B', '--before-context', '-C', '--context',
         '--binary-files', '-D', '--devices', '-d', '--directories',
@@ -126,7 +155,7 @@ export const FILES: Record<string, Entry> = {
       { flags: ['-e', '--regexp'], takesValue: true, role: 'pattern', operands: ['path'], facts: {} },
       { flags: ['-f', '--file'], takesValue: true, role: 'path', operands: ['path'], facts: {} },
       {
-        flags: ['-r', '-R', '--recursive'],
+        flags: ['-r', '-R', '--recursive', '--dereference-recursive'],
         facts: {
           says: 'Searches every file kept in one place, and in everything inside it, for a piece of text.',
           tell: ['Searches everything kept inside ', { role: 'path', which: 'all', from: 'operands' }, ' for the lines that contain ', { role: 'pattern' }, '.'],
@@ -139,14 +168,25 @@ export const FILES: Record<string, Entry> = {
     flagStyle: 'words',
     operands: ['path'],
     nestedHere: true,
+    // The tests and the ways to join them only choose which files are found. `-depth` is left out: macOS also takes a
+    // depth after it, as an optional value, and Linux takes nothing.
+    plain: [
+      '-E', '-H', '-L', '-P', '-X', '-d', '-s', '-x',
+      '-a', '-and', '-o', '-or', '-not', '-true', '-false', '-print', '-print0', '-ls', '-prune', '-quit', '-empty',
+      '-nouser', '-nogroup', '-xdev', '-mount', '-follow', '-noleaf', '-daystart', '-readable', '-writable', '-executable',
+      '-sparse', '-xattr', '-acl', '-ignore_readdir_race', '-noignore_readdir_race', '-warn', '-nowarn',
+    ],
     values: {
       '-f': 'path',
-      '-newer': 'path',
+      ...valuesOf('path', ['-newer', '-anewer', '-cnewer', '-mnewer', '-Bnewer', '-samefile']),
       '-user': 'user',
-      ...valuesOf('pattern', ['-name', '-iname', '-path', '-ipath', '-regex', '-iregex', '-wholename', '-iwholename']),
+      ...valuesOf('pattern', [
+        '-name', '-iname', '-path', '-ipath', '-regex', '-iregex', '-wholename', '-iwholename', '-lname', '-ilname',
+      ]),
       ...valuesOf('text', [
-        '-type', '-size', '-perm', '-mtime', '-atime', '-ctime', '-mmin', '-amin', '-cmin', '-maxdepth', '-mindepth',
-        '-group', '-links', '-inum', '-fstype',
+        '-type', '-xtype', '-size', '-perm', '-mtime', '-atime', '-ctime', '-Btime', '-mmin', '-amin', '-cmin', '-Bmin',
+        '-maxdepth', '-mindepth', '-group', '-gid', '-uid', '-links', '-inum', '-fstype', '-used', '-regextype', '-flags',
+        '-xattrname', '-printf',
       ]),
     },
     flags: [
@@ -160,7 +200,7 @@ export const FILES: Record<string, Entry> = {
         },
       },
       {
-        flags: ['-exec', '-execdir', '-ok'],
+        flags: ['-exec', '-execdir', '-ok', '-okdir'],
         takesValue: true,
         role: 'command',
         facts: {
@@ -172,12 +212,24 @@ export const FILES: Record<string, Entry> = {
       },
     ],
   },
-  // `-T` is left out: it takes a kind of disk on macOS, and takes nothing on Linux, where it shows each disk's kind.
-  df: { facts: fact('Shows how much room is left on each disk.', { ...LOOKS, docs: 'man 1 df' }) },
+  // `-T` and `-t` are left out: each takes a kind of disk on one of macOS and Linux and nothing on the other.
+  df: {
+    facts: fact('Shows how much room is left on each disk.', { ...LOOKS, docs: 'man 1 df' }),
+    operands: ['path'],
+    plain: [
+      '-a', '--all', '-b', '-c', '-g', '-H', '--si', '-h', '--human-readable', '-I', '-i', '--inodes', '-k', '-l', '--local',
+      '-m', '-n', '-P', '--portability', '-Y', '--total',
+    ],
+  },
   du: {
     facts: fact('Shows how much room files and folders take up.', { ...LOOKS, docs: 'man 1 du' }),
     operands: ['path'],
-    values: { '-d': 'text', '-I': 'pattern' },
+    plain: [
+      '-A', '--apparent-size', '-a', '--all', '-c', '--total', '-g', '-H', '-h', '--human-readable', '-k', '-L',
+      '--dereference', '-l', '--count-links', '-m', '-n', '-P', '--no-dereference', '-r', '-s', '--summarize', '--si', '-x',
+      '--one-file-system',
+    ],
+    values: { ...valuesOf('text', ['-d', '--max-depth', '-B', '--block-size', '-t', '--threshold']), '-I': 'pattern', '--exclude': 'pattern' },
   },
   rm: {
     facts: fact('Removes files from this computer.', {
@@ -210,9 +262,15 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 cp',
     }),
     operands: ['path'],
+    // `-S` is left out: it takes a backup ending on Linux, and takes nothing on macOS. `-t` names the destination
+    // ahead of the sources, which the sentence cannot follow, so it is left out too.
+    plain: [
+      '-c', '-f', '--force', '-H', '-i', '--interactive', '-L', '--dereference', '-l', '--link', '-N', '-n', '--no-clobber',
+      '-P', '--no-dereference', '-p', '--preserve', '-s', '--symbolic-link', '-v', '--verbose', '-X', '-x', '--one-file-system',
+    ],
     flags: [
       {
-        flags: ['-r', '-R', '--recursive'],
+        flags: ['-r', '-R', '--recursive', '-a', '--archive'],
         facts: {
           says: 'Copies a whole folder, and everything inside it, to another place.',
           tell: [
@@ -236,6 +294,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 mv',
     }),
     operands: ['path'],
+    plain: ['-f', '--force', '-h', '-i', '--interactive', '-n', '--no-clobber', '-v', '--verbose'],
   },
   mkdir: {
     facts: fact('Makes a new, empty folder.', {
@@ -245,6 +304,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 mkdir',
     }),
     operands: ['path'],
+    plain: ['-p', '--parents', '-v', '--verbose'],
     values: { '-m': 'mode', '--mode': 'mode' },
   },
   chmod: {
@@ -256,6 +316,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 chmod',
     }),
     operands: ['mode', 'path'],
+    plain: ['-f', '--silent', '--quiet', '-H', '-h', '-L', '-P', '-v', '--verbose'],
     flags: [
       {
         flags: ['-R', '--recursive'],
@@ -287,7 +348,14 @@ export const FILES: Record<string, Entry> = {
   },
   tar: {
     facts: fact('Packs files into one single file, or unpacks a file that was made that way.', { ...LOOKS, docs: 'man 1 tar' }),
-    plain: ['-z', '--gzip', '--gunzip', '-j', '--bzip2', '-J', '--xz', '-v', '--verbose', '-t', '--list'],
+    plain: [
+      '-z', '--gzip', '--gunzip', '-j', '--bzip2', '-J', '--xz', '-v', '--verbose', '-t', '--list',
+      '--acls', '--no-acls', '--xattrs', '--no-xattrs', '--selinux', '--no-selinux', '--numeric-owner', '-S', '--sparse',
+      '-G', '--incremental', '--null', '--no-null', '--recursion', '--no-recursion', '--unquote', '--no-unquote',
+      '--verbatim-files-from', '--no-verbatim-files-from', '-R', '--block-number', '--show-transformed-names',
+      '--show-stored-names', '--totals', '-w', '--interactive', '--confirmation', '--ignore-command-error',
+      '--no-ignore-command-error',
+    ],
     operands: ['path'],
     bareFlagsFirst: true,
     values: {
@@ -297,7 +365,7 @@ export const FILES: Record<string, Entry> = {
       '--exclude': 'pattern',
       ...valuesOf('text', [
         '--newer-mtime', '--suffix', '--quoting-style', '--quote-chars', '--no-quote-chars', '--sparse-version',
-        '--xattrs-include', '--xattrs-exclude',
+        '--xattrs-include', '--xattrs-exclude', '--hole-detection',
       ]),
     },
     flags: [
@@ -354,6 +422,9 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 unzip',
     }),
     operands: ['path'],
+    // `-l`, `-c`, `-t`, `-v` and `-Z` are left out: each only shows what the zip file holds and unpacks nothing, which
+    // the row cannot narrow to.
+    plain: ['-a', '-f', '-j', '-n', '-o', '-q', '-qq', '-u'],
     values: { '-d': 'path' },
     flags: [{ flags: ['-P'], takesValue: true, role: 'text', facts: { touchesCredentials: true } }],
   },
@@ -372,7 +443,7 @@ export const FILES: Record<string, Entry> = {
       ...valuesOf('text', ['-a', '--application', '-b', '-s', '--env']),
     },
   },
-  which: { facts: fact('Shows where a program is kept on this computer.', { ...LOOKS, docs: 'man 1 which' }), operands: ['text'] },
+  which: { facts: fact('Shows where a program is kept on this computer.', { ...LOOKS, docs: 'man 1 which' }), operands: ['text'], plain: ['-a', '-s'] },
   touch: {
     facts: fact('Marks a file as changed at this moment, and makes an empty file where none is there yet.', {
       ...LOCAL, repeatSafe: true,
@@ -382,6 +453,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 touch',
     }),
     operands: ['path'],
+    plain: ['-a', '-c', '--no-create', '-f', '-h', '--no-dereference', '-m'],
     values: { '-r': 'path', '-t': 'text', '-d': 'text', '-A': 'text' },
   },
   ln: {
@@ -440,6 +512,11 @@ export const FILES: Record<string, Entry> = {
       { ...LOCAL, effect: ['read'], docs: 'man 1 sed' },
     ),
     operands: ['text', 'path'],
+    // `-l` is left out: it takes a line length on Linux, and takes nothing on macOS.
+    plain: [
+      '-a', '--debug', '-E', '-r', '--regexp-extended', '--follow-symlinks', '-H', '-n', '--quiet', '--silent', '--posix',
+      '-s', '--separate', '--sandbox', '-u', '--unbuffered', '-z', '--null-data',
+    ],
     flags: [
       { flags: ['-e', '--expression'], takesValue: true, role: 'text', operands: ['path'], facts: {} },
       { flags: ['-f', '--file'], takesValue: true, role: 'path', operands: ['path'], facts: {} },
@@ -474,6 +551,12 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 sort',
     }),
     operands: ['path'],
+    plain: [
+      '-b', '--ignore-leading-blanks', '-C', '-c', '--check', '-d', '--dictionary-order', '-f', '--ignore-case', '-g',
+      '--general-numeric-sort', '-h', '--human-numeric-sort', '-i', '--ignore-nonprinting', '-M', '--month-sort', '-m',
+      '--merge', '-n', '--numeric-sort', '-R', '--random-sort', '-r', '--reverse', '-s', '--stable', '-u', '--unique', '-V',
+      '--version-sort', '-z', '--zero-terminated', '--debug', '--radixsort', '--mergesort', '--qsort', '--heapsort', '--mmap',
+    ],
     values: {
       ...valuesOf('path', ['-T', '--temporary-directory', '--random-source', '--files0-from']),
       ...valuesOf('text', ['-k', '--key', '-t', '--field-separator', '-S', '--buffer-size', '--batch-size', '--sort', '--parallel']),
@@ -506,6 +589,7 @@ export const FILES: Record<string, Entry> = {
   tr: {
     facts: fact('Swaps or removes letters in text as it passes through.', { ...LOOKS, docs: 'man 1 tr' }),
     operands: ['text'],
+    plain: ['-C', '-c', '--complement', '-d', '--delete', '-s', '--squeeze-repeats', '-u'],
   },
   diff: {
     facts: fact('Shows the differences between two files.', {
@@ -514,6 +598,15 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 diff',
     }),
     operands: ['path'],
+    // `-l` is left out: it passes what it shows through another program.
+    plain: [
+      '-a', '--text', '-B', '--ignore-blank-lines', '-b', '--ignore-space-change', '-c', '--context', '-d', '--minimal', '-E',
+      '--ignore-tab-expansion', '-e', '--ed', '-i', '--ignore-case', '--ignore-file-name-case', '--no-ignore-file-name-case',
+      '-N', '--new-file', '-n', '--rcs', '--normal', '-p', '--show-c-function', '-q', '--brief', '-r', '--recursive', '-s',
+      '--report-identical-files', '--speed-large-files', '--strip-trailing-cr', '-T', '--initial-tab', '-t', '--expand-tabs',
+      '-u', '--unified', '--unidirectional-new-file', '-w', '--ignore-all-space', '-y', '--side-by-side', '--left-column',
+      '--suppress-common-lines', '-v', '--version', '--help',
+    ],
     values: {
       ...valuesOf('pattern', ['-x', '--exclude', '-I', '--ignore-matching-lines']),
       ...valuesOf('path', ['-X', '--exclude-from', '--from-file', '--to-file']),
@@ -533,6 +626,17 @@ export const FILES: Record<string, Entry> = {
       { ...LOCAL, effect: ['read'], tell: ['Shows what is written inside ', { role: 'path', from: 'operands' }, ', a screenful at a time.'], docs: 'man 1 less' },
     ),
     operands: ['path'],
+    plain: [
+      '-?', '--help', '-a', '--search-skip-screen', '-A', '--SEARCH-SKIP-SCREEN', '-B', '--auto-buffers', '-c',
+      '--clear-screen', '-C', '--CLEAR-SCREEN', '-d', '--dumb', '-e', '--quit-at-eof', '-E', '--QUIT-AT-EOF', '-f', '--force',
+      '-F', '--quit-if-one-screen', '-g', '--hilite-search', '-G', '--HILITE-SEARCH', '-i', '--ignore-case', '-I',
+      '--IGNORE-CASE', '-J', '--status-column', '-K', '--quit-on-intr', '-L', '--no-lessopen', '-m', '--long-prompt', '-M',
+      '--LONG-PROMPT', '-n', '--line-numbers', '-N', '--LINE-NUMBERS', '-q', '--quiet', '--silent', '-Q', '--QUIET',
+      '--SILENT', '-r', '--raw-control-chars', '-R', '--RAW-CONTROL-CHARS', '-s', '--squeeze-blank-lines', '-S',
+      '--chop-long-lines', '-u', '--underline-special', '-U', '--UNDERLINE-SPECIAL', '-V', '--version', '-w',
+      '--hilite-unread', '-W', '--HILITE-UNREAD', '-X', '--no-init', '-~', '--tilde', '--follow-name', '--incsearch',
+      '--mouse', '--MOUSE', '--no-keypad', '--no-histdups', '--save-marks', '--use-backslash', '--use-color',
+    ],
     values: {
       '-p': 'pattern',
       '--pattern': 'pattern',
@@ -562,6 +666,13 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 file',
     }),
     operands: ['path'],
+    // `-p` is left out: it puts back the time each file was last opened, which is a change of its own.
+    plain: [
+      '--apple', '-b', '--brief', '-c', '--checking-printout', '-D', '-d', '-E', '--exclude-quiet', '--extension', '-h',
+      '--no-dereference', '-I', '-i', '--mime', '--mime-type', '--mime-encoding', '-k', '--keep-going', '-L',
+      '--dereference', '-l', '--list', '-N', '--no-pad', '-n', '--no-buffer', '-r', '--raw', '-s', '--special-files', '-v',
+      '--version', '-Z', '--uncompress-noreport', '-z', '--uncompress', '-0', '--print0', '--help',
+    ],
     values: { ...valuesOf('path', ['-m', '-M', '-f']), ...valuesOf('text', ['-e', '--exclude', '-F', '--separator', '-P', '--parameter']) },
     flags: [
       {
@@ -582,6 +693,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 stat',
     }),
     operands: ['path'],
+    plain: ['-F', '-L', '--dereference', '-l', '-n', '-q', '-r', '-s', '-x'],
     // `-f` and `-t` are left out: on macOS each takes a format, on Linux each takes nothing and changes what is shown.
     values: valuesOf('text', ['-c', '--format', '--printf']),
   },
@@ -593,6 +705,10 @@ export const FILES: Record<string, Entry> = {
   readlink: {
     facts: fact('Shows where a second name for a file leads.', { ...LOOKS, docs: 'man 1 readlink' }),
     operands: ['path'],
+    plain: [
+      '-e', '--canonicalize-existing', '-f', '--canonicalize', '-m', '--canonicalize-missing', '-n', '--no-newline', '-q',
+      '--quiet', '-s', '--silent', '-v', '--verbose', '-z', '--zero',
+    ],
   },
   basename: {
     facts: fact('Shows the last part of a file location, without the folders before it.', { ...LOOKS, docs: 'man 1 basename' }),
@@ -646,6 +762,12 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 zip',
     }),
     operands: ['path'],
+    // `-T` is left out: it runs another program to test the finished file.
+    plain: [
+      '-0', '-1', '-2', '-3', '-4', '-5', '-6', '-7', '-8', '-9', '-D', '--no-dir-entries', '-f', '--freshen', '-j',
+      '--junk-paths', '-q', '--quiet', '-r', '--recurse-paths', '-u', '--update', '-v', '--verbose', '-X', '--no-extra', '-y',
+      '--symlinks',
+    ],
     values: {
       ...valuesOf('path', ['-b', '-O', '--output-file']),
       ...valuesOf('text', [
