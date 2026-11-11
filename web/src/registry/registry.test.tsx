@@ -103,8 +103,8 @@ describe('registry.json', () => {
     const [major, minor] = core.version.split('.').map(Number)
     for (const item of registry.items) {
       const wanted = item.dependencies?.find((d) => d.startsWith('cmd-facts@'))
-      // every component asks for the core; an example asks only where it imports it itself
-      if (item.type === 'registry:block' && !wanted) continue
+      // every component asks for the core; an example asks only where it imports it itself, and shadcn's never do
+      if (item.type === 'registry:ui' || (item.type === 'registry:block' && !wanted)) continue
       expect(wanted, item.name).toBeDefined()
       const [, wMajor, wMinor] = /\^(\d+)\.(\d+)/.exec(wanted!)!.map(Number)
       expect(major === wMajor && minor! >= wMinor!, `${item.name} wants ${wanted}, core is ${core.version}`).toBe(true)
@@ -138,19 +138,23 @@ describe('Open in v0', () => {
     }
   })
 
-  // v0 follows a dependency given as a URL and skipped shadcn's own items given by bare name, so every dependency is
-  // a URL: this site's item, or shadcn's in the style the site installed
-  const SHADCN = /^https:\/\/ui\.shadcn\.com\/r\/styles\/new-york-v4\/([a-z-]+)\.json$/
+  // v0 skips shadcn's items named by bare name, and writes those named by URL to their path in shadcn's own repository
+  // (registry/new-york-v4/ui/…), so this site serves the shadcn components it uses, each with the target it belongs at
   const OURS = /^https:\/\/cmd-facts\.davidsling\.in\/r\/([a-z-]+)\.json$/
+  const SHADCN = items.filter((i) => i.type === 'registry:ui')
 
-  it('points every item at components this site serves or has', () => {
+  it('points every item at items this site serves', () => {
     for (const item of items)
-      for (const dep of item.registryDependencies ?? []) {
-        const shadcn = SHADCN.exec(dep)?.[1]
-        // the site has shadcn's item installed, or its preview could not draw the example
-        if (shadcn) expect(() => read(`../components/ui/${shadcn}.tsx`), `${item.name} → ${dep}`).not.toThrow()
-        else expect(names.has(OURS.exec(dep)?.[1] ?? ''), `${item.name} → ${dep}`).toBe(true)
-      }
+      for (const dep of item.registryDependencies ?? [])
+        expect(names.has(OURS.exec(dep)?.[1] ?? ''), `${item.name} → ${dep}`).toBe(true)
+  })
+
+  it("installs shadcn's components where shadcn would", () => {
+    expect(SHADCN.map((i) => i.name).sort()).toEqual(['badge', 'card', 'input', 'separator', 'tooltip'])
+    for (const item of SHADCN)
+      expect(item.files, item.name).toEqual([
+        { path: `src/components/ui/${item.name}.tsx`, type: 'registry:ui', target: `components/ui/${item.name}.tsx` },
+      ])
   })
 
   // v0 installs an example's own shadcn items but not those of the components it pulls in by URL, so an example
@@ -162,7 +166,8 @@ describe('Open in v0', () => {
       for (const dep of deps) {
         const used = byName.get(OURS.exec(dep)?.[1] ?? '')
         for (const own of used?.registryDependencies ?? [])
-          if (SHADCN.test(own)) expect(deps, `${item.name} → ${used!.name} → ${own}`).toContain(own)
+          if (SHADCN.some((i) => own.endsWith(`/r/${i.name}.json`)))
+            expect(deps, `${item.name} → ${used!.name} → ${own}`).toContain(own)
       }
     }
   })
