@@ -123,15 +123,28 @@ function Code({ children, className = '' }: { children: string; className?: stri
 }
 
 /** The component the playground is, written the way a consumer would write it, with the line typed above in it. */
-const playgroundCode = (line: string) => `import { CommandLine, Sentence, useExplain } from 'cmd-facts/react'
+// Set narrow on purpose: it sits beside the previews, and a prop per line keeps it from wrapping mid-tag.
+const playgroundCode = (line: string) => `import {
+  CommandLine,
+  Sentence,
+  useExplain,
+} from 'cmd-facts/react'
 
 function Approve() {
-  const line = ${JSON.stringify(line)}
+  const line =
+    ${JSON.stringify(line)}
   const explanation = useExplain(line)
   return (
     <>
-      <CommandLine line={line} of={explanation} className="line" />
-      <Sentence of={explanation} className="said" />
+      <CommandLine
+        line={line}
+        of={explanation}
+        className="line"
+      />
+      <Sentence
+        of={explanation}
+        className="said"
+      />
     </>
   )
 }`
@@ -199,7 +212,8 @@ function Playground() {
         />
       </div>
 
-      <div className="border-t border-line">
+      <div className="grid border-t border-line lg:grid-cols-2">
+        <div className="min-w-0">
         <div className="min-w-0 px-5 py-6 sm:px-7">
           <p className="eyebrow normal-case tracking-[0.04em]">&lt;CommandLine line={'{line}'} /&gt;</p>
           <div className="mt-4 font-mono text-[15px] leading-relaxed break-words whitespace-pre-wrap sm:text-[18px]">
@@ -212,9 +226,11 @@ function Playground() {
             <Sentence of={explanation} className="said" />
           </p>
         </div>
-        <div className="min-w-0 border-t border-line bg-white/[0.015] px-5 py-6 sm:px-7">
+        </div>
+        {/* beside the previews, so the code and what it draws are read together; long lines wrap rather than hide */}
+        <div className="min-w-0 border-t border-line bg-white/[0.015] px-5 py-6 sm:px-7 lg:border-t-0 lg:border-l">
           <p className="eyebrow">The code</p>
-          <Code className="mt-4 border-none bg-transparent px-0 py-0">{playgroundCode(line)}</Code>
+          <Code className="mt-4 border-none bg-transparent px-0 py-0 break-words whitespace-pre-wrap">{playgroundCode(line)}</Code>
         </div>
       </div>
     </div>
