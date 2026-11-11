@@ -152,6 +152,10 @@
         "flags": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^-" } },
         "facts": { "$ref": "#/$defs/overlay" },
         "takesValue": { "type": "boolean" },
+        "attached": {
+          "description": "The flag takes a value only when it is written onto the flag itself (`-i.bak`), never from the next word.",
+          "type": "boolean"
+        },
         "role": { "$ref": "#/$defs/role" },
         "operands": {
           "description": "Roles for the positional arguments wherever this flag is on the line, in place of the row's own. Never `command`.",

@@ -1,5 +1,33 @@
 import { fact, opaqueFact, valuesOf, LOCAL, LOOKS } from '../entry.ts'
-import type { Entry } from '../entry.ts'
+import type { Entry, Rule } from '../entry.ts'
+
+// Which running programs a pattern is matched against, shared by the two commands that take the same options.
+const PICK_VALUES = {
+  ...valuesOf('user', ['-u', '-U']),
+  ...valuesOf('text', ['-g', '-G', '-t', '-d', '-s', '--signal', '-O', '--older', '-r', '--runstates', '--ns', '--nslist']),
+  '-P': 'pid',
+  '-F': 'path',
+} as const
+
+const DISK_IMAGE_OPEN: Rule = {
+  facts: fact('Opens a disk image so the files inside it can be reached, like a disk that was plugged in.', {
+    ...LOCAL, reversible: 'yes', repeatSafe: true,
+    effect: ['read', 'configure'],
+    docs: 'man 1 hdiutil',
+  }),
+  operands: ['path'],
+  values: { '-mountpoint': 'path', '-shadow': 'path' },
+  flags: [{ flags: ['-stdinpass'], facts: { touchesCredentials: true } }],
+}
+
+const DISK_IMAGE_CLOSE: Rule = {
+  facts: fact('Disconnects a disk image or a disk, so its files can no longer be reached.', {
+    ...LOCAL, reversible: 'yes', repeatSafe: true,
+    effect: ['terminate', 'configure'],
+    docs: 'man 1 hdiutil',
+  }),
+  operands: ['device'],
+}
 
 export const SYSTEM: Record<string, Entry> = {
   // `echo` and `printf` are given no slotted sentence: the words they are handed are one message, and listing them
@@ -56,6 +84,7 @@ export const SYSTEM: Record<string, Entry> = {
       note: 'Anything the program had not saved is lost.',
       docs: 'man 1 kill',
     }),
+    plain: ['-HUP', '-INT', '-QUIT', '-ABRT', '-ALRM', '-TERM', '-1', '-2', '-3', '-6', '-14', '-15'],
     operands: ['pid'],
     values: { '-s': 'signal' },
     flags: [
@@ -442,5 +471,479 @@ export const SYSTEM: Record<string, Entry> = {
         operands: ['text', 'text', 'device'],
       },
     },
+  },
+  killall: {
+    facts: fact('Stops every running program that has a given name.', {
+      ...LOCAL, repeatSafe: true,
+      effect: ['terminate'],
+      reversible: 'no',
+      tell: ['Stops every running program called ', { role: 'text', which: 'all', from: 'operands' }, '.'],
+      note: 'Anything those programs had not saved is lost.',
+      docs: 'man 1 killall',
+    }),
+    plain: ['-HUP', '-INT', '-QUIT', '-ABRT', '-ALRM', '-TERM', '-1', '-2', '-3', '-6', '-14', '-15'],
+    operands: ['text'],
+    values: { '-u': 'user', '-t': 'text', '-c': 'text' },
+    flags: [{ flags: ['-9', '-KILL'], facts: { says: 'Stops at once every running program that has a given name, without letting it finish.' } }],
+  },
+  pkill: {
+    facts: fact('Stops the running programs whose names match a pattern.', {
+      ...LOCAL, repeatSafe: true,
+      effect: ['terminate'],
+      reversible: 'no',
+      tell: ['Stops the running programs whose names match ', { role: 'pattern' }, '.'],
+      note: 'Anything those programs had not saved is lost.',
+      docs: 'man 1 pkill',
+    }),
+    plain: ['-HUP', '-INT', '-QUIT', '-ABRT', '-ALRM', '-TERM', '-1', '-2', '-3', '-6', '-14', '-15'],
+    operands: ['pattern'],
+    // A signal is named as a word (`-HUP`), which read as a bundle would hand `P` to `-U` as an account.
+    flagStyle: 'words',
+    values: { ...PICK_VALUES },
+    flags: [{ flags: ['-9', '-KILL'], facts: { says: 'Stops at once the running programs whose names match a pattern, without letting them finish.' } }],
+  },
+  pgrep: {
+    facts: fact('Lists the running programs whose names match a pattern.', {
+      ...LOOKS,
+      tell: ['Lists the running programs whose names match ', { role: 'pattern' }, '.'],
+      docs: 'man 1 pgrep',
+    }),
+    operands: ['pattern'],
+    flagStyle: 'words',
+    values: { ...PICK_VALUES },
+  },
+  // Replacing the schedule means commands this line never shows will run later on their own, so the row is blind,
+  // and listing the schedule reads the same way: the line alone cannot say which of the two it is.
+  crontab: {
+    facts: opaqueFact(
+      'Shows or replaces the list of commands this computer runs on a schedule for one account.',
+      'the commands in the schedule, which run later on their own',
+      { ...LOCAL, effect: ['read', 'configure'], reversible: 'no', docs: 'man 1 crontab' },
+    ),
+    operands: ['path'],
+    values: { '-u': 'user' },
+    flags: [
+      {
+        flags: ['-r'],
+        facts: { effect: ['delete'], says: 'Removes every command one account has scheduled to run.' },
+      },
+    ],
+  },
+  nohup: {
+    facts: opaqueFact(
+      'Runs another command so that it keeps going after the window it was started from is closed.',
+      'the command it was given, which keeps running on its own',
+      { privilege: 'none', touchesCredentials: false, effect: ['execute'], network: 'arbitrary', docs: 'man 1 nohup' },
+    ),
+    operands: ['command'],
+    nestedHere: true,
+  },
+  caffeinate: {
+    facts: opaqueFact(
+      'Keeps this computer awake, for a while or for as long as another command runs.',
+      'the command it was given, if it was given one',
+      { ...LOCAL, effect: ['configure', 'execute'], docs: 'man 8 caffeinate' },
+    ),
+    operands: ['command'],
+    values: { '-t': 'text', '-w': 'pid' },
+    nestedHere: true,
+  },
+  say: {
+    facts: fact('Reads text aloud through the speakers.', { ...LOOKS, docs: 'man 1 say' }),
+    operands: ['text'],
+    values: { '-f': 'path', '--input-file': 'path', ...valuesOf('text', ['-v', '--voice', '-r', '--rate', '-a', '--audio-device', '--data-format']) },
+    flags: [
+      {
+        flags: ['-o', '--output-file'],
+        takesValue: true,
+        role: 'path',
+        facts: { effect: ['create', 'write'], reversible: 'no', says: 'Turns text into speech and saves it as a sound file.' },
+      },
+    ],
+  },
+  pbcopy: {
+    facts: fact('Puts the text it is given onto the clipboard, in place of what was there.', {
+      ...LOCAL, repeatSafe: true,
+      effect: ['write'],
+      reversible: 'no',
+      docs: 'man 1 pbcopy',
+    }),
+  },
+  pbpaste: {
+    facts: fact('Shows what is on the clipboard.', {
+      effect: ['read'], reversible: 'yes', network: 'none', privilege: 'none', repeatSafe: true,
+      touchesCredentials: true,
+      note: 'The clipboard holds whatever was copied last, which is often a password or a sign-in code.',
+      docs: 'man 1 pbpaste',
+    }),
+  },
+  osascript: {
+    facts: opaqueFact(
+      'Runs a script that can control the apps on this computer, and this computer itself.',
+      'the script it was given, which can do anything the apps it talks to can do, and run other commands',
+      { privilege: 'none', touchesCredentials: false, effect: ['execute'], network: 'arbitrary', docs: 'man 1 osascript' },
+    ),
+    operands: ['path', 'text'],
+    values: { '-l': 'text', '-s': 'text' },
+    flags: [{ flags: ['-e'], takesValue: true, role: 'text', operands: ['text'], facts: {} }],
+  },
+  shutdown: {
+    facts: fact('Turns this computer off or restarts it.', {
+      network: 'none', touchesCredentials: false,
+      effect: ['terminate'],
+      reversible: 'no',
+      privilege: 'admin',
+      repeatSafe: false,
+      note: 'Anything not saved in open apps is lost, and everyone connected to this computer is cut off.',
+      docs: 'man 8 shutdown',
+    }),
+    operands: ['text'],
+    flags: [
+      { flags: ['-r'], facts: { says: 'Restarts this computer.' } },
+      { flags: ['-h'], facts: { says: 'Turns this computer off.' } },
+    ],
+  },
+  reboot: {
+    facts: fact('Restarts this computer straight away.', {
+      network: 'none', touchesCredentials: false,
+      effect: ['terminate'],
+      reversible: 'no',
+      privilege: 'admin',
+      repeatSafe: false,
+      note: 'Anything not saved in open apps is lost, and everyone connected to this computer is cut off.',
+      docs: 'man 8 reboot',
+    }),
+  },
+  pmset: {
+    facts: fact('Shows or changes the power settings of this computer, such as when it goes to sleep.', {
+      network: 'none', touchesCredentials: false,
+      effect: ['read', 'configure'],
+      reversible: 'unknown',
+      privilege: 'admin',
+      repeatSafe: false,
+      docs: 'man 1 pmset',
+    }),
+    operands: ['text'],
+  },
+  scutil: {
+    facts: fact('Shows the names and network settings this computer uses.', { ...LOOKS, docs: 'man 8 scutil' }),
+    values: { '--get': 'text', '-r': 'host' },
+    flags: [
+      {
+        // `--set Name value`: the new value is the operand that follows.
+        flags: ['--set'],
+        takesValue: true,
+        role: 'text',
+        facts: {
+          effect: ['configure'],
+          reversible: 'unknown',
+          privilege: 'admin',
+          says: 'Changes one of the names this computer goes by, or how it finds other computers on a network.',
+        },
+      },
+    ],
+    operands: ['text'],
+  },
+  hostname: {
+    facts: fact('Shows or changes the name this computer goes by on a network.', {
+      network: 'none', touchesCredentials: false, repeatSafe: true,
+      effect: ['read', 'configure'],
+      reversible: 'unknown',
+      privilege: 'admin',
+      docs: 'man 1 hostname',
+    }),
+    operands: ['text'],
+  },
+  id: {
+    facts: fact('Shows which account is being used and which groups it belongs to.', { ...LOOKS, docs: 'man 1 id' }),
+    operands: ['user'],
+  },
+  uptime: { facts: fact('Shows how long this computer has been running since it last started.', { ...LOOKS, docs: 'man 1 uptime' }) },
+  who: { facts: fact('Shows the accounts signed in to this computer right now.', { ...LOOKS, docs: 'man 1 who' }) },
+  w: {
+    facts: fact('Shows the accounts signed in to this computer right now, and what each one is running.', { ...LOOKS, docs: 'man 1 w' }),
+    operands: ['user'],
+  },
+  last: {
+    facts: fact('Shows when accounts signed in to this computer, and from where.', { ...LOOKS, docs: 'man 1 last' }),
+    operands: ['user'],
+    values: { '-f': 'path', '-h': 'host', '-t': 'text', '-n': 'text' },
+  },
+  sysctl: {
+    facts: fact('Shows or changes low-level settings of the system this computer runs.', {
+      network: 'none', touchesCredentials: false, repeatSafe: true,
+      effect: ['read', 'configure'],
+      reversible: 'unknown',
+      privilege: 'admin',
+      note: 'A changed setting usually lasts until the computer next restarts.',
+      docs: 'man 8 sysctl',
+    }),
+    operands: ['text'],
+    values: { '-f': 'path' },
+  },
+  hdiutil: {
+    facts: fact('Works with disk images, files that hold the contents of a whole disk.', {
+      network: 'none', privilege: 'none', touchesCredentials: true,
+      effect: ['read', 'write', 'create', 'terminate', 'configure'],
+      reversible: 'no',
+      repeatSafe: false,
+      docs: 'man 1 hdiutil',
+    }),
+    sub: {
+      attach: DISK_IMAGE_OPEN,
+      mount: DISK_IMAGE_OPEN,
+      detach: DISK_IMAGE_CLOSE,
+      eject: DISK_IMAGE_CLOSE,
+      create: {
+        facts: fact('Makes a new disk image file.', {
+          ...LOCAL, repeatSafe: true,
+          effect: ['create', 'write'],
+          reversible: 'no',
+          note: 'A file already in that place with the same name is replaced.',
+          docs: 'man 1 hdiutil',
+        }),
+        operands: ['path'],
+        values: { '-srcfolder': 'path', '-srcdevice': 'device', ...valuesOf('text', ['-size', '-fs', '-volname', '-type', '-format', '-layout']) },
+        flags: [{ flags: ['-passphrase', '-stdinpass'], facts: { touchesCredentials: true } }],
+      },
+      convert: {
+        facts: fact('Makes a copy of a disk image in a different format.', {
+          ...LOCAL, repeatSafe: true,
+          effect: ['read', 'create', 'write'],
+          reversible: 'no',
+          docs: 'man 1 hdiutil',
+        }),
+        operands: ['path'],
+        values: { '-o': 'path', '-format': 'text' },
+      },
+      info: { facts: fact('Lists the disk images that are open on this computer.', { ...LOOKS, docs: 'man 1 hdiutil' }) },
+      imageinfo: { facts: fact('Shows the details of a disk image file.', { ...LOOKS, docs: 'man 1 hdiutil' }), operands: ['path'] },
+      verify: { facts: fact('Checks a disk image file for damage without changing it.', { ...LOOKS, docs: 'man 1 hdiutil' }), operands: ['path'] },
+    },
+    flagStyle: 'words',
+  },
+  codesign: {
+    facts: fact('Checks the signature that shows who made an app and that it has not been changed since.', {
+      ...LOOKS,
+      tell: ['Checks the signature on ', { role: 'path', which: 'all', from: 'operands' }, '.'],
+      docs: 'man 1 codesign',
+    }),
+    operands: ['path'],
+    values: {
+      ...valuesOf('path', ['--entitlements', '--keychain', '-D', '--detached', '--file-list', '--resource-rules']),
+      ...valuesOf('text', [
+        '-r', '--requirements', '-i', '--identifier', '-o', '--options', '--prefix', '--timestamp', '-a', '--architecture',
+        '--bundle-version', '-P', '--pagesize', '-R', '--test-requirement',
+      ]),
+    },
+    flags: [
+      {
+        flags: ['-s', '--sign'],
+        takesValue: true,
+        role: 'text',
+        facts: {
+          effect: ['write'],
+          reversible: 'unknown',
+          touchesCredentials: true,
+          says: 'Adds a signature to an app that shows who made it, using a signing key kept on this computer.',
+          tell: ['Signs ', { role: 'path', which: 'all', from: 'operands' }, ' with a signing key kept on this computer.'],
+        },
+      },
+      // Each takes its value only after `=`, and on its own falls back to a default.
+      { flags: ['--preserve-metadata'], attached: true, role: 'text', facts: {} },
+      {
+        flags: ['--extract-certificates'],
+        attached: true,
+        role: 'path',
+        facts: { effect: ['create', 'write'], note: 'It also saves the certificates behind the signature into files in this folder.' },
+      },
+      {
+        flags: ['--remove-signature'],
+        facts: { effect: ['write'], reversible: 'unknown', says: 'Removes the signature from an app.' },
+      },
+    ],
+  },
+  plutil: {
+    facts: fact('Checks or shows a settings file in the format apps on macOS use for their settings.', {
+      ...LOOKS,
+      docs: 'man 1 plutil',
+    }),
+    flagStyle: 'words',
+    operands: ['path'],
+    values: { '-o': 'path', '-e': 'text', '-extract': 'text', '-type': 'text' },
+    flags: [
+      {
+        flags: ['-convert'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['write'], reversible: 'no', says: 'Rewrites a settings file in another format, in place.' },
+      },
+      {
+        flags: ['-insert', '-replace', '-remove'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['write'], reversible: 'no', says: 'Changes one entry in a settings file, in place.' },
+      },
+    ],
+  },
+  mdfind: {
+    facts: fact('Searches this computer by name and contents, using the index macOS keeps for searching.', {
+      ...LOOKS,
+      docs: 'man 1 mdfind',
+    }),
+    operands: ['text'],
+    values: { '-onlyin': 'path', '-name': 'text', '-attr': 'text', '-s': 'text' },
+  },
+  mdutil: {
+    facts: fact('Shows or changes whether macOS keeps a search index for a disk.', {
+      network: 'none', touchesCredentials: false, repeatSafe: true,
+      effect: ['read', 'configure'],
+      reversible: 'unknown',
+      privilege: 'admin',
+      docs: 'man 1 mdutil',
+    }),
+    operands: ['path'],
+    values: { '-i': 'text' },
+    flags: [{ flags: ['-E'], facts: { effect: ['delete'], says: 'Removes the search index macOS keeps for a disk, so it is built again.' } }],
+  },
+  tmutil: {
+    facts: fact('Works with the backups macOS makes of this computer.', {
+      network: 'none', touchesCredentials: false,
+      effect: ['read', 'write', 'create', 'delete', 'terminate', 'configure'],
+      reversible: 'no',
+      privilege: 'admin',
+      repeatSafe: false,
+      docs: 'man 8 tmutil',
+    }),
+    sub: {
+      startbackup: {
+        facts: fact('Starts a backup of this computer now.', { ...LOCAL, reversible: 'yes', effect: ['read', 'create'], repeatSafe: false, docs: 'man 8 tmutil' }),
+        values: { '-d': 'text', '--destination': 'text' },
+      },
+      stopbackup: {
+        facts: fact('Stops a backup that is running.', { ...LOCAL, reversible: 'yes', repeatSafe: true, effect: ['terminate'], docs: 'man 8 tmutil' }),
+      },
+      status: { facts: fact('Shows whether a backup is running, and how far along it is.', { ...LOOKS, docs: 'man 8 tmutil' }) },
+      listbackups: { facts: fact('Lists the backups made of this computer.', { ...LOOKS, docs: 'man 8 tmutil' }) },
+      latestbackup: { facts: fact('Shows where the most recent backup of this computer is kept.', { ...LOOKS, docs: 'man 8 tmutil' }) },
+      destinationinfo: { facts: fact('Shows which disks backups of this computer are saved to.', { ...LOOKS, docs: 'man 8 tmutil' }) },
+      enable: {
+        facts: fact('Turns on regular backups of this computer.', { reversible: 'yes', network: 'none', touchesCredentials: false, repeatSafe: true, effect: ['configure'], privilege: 'admin', docs: 'man 8 tmutil' }),
+      },
+      disable: {
+        facts: fact('Turns off regular backups of this computer.', { reversible: 'yes', network: 'none', touchesCredentials: false, repeatSafe: true, effect: ['configure'], privilege: 'admin', docs: 'man 8 tmutil' }),
+      },
+      delete: {
+        facts: fact('Removes a backup of this computer.', {
+          network: 'none', touchesCredentials: false, repeatSafe: true,
+          effect: ['delete'],
+          reversible: 'no',
+          privilege: 'admin',
+          note: 'Files kept only in that backup cannot be brought back from it.',
+          docs: 'man 8 tmutil',
+        }),
+        operands: ['path'],
+        values: { '-d': 'path', '-t': 'text', '-p': 'path' },
+      },
+      deletelocalsnapshots: {
+        facts: fact('Removes the snapshots of this computer that backups keep on its own disk.', {
+          network: 'none', touchesCredentials: false, repeatSafe: true,
+          effect: ['delete'],
+          reversible: 'no',
+          privilege: 'admin',
+          docs: 'man 8 tmutil',
+        }),
+        operands: ['text'],
+      },
+      restore: {
+        facts: fact('Puts files back from a backup, in place of what is there now.', {
+          ...LOCAL, repeatSafe: true,
+          effect: ['read', 'create', 'write'],
+          reversible: 'no',
+          tell: ['Puts ', { role: 'path', which: 'all-but-last' }, ' back from a backup into ', { role: 'path', which: 'last' }, '.'],
+          docs: 'man 8 tmutil',
+        }),
+        operands: ['path'],
+      },
+    },
+  },
+  // With no command given it opens a prompt that takes changes as they are typed, which the line does not show.
+  dscl: {
+    facts: opaqueFact(
+      'Looks at or changes the accounts and groups on this computer.',
+      'the changes typed into it, if it is opened without a command to run',
+      { ...LOCAL, effect: ['read'], docs: 'man 1 dscl' },
+    ),
+    plain: ['-read', '-readall', '-readpl', '-readpli', '-list', '-search', '-diff', '-raw', '-plist', '-url', '-q'],
+    flagStyle: 'words',
+    operands: ['text'],
+    values: { '-u': 'user', '-f': 'path' },
+    flags: [
+      { flags: ['-P'], takesValue: true, role: 'text', facts: { touchesCredentials: true } },
+      {
+        flags: ['-create', '-append', '-merge', '-change'],
+        facts: { effect: ['create', 'configure'], reversible: 'unknown', privilege: 'admin', says: 'Adds or changes an account, a group, or a detail of one.' },
+      },
+      {
+        flags: ['-delete'],
+        facts: { effect: ['delete', 'configure'], reversible: 'no', privilege: 'admin', says: 'Removes an account, a group, or a detail of one.' },
+      },
+      {
+        flags: ['-passwd'],
+        facts: {
+          effect: ['configure'],
+          reversible: 'no',
+          privilege: 'admin',
+          touchesCredentials: true,
+          says: 'Sets a new password for an account on this computer.',
+        },
+      },
+    ],
+  },
+  sysadminctl: {
+    facts: fact('Looks at or changes the accounts on this computer and some of the settings that protect it.', {
+      effect: ['read'], reversible: 'yes', network: 'none', touchesCredentials: false, repeatSafe: true,
+      privilege: 'admin',
+      docs: 'man 8 sysadminctl',
+    }),
+    flagStyle: 'words',
+    values: { '-fullName': 'text', '-UID': 'text', '-GID': 'text', '-shell': 'path', '-home': 'path', '-hint': 'text', '-picture': 'path' },
+    flags: [
+      {
+        flags: ['-addUser'],
+        takesValue: true,
+        role: 'user',
+        facts: { effect: ['create', 'configure'], reversible: 'unknown', says: 'Adds a new account to this computer.' },
+      },
+      {
+        flags: ['-deleteUser'],
+        takesValue: true,
+        role: 'user',
+        facts: {
+          effect: ['delete', 'configure'],
+          reversible: 'no',
+          says: 'Removes an account from this computer.',
+          note: 'Unless told to keep it, what was kept in that account is removed with it.',
+        },
+      },
+      {
+        flags: ['-resetPasswordFor', '-secureTokenOn', '-secureTokenOff'],
+        takesValue: true,
+        role: 'user',
+        facts: { effect: ['configure'], reversible: 'no', touchesCredentials: true, says: 'Changes how an account on this computer signs in.' },
+      },
+      { flags: ['-password', '-adminPassword', '-newPassword', '-oldPassword'], takesValue: true, role: 'text', facts: { touchesCredentials: true } },
+      { flags: ['-adminUser'], takesValue: true, role: 'user', facts: { touchesCredentials: true } },
+      {
+        flags: ['-admin'],
+        facts: { note: 'The new account can change anything on this computer.' },
+      },
+      {
+        flags: ['-guestAccount', '-screenLock', '-automaticTime', '-afpGuestAccess', '-smbGuestAccess'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['configure'], reversible: 'yes', says: 'Changes a setting that controls who can use this computer.' },
+      },
+    ],
   },
 }

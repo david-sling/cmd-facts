@@ -72,6 +72,18 @@ describe('a flag’s value is never mistaken for an operand', () => {
       'Sends ./report.csv from this computer to api.example.com.',
     )
   })
+
+  // A slot that says where its value comes from is not filled by another flag that gives the same role.
+  it('takes a slot’s value only from where the row says it comes from', () => {
+    expect(said('curl --cacert ca.pem -o out.bin https://example.com/f')).toBe(
+      'Makes a request to example.com and saves what comes back into out.bin.',
+    )
+    expect(said('curl -T notes.txt --cacert ca.pem https://example.com/up')).toBe('Sends notes.txt from this computer to example.com.')
+    expect(said('grep -f patterns.txt -e TODO notes.txt')).toBe('Searches notes.txt for the lines that contain TODO.')
+    expect(said('sort -o sorted.txt names.txt')).toBe('Puts the lines of names.txt in order and saves them into sorted.txt.')
+    expect(said('sort names.txt -o sorted.txt')).toBe('Puts the lines of names.txt in order and saves them into sorted.txt.')
+    expect(said('diff -X skip.txt a.txt b.txt')).toBe('Shows how a.txt and b.txt differ.')
+  })
 })
 
 describe('falling back', () => {

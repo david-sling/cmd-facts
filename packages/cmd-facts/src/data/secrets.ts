@@ -1,4 +1,4 @@
-import { fact, LOCAL, LOOKS } from '../entry.ts'
+import { fact, valuesOf, LOCAL, LOOKS } from '../entry.ts'
 import type { Entry } from '../entry.ts'
 
 export const SECRETS: Record<string, Entry> = {
@@ -266,5 +266,51 @@ export const SECRETS: Record<string, Entry> = {
         operands: ['text'],
       },
     },
+  },
+  'ssh-keygen': {
+    facts: fact('Makes or works with the key files this computer uses to prove who it is to other computers.', {
+      network: 'none', privilege: 'none', repeatSafe: true,
+      effect: ['read', 'create', 'write'],
+      touchesCredentials: true,
+      reversible: 'unknown',
+      docs: 'man 1 ssh-keygen',
+    }),
+    values: {
+      ...valuesOf('path', ['-f', '-s']),
+      '-F': 'host',
+      ...valuesOf('text', ['-t', '-b', '-C', '-E', '-I', '-n', '-O', '-V', '-z', '-Y', '-m', '-a', '-D', '-M', '-r', '-w', '-Z']),
+    },
+    flags: [
+      { flags: ['-N', '-P'], takesValue: true, role: 'text', facts: { touchesCredentials: true } },
+      {
+        flags: ['-R'],
+        takesValue: true,
+        role: 'host',
+        facts: {
+          effect: ['write'],
+          reversible: 'no',
+          says: 'Removes a computer from the list of computers this one has connected to before.',
+          note: 'The next connection to that computer is not checked against what it showed last time.',
+        },
+      },
+    ],
+  },
+  'ssh-add': {
+    facts: fact('Hands a key file to the program that keeps keys ready for signing in to other computers.', {
+      network: 'none', privilege: 'none', repeatSafe: true,
+      effect: ['read', 'configure'],
+      touchesCredentials: true,
+      reversible: 'yes',
+      docs: 'man 1 ssh-add',
+    }),
+    operands: ['path'],
+    values: { '-H': 'path', ...valuesOf('text', ['-t', '-E', '-h', '-S', '-s', '-e']) },
+    flags: [
+      { flags: ['-D'], facts: { says: 'Takes every key out of the program that keeps keys ready for signing in.' } },
+      {
+        flags: ['-K', '--apple-use-keychain'],
+        facts: { effect: ['write'], reversible: 'unknown', note: 'The password for the key is also saved in the macOS password store.' },
+      },
+    ],
   },
 }

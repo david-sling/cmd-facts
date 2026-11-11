@@ -116,6 +116,20 @@ describe('the grammar layer', () => {
     expect(says(packOf({ k: outOf }))).toContainEqual(expect.stringContaining('whose operands hold a command'))
   })
 
+  it('wants a slot that names a flag to name one that gives that role', () => {
+    const entry = (from: string): Entry => ({
+      facts: fact('Saves a file.', { ...LOOKS, tell: ['Saves ', { role: 'path', from }, '.'] }),
+      operands: ['path'],
+      values: { '--log': 'path' },
+      flags: [{ flags: ['-o', '--output'], takesValue: true, role: 'path', facts: {} }],
+    })
+    expect(says(packOf({ k: entry('-o') }))).toEqual([])
+    expect(says(packOf({ k: entry('operands') }))).toEqual([])
+    // An argument reports its flag as the rule's first spelling, so `--output` would never match.
+    expect(says(packOf({ k: entry('--output') }))).toContainEqual(expect.stringContaining('first spelling of a flag rule'))
+    expect(says(packOf({ k: entry('--log') }))).toContainEqual(expect.stringContaining('first spelling of a flag rule'))
+  })
+
   it('accepts a flag that turns operands into files, and lets `tell` name them', () => {
     const entry: Entry = {
       facts: fact('Searches files.', { ...LOOKS, tell: ['Searches ', { role: 'path', which: 'all' }, '.'] }),

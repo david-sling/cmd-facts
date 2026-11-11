@@ -65,7 +65,7 @@ Beyond `facts`, a row describes just enough grammar for the line to be read.
 | Field | What it does |
 |---|---|
 | `operands` | Roles for the positional arguments; the last entry repeats for the rest. |
-| `flags` | Flags that change the fact set rather than the detail. Each is `{ flags, facts, takesValue?, role?, operands? }`; `operands` replaces the row's operand roles wherever the flag appears, as `grep -e` turns every operand into a file. |
+| `flags` | Flags that change the fact set rather than the detail. Each is `{ flags, facts, takesValue?, attached?, role?, operands? }`. `attached` is a value that only counts written onto the flag, as in `sed -i.bak` or `make -j4`; `operands` replaces the row's operand roles wherever the flag appears, as `grep -e` turns every operand into a file. |
 | `values` | Flags that take a value whose role matters, where the flag changes nothing else. |
 | `plain` | Flags that were looked at and change nothing the fields carry, and take no value: `rm -v`, `curl -s`. |
 | `flagStyle` | `posix` by default; `words` turns off single-dash bundling for programs whose flags are whole words, such as `find -exec`. |

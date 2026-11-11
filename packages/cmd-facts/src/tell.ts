@@ -21,7 +21,8 @@ const host = (value: string): string => {
 }
 
 function pick(args: ArgSlot[], slot: Slot): ArgSlot[] {
-  const of = args.filter((a) => a.role === slot.role)
+  const from = (a: ArgSlot) => slot.from === undefined || (slot.from === 'operands' ? a.flag === undefined : a.flag === slot.from)
+  const of = args.filter((a) => a.role === slot.role && from(a))
   if (!of.length) return []
   switch (slot.which) {
     case 'all':

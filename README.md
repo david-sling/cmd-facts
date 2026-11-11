@@ -263,7 +263,9 @@ matched against whatever it knows about this computer, or counted, so forty file
 forty names.
 
 A slot names a role and which arguments of it to take — `first` by default, or `all`, `last`, `all-but-last`, or an
-index. `show: 'host'` is the one reduction a slot may ask for. Reductions are a closed list on purpose: each one is
+index. `from` narrows where they come from: `operands` for the positions the command was pointed at, or a flag's
+first spelling for that flag's value, so `sort -o out.txt in.txt` sorts in.txt. `show: 'host'` is the one reduction a
+slot may ask for. Reductions are a closed list on purpose: each one is
 a way to read an argument wrong. A slot for a role the row never gives an argument is a lint failure, not a silent
 fallback for ever.
 
@@ -507,6 +509,11 @@ arrives at `confidence: derived`, so a consumer gating on `verified` never auto-
 **tldr-pages is a coverage checklist only.** Its 375 macOS pages are a good list of what people actually run, and it
 was used that way. No prose was copied or adapted from it, so no CC-BY attribution obligation is incurred. Its writing
 is developer-voiced and would be the wrong register here anyway.
+
+**Fig's completion specs are a grammar check only.** `pnpm figcheck` compares which flags take a value against
+`@withfig/autocomplete` (MIT), a dev dependency, and reports how many of the commands Fig completes have a row here.
+Nothing from a spec reaches the table: a spec knows that `-o` takes a file, not that the file is replaced. Where a
+spec is wrong about its own command, the script records it with the manual as witness rather than copying the error.
 
 ## This repository
 

@@ -80,8 +80,9 @@ describe('the grammar layer is declared honestly', () => {
       }
       if (rule.assignmentsFirst) expect(rule.nestedHere, name).toBe(true)
       for (const f of rule.flags ?? []) {
-        if (f.role) expect(f.takesValue, `${name} ${f.flags[0]}`).toBe(true)
-        if (!Object.keys(f.facts).length) expect(f.takesValue, `${name} ${f.flags[0]}`).toBe(true)
+        if (f.role) expect(f.takesValue || f.attached, `${name} ${f.flags[0]}`).toBe(true)
+        if (!Object.keys(f.facts).length) expect(f.takesValue || f.attached, `${name} ${f.flags[0]}`).toBe(true)
+        expect(f.takesValue && f.attached, `${name} ${f.flags[0]}`).toBeFalsy()
       }
     }
   })

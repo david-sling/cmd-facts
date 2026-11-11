@@ -1,5 +1,15 @@
-import { fact, opaqueFact, valuesOf } from '../entry.ts'
+import { fact, opaqueFact, valuesOf, LOOKS } from '../entry.ts'
 import type { Entry } from '../entry.ts'
+import type { Overlay } from '../facts.ts'
+
+const SETTINGS_RUN_HERE = 'any program its settings tell it to run on this computer'
+
+// Sending a body makes a request that may change something at the other end, so it is not safe to repeat.
+const WGET_SENDS: Overlay = {
+  effect: ['transmit'],
+  repeatSafe: false,
+  says: 'Sends information from this computer to a web address, and saves what comes back.',
+}
 
 const SSH_SETTINGS_RUN =
   'whatever it is asked to run on the other computer, and any program its settings tell it to run on this one'
@@ -97,7 +107,7 @@ export const NET: Record<string, Entry> = {
             'Makes a request to ',
             { role: 'url', show: 'host' },
             ' and saves what comes back into ',
-            { role: 'path' },
+            { role: 'path', from: '-o' },
             '.',
           ],
           note: 'A file already in that place with the same name is replaced by what is downloaded.',
@@ -134,7 +144,7 @@ export const NET: Record<string, Entry> = {
           effect: ['read', 'transmit'],
           repeatSafe: false,
           says: 'Sends a file from this computer to a web address, and shows what comes back.',
-          tell: ['Sends ', { role: 'path' }, ' from this computer to ', { role: 'url', show: 'host' }, '.'],
+          tell: ['Sends ', { role: 'path', from: '-T' }, ' from this computer to ', { role: 'url', show: 'host' }, '.'],
         },
       },
       {
@@ -211,6 +221,255 @@ export const NET: Record<string, Entry> = {
           network: 'listens',
           note: 'It also opens a door on this computer: anything that connects to it is passed through to the other side.',
         },
+      },
+    ],
+  },
+  scp: {
+    facts: fact('Copies files between this computer and another one over the network.', {
+      privilege: 'none', touchesCredentials: false, repeatSafe: true,
+      effect: ['read', 'create', 'write', 'transmit'],
+      network: 'known-host',
+      reversible: 'no',
+      tell: ['Copies ', { role: 'text', which: 'all-but-last', from: 'operands' }, ' to ', { role: 'text', which: 'last', from: 'operands' }, '.'],
+      note: 'A file already at the destination with the same name is replaced.',
+      docs: 'man 1 scp',
+    }),
+    operands: ['text'],
+    values: valuesOf('text', ['-P', '-c', '-l', '-J', '-D', '-X']),
+    flags: [
+      { flags: ['-i'], takesValue: true, role: 'path', facts: { touchesCredentials: true } },
+      { flags: ['-o'], takesValue: true, role: 'text', facts: { effect: ['execute'], opaque: true, handsOverTo: SETTINGS_RUN_HERE } },
+      { flags: ['-F'], takesValue: true, role: 'path', facts: { effect: ['execute'], opaque: true, handsOverTo: SETTINGS_RUN_HERE } },
+      {
+        flags: ['-S'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['execute'], opaque: true, handsOverTo: 'the program named to make the connection in its place' },
+      },
+    ],
+  },
+  rsync: {
+    facts: fact('Copies files to another place, here or on another computer, sending only what has changed.', {
+      privilege: 'none', touchesCredentials: false, repeatSafe: true,
+      effect: ['read', 'create', 'write', 'transmit'],
+      network: 'known-host',
+      reversible: 'no',
+      tell: [
+        'Copies ',
+        { role: 'text', which: 'all-but-last', from: 'operands' },
+        ' to ',
+        { role: 'text', which: 'last', from: 'operands' },
+        ', sending only what has changed.',
+      ],
+      note: 'Files already at the destination with the same names are replaced.',
+      docs: 'man 1 rsync',
+    }),
+    operands: ['text'],
+    values: {
+      ...valuesOf('pattern', ['--exclude', '--include', '-f', '--filter']),
+      ...valuesOf('path', [
+        '--exclude-from', '--include-from', '--files-from', '--log-file', '--backup-dir', '-T', '--temp-dir', '--partial-dir',
+        '--compare-dest', '--copy-dest', '--link-dest', '--read-batch',
+      ]),
+      ...valuesOf('text', [
+        '--chmod', '--chown', '--usermap', '--groupmap', '--bwlimit', '--timeout', '--max-size', '--min-size', '--suffix',
+        '--rsync-path', '--port', '-B', '--block-size', '--info', '--debug', '--out-format', '--log-file-format',
+        '--checksum-choice', '--compress-choice', '--iconv', '--max-delete', '--contimeout', '-M', '--remote-option', '-@',
+        '--modify-window', '--compress-level', '--skip-compress', '--address', '--sockopts', '--stop-at', '--time-limit',
+        '--outbuf', '--protocol', '--checksum-seed',
+      ]),
+    },
+    flags: [
+      {
+        flags: ['--delete', '--del', '--delete-before', '--delete-during', '--delete-after', '--delete-delay', '--delete-excluded'],
+        facts: {
+          effect: ['delete'],
+          says: 'Makes one folder match another exactly, removing files at the destination that are not in the source.',
+        },
+      },
+      {
+        flags: ['--remove-source-files'],
+        facts: { effect: ['delete'], says: 'Moves files to another place, here or on another computer, removing the originals once sent.' },
+      },
+      {
+        flags: ['-e', '--rsh'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['execute'], opaque: true, handsOverTo: 'the program named to reach the other computer' },
+      },
+      { flags: ['--password-file'], takesValue: true, role: 'path', facts: { touchesCredentials: true } },
+      {
+        flags: ['--write-batch', '--only-write-batch'],
+        takesValue: true,
+        role: 'path',
+        facts: { effect: ['create', 'write'], note: 'It also saves a record of the changes into the named file, to be played back later.' },
+      },
+    ],
+  },
+  wget: {
+    facts: fact('Fetches whatever is at a web address and saves it into a file in this folder.', {
+      privilege: 'none', touchesCredentials: false, repeatSafe: true,
+      effect: ['read', 'create'],
+      network: 'arbitrary',
+      reversible: 'unknown',
+      tell: ['Makes a request to ', { role: 'url', show: 'host', from: 'operands' }, ' and saves what comes back into this folder.'],
+      docs: 'man 1 wget',
+    }),
+    operands: ['url'],
+    values: {
+      ...valuesOf('path', ['-P', '--directory-prefix', '-i', '--input-file', '--ca-certificate', '--ca-directory', '--crl-file']),
+      ...valuesOf('pattern', ['--accept-regex', '--reject-regex']),
+      ...valuesOf('text', [
+        '-U', '--user-agent', '--header', '-t', '--tries', '-T', '--timeout', '-w', '--wait', '-l', '--level', '-A', '--accept',
+        '-R', '--reject', '-D', '--domains', '--limit-rate', '--method', '--report-speed', '-B', '--base', '--start-pos',
+        '--progress', '--dns-timeout', '--connect-timeout', '--read-timeout', '--waitretry', '-Q', '--quota', '--bind-address',
+        '--restrict-file-names', '--local-encoding', '--remote-encoding', '--cut-dirs', '--compression', '--referer',
+        '--secure-protocol', '--certificate-type', '--private-key-type', '--ciphers', '--regex-type', '--exclude-domains',
+        '--follow-tags', '--ignore-tags', '-I', '--include-directories', '-X', '--exclude-directories',
+      ]),
+    },
+    flags: [
+      {
+        flags: ['-O', '--output-document'],
+        takesValue: true,
+        role: 'path',
+        facts: {
+          effect: ['write'],
+          reversible: 'no',
+          says: 'Fetches whatever is at a web address and saves it into a file on this computer.',
+          tell: ['Makes a request to ', { role: 'url', show: 'host', from: 'operands' }, ' and saves what comes back into ', { role: 'path', from: '-O' }, '.'],
+          note: 'What the named file held before is replaced.',
+        },
+      },
+      {
+        flags: ['-o', '--output-file', '-a', '--append-output', '--rejected-log'],
+        takesValue: true,
+        role: 'path',
+        facts: { effect: ['write'], note: 'It also writes a record of what it did into the named file.' },
+      },
+      { flags: ['--post-data', '--body-data'], takesValue: true, role: 'text', facts: WGET_SENDS },
+      { flags: ['--post-file', '--body-file'], takesValue: true, role: 'path', facts: WGET_SENDS },
+      {
+        flags: ['--user', '--password', '--http-user', '--http-password', '--ftp-user', '--ftp-password', '--proxy-user', '--proxy-password'],
+        takesValue: true,
+        role: 'text',
+        facts: { touchesCredentials: true },
+      },
+      { flags: ['--load-cookies', '--certificate', '--private-key'], takesValue: true, role: 'path', facts: { touchesCredentials: true } },
+      { flags: ['--ask-password'], facts: { touchesCredentials: true } },
+      {
+        flags: ['-r', '--recursive', '-m', '--mirror'],
+        facts: { says: 'Fetches a web page and everything it links to on the same site, saving it all into this folder.' },
+      },
+      {
+        // An instruction given this way can change where files are saved, or anything else a settings file could.
+        flags: ['-e', '--execute'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['write'], reversible: 'no' },
+      },
+      { flags: ['--config'], takesValue: true, role: 'path', facts: { effect: ['write'], reversible: 'no' } },
+      {
+        flags: ['--save-cookies'],
+        takesValue: true,
+        role: 'path',
+        facts: { effect: ['write'], touchesCredentials: true, note: 'The sign-in details the site hands back are saved into the named file.' },
+      },
+      { flags: ['--no-check-certificate'], facts: { note: 'This one does not check that the site answering is the site it claims to be.' } },
+    ],
+  },
+  nc: {
+    facts: fact('Opens a direct connection to another computer and passes text back and forth through it.', {
+      reversible: 'yes', privilege: 'none', touchesCredentials: false,
+      effect: ['read', 'transmit'],
+      network: 'arbitrary',
+      repeatSafe: false,
+      tell: ['Opens a direct connection to ', { role: 'host', from: 'operands' }, ' and passes text back and forth through it.'],
+      docs: 'man 1 nc',
+    }),
+    operands: ['host', 'text'],
+    // macOS takes `-c` as a switch; elsewhere it can name a program, so only `-e` is read as one.
+    values: valuesOf('text', ['-p', '-s', '-w', '-x', '-X', '-i', '-I', '-O', '-T', '-V', '-P', '-b', '-G', '-H', '-J', '-L']),
+    flags: [
+      {
+        flags: ['-l'],
+        operands: ['text'],
+        facts: { network: 'listens', says: 'Waits for another computer to connect to this one, and passes text back and forth with it.' },
+      },
+      {
+        flags: ['-e'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['execute'], opaque: true, handsOverTo: 'the program named to take over the connection, run on this computer' },
+      },
+    ],
+  },
+  dig: {
+    facts: fact('Asks the naming service which address a name on the network points to.', { effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true, network: 'known-host', docs: 'man 1 dig' }),
+    operands: ['text'],
+    values: { '-f': 'path', ...valuesOf('text', ['-b', '-c', '-p', '-q', '-t', '-x']) },
+    flags: [
+      { flags: ['-k'], takesValue: true, role: 'path', facts: { touchesCredentials: true } },
+      { flags: ['-y'], takesValue: true, role: 'text', facts: { touchesCredentials: true } },
+    ],
+  },
+  nslookup: {
+    facts: fact('Asks the naming service which address a name on the network points to.', { effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true, network: 'known-host', docs: 'man 1 nslookup' }),
+    operands: ['domain', 'host'],
+  },
+  host: {
+    facts: fact('Asks the naming service which address a name on the network points to.', { effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true, network: 'known-host', docs: 'man 1 host' }),
+    operands: ['domain', 'host'],
+    values: valuesOf('text', ['-t', '-c', '-W', '-N', '-R', '-m']),
+  },
+  traceroute: {
+    facts: fact('Shows each step network traffic takes on its way to another computer.', {
+      effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true,
+      network: 'known-host',
+      tell: ['Shows each step network traffic takes on its way to ', { role: 'host', from: 'operands' }, '.'],
+      docs: 'man 8 traceroute',
+    }),
+    operands: ['host', 'text'],
+    values: valuesOf('text', ['-f', '-g', '-i', '-m', '-M', '-p', '-q', '-s', '-t', '-w', '-z', '-A', '-P']),
+  },
+  netstat: {
+    facts: fact("Shows this computer's network connections, and how its traffic is sent on.", { ...LOOKS, docs: 'man 1 netstat' }),
+    values: valuesOf('text', ['-f', '-I', '-p', '-w']),
+  },
+  ifconfig: {
+    facts: fact('Shows or changes the settings of the network connections on this computer.', {
+      network: 'none', touchesCredentials: false,
+      effect: ['read', 'configure'],
+      reversible: 'unknown',
+      privilege: 'admin',
+      repeatSafe: false,
+      note: 'A changed setting can cut this computer off from the network until it is put back.',
+      docs: 'man 8 ifconfig',
+    }),
+    operands: ['device', 'text'],
+  },
+  whois: {
+    facts: fact('Looks up who a web address or network address is registered to.', {
+      effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true,
+      network: 'known-host',
+      tell: ['Looks up who ', { role: 'domain', from: 'operands' }, ' is registered to.'],
+      docs: 'man 1 whois',
+    }),
+    operands: ['domain'],
+    values: { '-h': 'text', '-p': 'text', '-c': 'text' },
+  },
+  arp: {
+    facts: fact('Shows the list that matches network addresses to the devices nearby.', { ...LOOKS, docs: 'man 8 arp' }),
+    operands: ['host', 'text'],
+    values: { '-i': 'text' },
+    flags: [
+      {
+        flags: ['-d'],
+        facts: { effect: ['configure', 'delete'], reversible: 'unknown', privilege: 'admin', says: 'Removes entries from the list that matches network addresses to nearby devices.' },
+      },
+      {
+        flags: ['-s', '-S'],
+        facts: { effect: ['configure'], reversible: 'unknown', privilege: 'admin', says: 'Adds an entry to the list that matches network addresses to nearby devices.' },
       },
     ],
   },

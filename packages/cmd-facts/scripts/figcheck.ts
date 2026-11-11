@@ -51,24 +51,29 @@ const namesOf = (name: string | string[] | undefined): string[] => (name === und
 // A spec sometimes spells an option with its value attached (`--color[=WHEN]`); the flag is the part before it.
 const spellingOf = (raw: string): string => raw.replace(/[=[].*$/, '')
 
-/** Whether a Fig option must be followed by a value. An optional one may stand alone, so nothing is claimed. */
+/**
+ * Whether a Fig option must be followed by a value. An optional one may stand alone, so nothing is claimed. Some specs
+ * write the value into the name instead of declaring it (`--tries=NUMBER`); `--color[=WHEN]` is optional.
+ */
 const requiresValue = (o: FigOption): boolean => {
+  if (namesOf(o.name).some((n) => /^[^[]*=/.test(n))) return true
   if (!o.args) return false
   const args = Array.isArray(o.args) ? o.args : [o.args]
   return args.some((a) => !a.isOptional)
 }
 
-type Declared = { takesValue: Set<string>; bare: Set<string>; bundles: boolean }
+type Declared = { takesValue: Set<string>; bare: Set<string>; attached: Set<string>; bundles: boolean }
 
 /** Every flag spelling a rule declares, split by whether the table says it consumes the next word. */
 function declaredOf(rule: Rule, globals: FlagRule[] = []): Declared {
   const takesValue = new Set<string>(Object.keys(rule.values ?? {}))
   const bare = new Set<string>()
+  const attached = new Set<string>()
   for (const r of [...(rule.flags ?? []), ...globals]) {
-    for (const f of r.flags) (r.takesValue ? takesValue : bare).add(f)
+    for (const f of r.flags) (r.takesValue ? takesValue : r.attached ? attached : bare).add(f)
   }
   for (const f of rule.plain ?? []) bare.add(f)
-  return { takesValue, bare, bundles: rule.flagStyle !== 'words' }
+  return { takesValue, bare, attached, bundles: rule.flagStyle !== 'words' }
 }
 
 /**
@@ -103,6 +108,20 @@ const FIG_WRONG = new Set([
   'pip list --extra-index-url',
   'pip freeze -r',
   'pip freeze --path',
+  ...['-f', '-s', '-F', '-i'].map((f) => `ln ${f}`), // Switches.
+  'readlink -f', // A switch.
+  // BSD sed requires a backup ending after these, GNU sed takes one only attached; the row reads neither as a value.
+  'sed -i',
+  'sed -I',
+  'zip -d', // A switch: the entries to remove are the operands after the packed file.
+  'crontab -u', // Takes the account whose schedule it works on; Fig declares no args.
+  ...['-a', '-b', '-c', '-u'].map((f) => `pmset ${f}`), // Switches choosing which power source a setting applies to.
+  'sysctl -e', // A switch.
+  'pkill -q', // A switch on macOS; only GNU's `--queue` takes a value.
+  'nc -l', // A switch: the port to wait on is the operand.
+  'codesign --extract-certificates', // The prefix is optional, so it only counts after `=`.
+  'traceroute -w', // Takes the time to wait; Fig declares no args.
+  ...['-d', '-O', '-F'].map((f) => `rsync ${f}`), // Switches.
   'ps -a', // A switch on macOS.
   'top -b', // Not a macOS option; a switch where it exists.
   'unzip -l', // Switches.
@@ -130,7 +149,7 @@ function compare(declared: Declared, options: FigOption[], where: string): Findi
     // `--` ends the flags; `parse()` reads it as grammar, never as an option, whatever a spec lists it as.
     if (!spellings.length || spellings.includes('--')) continue
     seen++
-    const known = spellings.some((s) => declared.takesValue.has(s) || declared.bare.has(s) || bundled(declared, s))
+    const known = spellings.some((s) => declared.takesValue.has(s) || declared.bare.has(s) || declared.attached.has(s) || bundled(declared, s))
     if (!known) unreviewed.push(spellings.join('/'))
     const command = where.split(' ')[0]
     if (spellings.some((s) => FIG_WRONG.has(`${where} ${s}`) || FIG_WRONG.has(`${command} ${s}`))) continue
@@ -138,8 +157,13 @@ function compare(declared: Declared, options: FigOption[], where: string): Findi
     const needs = requiresValue(o)
     const asValue = spellings.some((s) => declared.takesValue.has(s) || bundled(declared, s))
     const asBare = spellings.some((s) => declared.bare.has(s))
+    // A value written into the spec's own name (`--opt=VALUE`) is the attached form; one declared as args is not.
+    if (spellings.some((s) => declared.attached.has(s))) {
+      if (o.args) conflicts.push(`${label} takes its value as the next word; the table takes one only attached`)
+      continue
+    }
     if (needs && asBare && !asValue) conflicts.push(`${label} requires a value; the table reads it as bare`)
-    else if (!o.args && asValue) conflicts.push(`${label} takes no value; the table consumes the next word`)
+    else if (!needs && !o.args && asValue) conflicts.push(`${label} takes no value; the table consumes the next word`)
     else if (needs && !asValue && !asBare) missing.push(label)
   }
 
