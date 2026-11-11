@@ -128,7 +128,7 @@ const TABS = [
 ] as const
 
 /**
- * The page's lead: an approval prompt built from both components, live beside the one file that draws it. Its code is
+ * An approval prompt built from both components, live beside the one file that draws it. Its code is
  * the registry example exactly, so what is read here is what Open in v0 hands over.
  */
 function Showcase() {
@@ -262,13 +262,6 @@ function ReactPage() {
       </section>
 
       <section className="mx-4 mt-16 sm:mx-8 lg:mx-14">
-        <Showcase />
-        <p className="mt-4 text-[14px] text-ink-3">
-          An approval prompt from both components. Point at a value, or a word in the command, to see its pair.
-        </p>
-      </section>
-
-      <section className="mx-4 mt-24 sm:mx-8 lg:mx-14">
         <p className="eyebrow">The least you need</p>
         <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.6rem)] font-light leading-[1.08] tracking-[-0.03em] text-ink">
           One component, one prop.
@@ -277,6 +270,19 @@ function ReactPage() {
           <Playground />
         </div>
         <p className="mt-4 text-[14px] text-ink-3">Type any line, or pick one of the examples.</p>
+      </section>
+
+      <section className="mx-4 mt-24 sm:mx-8 lg:mx-14">
+        <p className="eyebrow">Put together</p>
+        <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.6rem)] font-light leading-[1.08] tracking-[-0.03em] text-ink">
+          An approval prompt.
+        </h2>
+        <div className="mt-10">
+          <Showcase />
+        </div>
+        <p className="mt-4 text-[14px] text-ink-3">
+          Both components, with each value drawn by its role. Point at a value, or a word in the command, to see its pair.
+        </p>
       </section>
 
       <section className="mx-4 mt-24 sm:mx-8 lg:mx-14">
