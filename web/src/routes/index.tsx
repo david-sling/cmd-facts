@@ -17,6 +17,9 @@ function Home() {
           cmd-facts
         </a>
         <nav className="flex items-center gap-6">
+          <a href="/react" className="text-[15px] text-ink-2 transition-colors hover:text-ink">
+            React
+          </a>
           <a href="/docs" className="text-[15px] text-ink-2 transition-colors hover:text-ink">
             Docs
           </a>
@@ -111,6 +114,9 @@ function Home() {
           <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[14px] text-ink-2">
             <a href="/docs" className="transition-colors hover:text-ink">
               Docs
+            </a>
+            <a href="/react" className="transition-colors hover:text-ink">
+              React
             </a>
             <a href={REPO_URL} target="_blank" rel="noreferrer" className="transition-colors hover:text-ink">
               GitHub
