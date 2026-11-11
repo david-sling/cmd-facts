@@ -291,9 +291,19 @@ function ReactPage() {
         <div className="mt-10">
           <Showcase />
         </div>
-        <p className="mt-4 text-[14px] text-ink-3">
-          Both components, with each value drawn by its role. Point at a value, or a word in the command, to see its pair.
-        </p>
+        <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+          <p className="text-[14px] text-ink-3">
+            Both components, with each value drawn by its role. Point at a value, or a word in the command, to see its
+            pair.
+          </p>
+          <a
+            href="/docs/react/examples"
+            className="group inline-flex items-center gap-1.5 text-[15px] text-ink transition-colors hover:text-pink"
+          >
+            See more examples
+            <ArrowRight aria-hidden className="size-4 transition-transform group-hover:translate-x-0.5" />
+          </a>
+        </div>
       </section>
 
       <section className="mx-4 mt-24 sm:mx-8 lg:mx-14">
