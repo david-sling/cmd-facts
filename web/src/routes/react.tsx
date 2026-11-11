@@ -149,15 +149,23 @@ function CodeTabs({ files, opens, edit }: { files: readonly File[]; opens?: stri
   const code = (edit ? edit(shown) : shown.source).trimEnd()
   return (
     <div className="min-w-0 border-t border-line bg-white/[0.015] lg:border-t-0 lg:border-l">
-      <div className="flex items-end justify-between gap-3 border-b border-line pr-3 pb-1.5 sm:pr-5">
-        <div role="tablist" aria-label="Code" className="flex flex-wrap gap-1 px-3 pt-3 sm:px-5">
+      <div className="flex items-center justify-between gap-3 border-b border-line pr-3 sm:pr-5">
+        {/* one row that scrolls sideways when the files outgrow the column, beside a button that stays put */}
+        <div
+          role="tablist"
+          aria-label="Code"
+          className="flex min-w-0 flex-1 gap-1 overflow-x-auto px-3 pt-3 [scrollbar-width:thin] sm:px-5"
+        >
           {files.map((f) => (
             <button
               key={f.id}
               type="button"
               role="tab"
               aria-selected={tab === f.id}
-              onClick={() => setTab(f.id)}
+              onClick={(e) => {
+                setTab(f.id)
+                e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+              }}
               className={`shrink-0 rounded-t-md px-3 py-2 font-mono text-[12px] transition-colors ${
                 tab === f.id ? 'bg-white/[0.06] text-pink' : 'text-ink-3 hover:text-ink-2'
               }`}
