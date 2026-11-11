@@ -138,16 +138,18 @@ describe('Open in v0', () => {
     }
   })
 
-  it('points examples at components this site serves or has', () => {
-    for (const item of examples)
+  // v0 follows a dependency given as a URL and skipped shadcn's own items given by bare name, so every dependency is
+  // a URL: this site's item, or shadcn's in the style the site installed
+  const SHADCN = /^https:\/\/ui\.shadcn\.com\/r\/styles\/new-york-v4\/([a-z-]+)\.json$/
+  const OURS = /^https:\/\/cmd-facts\.davidsling\.in\/r\/([a-z-]+)\.json$/
+
+  it('points every item at components this site serves or has', () => {
+    for (const item of items)
       for (const dep of item.registryDependencies ?? []) {
-        // a bare name is shadcn's own item; the site has it installed, or the preview could not draw the example
-        if (!dep.includes('/')) {
-          if (dep !== 'utils') expect(() => read(`../components/ui/${dep}.tsx`), `${item.name} → ${dep}`).not.toThrow()
-          continue
-        }
-        const name = /^https:\/\/cmd-facts\.davidsling\.in\/r\/([a-z-]+)\.json$/.exec(dep)?.[1]
-        expect(name && names.has(name), `${item.name} → ${dep}`).toBe(true)
+        const shadcn = SHADCN.exec(dep)?.[1]
+        // the site has shadcn's item installed, or its preview could not draw the example
+        if (shadcn) expect(() => read(`../components/ui/${shadcn}.tsx`), `${item.name} → ${dep}`).not.toThrow()
+        else expect(names.has(OURS.exec(dep)?.[1] ?? ''), `${item.name} → ${dep}`).toBe(true)
       }
   })
 
@@ -158,9 +160,9 @@ describe('Open in v0', () => {
     for (const item of examples) {
       const deps = item.registryDependencies ?? []
       for (const dep of deps) {
-        const used = byName.get(/\/r\/([a-z-]+)\.json$/.exec(dep)?.[1] ?? '')
+        const used = byName.get(OURS.exec(dep)?.[1] ?? '')
         for (const own of used?.registryDependencies ?? [])
-          if (!own.includes('/')) expect(deps, `${item.name} → ${used!.name} → ${own}`).toContain(own)
+          if (SHADCN.test(own)) expect(deps, `${item.name} → ${used!.name} → ${own}`).toContain(own)
       }
     }
   })

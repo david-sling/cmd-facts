@@ -9,10 +9,8 @@
       "title": "Command line",
       "description": "A command line exactly as written, each word drawn by what cmd-facts read it as: program, flag, value, operator, redirection.",
       "dependencies": [
-        "cmd-facts@^0.5.0"
-      ],
-      "registryDependencies": [
-        "utils"
+        "cmd-facts@^0.5.0",
+        "cn"
       ],
       "files": [
         {
@@ -27,11 +25,11 @@
       "title": "Sentence",
       "description": "The plain-English sentence for a command, with the command's own text drawn apart from the words around it.",
       "dependencies": [
-        "cmd-facts@^0.5.0"
+        "cmd-facts@^0.5.0",
+        "cn"
       ],
       "registryDependencies": [
-        "utils",
-        "badge"
+        "https://ui.shadcn.com/r/styles/new-york-v4/badge.json"
       ],
       "files": [
         {
@@ -61,8 +59,7 @@
       "title": "Sentence example",
       "description": "What a command does, in one line: <Sentence command=\"\u2026\" />.",
       "registryDependencies": [
-        "badge",
-        "utils",
+        "https://ui.shadcn.com/r/styles/new-york-v4/badge.json",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -79,7 +76,6 @@
       "title": "Command line example",
       "description": "A few command lines, each word drawn by what it was read as.",
       "registryDependencies": [
-        "utils",
         "https://cmd-facts.davidsling.in/r/command-line.json"
       ],
       "files": [
@@ -96,10 +92,9 @@
       "title": "Approval prompt example",
       "description": "An approval prompt: the command line, and the sentence for it.",
       "registryDependencies": [
-        "badge",
-        "card",
-        "input",
-        "utils",
+        "https://ui.shadcn.com/r/styles/new-york-v4/badge.json",
+        "https://ui.shadcn.com/r/styles/new-york-v4/card.json",
+        "https://ui.shadcn.com/r/styles/new-york-v4/input.json",
         "https://cmd-facts.davidsling.in/r/command-line.json",
         "https://cmd-facts.davidsling.in/r/sentence.json",
         "https://cmd-facts.davidsling.in/r/use-explain.json"
@@ -118,8 +113,7 @@
       "title": "Sentence with renderValue",
       "description": "Drawing a sentence's values yourself, with a count in place of a long list.",
       "registryDependencies": [
-        "badge",
-        "utils",
+        "https://ui.shadcn.com/r/styles/new-york-v4/badge.json",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -136,7 +130,6 @@
       "title": "Command line with renderPart",
       "description": "Drawing a command line's words yourself, on top of the component's own classes.",
       "registryDependencies": [
-        "utils",
         "https://cmd-facts.davidsling.in/r/command-line.json"
       ],
       "files": [
@@ -145,6 +138,9 @@
           "type": "registry:page",
           "target": "app/page.tsx"
         }
+      ],
+      "dependencies": [
+        "cn"
       ]
     },
     {
@@ -156,9 +152,8 @@
         "cmd-facts@^0.5.0"
       ],
       "registryDependencies": [
-        "badge",
-        "tooltip",
-        "utils",
+        "https://ui.shadcn.com/r/styles/new-york-v4/badge.json",
+        "https://ui.shadcn.com/r/styles/new-york-v4/tooltip.json",
         "https://cmd-facts.davidsling.in/r/command-line.json",
         "https://cmd-facts.davidsling.in/r/sentence.json",
         "https://cmd-facts.davidsling.in/r/use-explain.json"
@@ -177,9 +172,8 @@
       "title": "Redacted",
       "description": "The sentence as a classified document: every value blacked out, declassified on hover.",
       "registryDependencies": [
-        "badge",
-        "tooltip",
-        "utils",
+        "https://ui.shadcn.com/r/styles/new-york-v4/badge.json",
+        "https://ui.shadcn.com/r/styles/new-york-v4/tooltip.json",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -196,9 +190,8 @@
       "title": "Ransom note",
       "description": "Every value cut out of magazines, one letter at a time.",
       "registryDependencies": [
-        "badge",
-        "tooltip",
-        "utils",
+        "https://ui.shadcn.com/r/styles/new-york-v4/badge.json",
+        "https://ui.shadcn.com/r/styles/new-york-v4/tooltip.json",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -218,10 +211,9 @@
         "cmd-facts@^0.5.0"
       ],
       "registryDependencies": [
-        "badge",
-        "separator",
-        "tooltip",
-        "utils",
+        "https://ui.shadcn.com/r/styles/new-york-v4/badge.json",
+        "https://ui.shadcn.com/r/styles/new-york-v4/separator.json",
+        "https://ui.shadcn.com/r/styles/new-york-v4/tooltip.json",
         "https://cmd-facts.davidsling.in/r/command-line.json",
         "https://cmd-facts.davidsling.in/r/sentence.json",
         "https://cmd-facts.davidsling.in/r/use-explain.json"

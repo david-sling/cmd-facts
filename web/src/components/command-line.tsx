@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { explain, linePartsOf, type Explainer, type Explanation, type LinePart } from 'cmd-facts'
 
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 
 /** The classes each kind of word is drawn with. This file is yours now: change them here. */
 const tone: Record<Exclude<LinePart['kind'], 'space'>, string> = {
