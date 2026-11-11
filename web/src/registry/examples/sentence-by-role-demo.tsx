@@ -6,20 +6,22 @@ import { Cpu, FileText, Globe, MousePointer2, Server, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { CommandLine } from '@/components/command-line'
 import { Sentence } from '@/components/sentence'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { useExplain } from '@/hooks/use-explain'
 
 const command = 'curl -o dump.sql https://db.example.com/export && chown alice dump.sql && ssh admin@db.internal'
 
-// One look per kind of value, so a reader tells a host from a file at a glance. A role not listed keeps the default.
-const byRole: Partial<Record<Role, { icon: LucideIcon; className: string; underline: string }>> = {
-  url: { icon: Globe, className: 'bg-sky-400/15 text-sky-700 dark:text-sky-300', underline: 'decoration-sky-500' },
-  host: { icon: Server, className: 'bg-violet-400/15 text-violet-700 dark:text-violet-300', underline: 'decoration-violet-500' },
-  path: { icon: FileText, className: 'bg-amber-400/15 text-amber-700 dark:text-amber-300', underline: 'decoration-amber-500' },
-  user: { icon: User, className: 'bg-emerald-400/15 text-emerald-700 dark:text-emerald-300', underline: 'decoration-emerald-500' },
-  pid: { icon: Cpu, className: 'bg-rose-400/15 text-rose-700 dark:text-rose-300', underline: 'decoration-rose-500' },
+// One look per kind of value, so a reader tells a host from a file at a glance: a colour for the word in the
+// command, an underline and an icon for the value in the sentence, and a wash for both when either is pointed at.
+// A role not listed keeps the default.
+type Look = { icon: LucideIcon; text: string; underline: string; wash: string }
+const byRole: Partial<Record<Role, Look>> = {
+  url: { icon: Globe, text: 'text-sky-700 dark:text-sky-300', underline: 'decoration-sky-500', wash: 'bg-sky-400/15' },
+  host: { icon: Server, text: 'text-violet-700 dark:text-violet-300', underline: 'decoration-violet-500', wash: 'bg-violet-400/15' },
+  path: { icon: FileText, text: 'text-amber-700 dark:text-amber-300', underline: 'decoration-amber-500', wash: 'bg-amber-400/15' },
+  user: { icon: User, text: 'text-emerald-700 dark:text-emerald-300', underline: 'decoration-emerald-500', wash: 'bg-emerald-400/15' },
+  pid: { icon: Cpu, text: 'text-rose-700 dark:text-rose-300', underline: 'decoration-rose-500', wash: 'bg-rose-400/15' },
 }
 
 /**
@@ -87,9 +89,7 @@ export default function Page() {
                 <span
                   onMouseEnter={() => setPointed(value)}
                   onMouseLeave={() => setPointed(null)}
-                  className={`cursor-help rounded-sm underline decoration-dotted underline-offset-4 transition-colors ${
-                    look?.underline ?? ''
-                  } ${lit ? (look?.className ?? 'bg-accent') : ''}`}
+                  className={`cursor-help rounded-sm transition-colors ${look?.text ?? ''} ${lit ? (look?.wash ?? 'bg-accent') : ''}`}
                 >
                   {part.text}
                 </span>
@@ -105,28 +105,27 @@ export default function Page() {
                 const leave = () => setPointed(null)
                 const lit = pointed === v.index && (words.get(v.index)?.length ?? 0) > 0
                 return (
-                  <Badge
-                    variant="secondary"
+                  <span
                     tabIndex={0}
                     title={`${v.role}: ${v.written.join(', ')}`}
                     onMouseEnter={point}
                     onMouseLeave={leave}
                     onFocus={point}
                     onBlur={leave}
-                    className={`cursor-help gap-0.5 px-1 py-0 font-mono text-[0.85em] font-normal transition-shadow hover:ring-1 hover:ring-current ${
-                      lit ? 'ring-1 ring-current' : ''
-                    } ${look?.className ?? ''}`}
+                    className={`cursor-help rounded-sm pl-1 font-mono text-[0.9em] whitespace-nowrap underline decoration-dotted decoration-2 underline-offset-4 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-current ${
+                      look?.underline ?? ''
+                    } ${lit ? (look?.wash ?? 'bg-accent') : ''}`}
                   >
-                    {look && <look.icon aria-hidden />}
+                    {look && <look.icon aria-hidden className={`mr-0.5 inline size-[0.9em] align-[-0.1em] ${look.text}`} />}
                     {v.text}
-                  </Badge>
+                  </span>
                 )
               }}
             />
           </p>
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <MousePointer2 aria-hidden className="size-3.5" />
-            Point at a value or an underlined word to see where it sits in the command.
+            Point at an underlined value or a coloured word to see its pair.
           </p>
         </CardContent>
         <CardFooter className="justify-end gap-2">

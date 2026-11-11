@@ -238,7 +238,7 @@
       ],
       "name": "sentence-by-role-demo",
       "title": "An approval prompt, values by role",
-      "description": "An approval prompt whose sentence draws each value by role, with an icon; pointing at a value or a word lights its pair.",
+      "description": "An approval prompt: the command's values coloured by role, the sentence's underlined with an icon; pointing at either lights its pair.",
       "dependencies": [
         "cmd-facts@^0.5.0",
         "lucide-react"
