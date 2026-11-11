@@ -8,26 +8,140 @@
       "type": "registry:component",
       "title": "Command line",
       "description": "A command line exactly as written, each word drawn by what cmd-facts read it as: program, flag, value, operator, redirection.",
-      "dependencies": ["cmd-facts@^0.5.0"],
-      "registryDependencies": ["utils"],
-      "files": [{ "path": "src/registry/command-line.tsx", "type": "registry:component" }]
+      "dependencies": [
+        "cmd-facts@^0.5.0"
+      ],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "path": "src/components/command-line.tsx",
+          "type": "registry:component"
+        }
+      ]
     },
     {
       "name": "sentence",
       "type": "registry:component",
       "title": "Sentence",
       "description": "The plain-English sentence for a command, with the command's own text drawn apart from the words around it.",
-      "dependencies": ["cmd-facts@^0.5.0"],
-      "registryDependencies": ["utils"],
-      "files": [{ "path": "src/registry/sentence.tsx", "type": "registry:component" }]
+      "dependencies": [
+        "cmd-facts@^0.5.0"
+      ],
+      "registryDependencies": [
+        "utils"
+      ],
+      "files": [
+        {
+          "path": "src/components/sentence.tsx",
+          "type": "registry:component"
+        }
+      ]
     },
     {
       "name": "use-explain",
       "type": "registry:hook",
       "title": "useExplain",
       "description": "explain() for a component, recomputed only when the line changes.",
-      "dependencies": ["cmd-facts@^0.5.0"],
-      "files": [{ "path": "src/registry/use-explain.ts", "type": "registry:hook" }]
+      "dependencies": [
+        "cmd-facts@^0.5.0"
+      ],
+      "files": [
+        {
+          "path": "src/hooks/use-explain.ts",
+          "type": "registry:hook"
+        }
+      ]
+    },
+    {
+      "name": "sentence-demo",
+      "type": "registry:block",
+      "title": "Sentence example",
+      "description": "Type a command and read what it does, with the command's own text drawn apart.",
+      "dependencies": [
+        "cmd-facts@^0.5.0"
+      ],
+      "registryDependencies": [
+        "https://cmd-facts.davidsling.in/r/sentence.json"
+      ],
+      "files": [
+        {
+          "path": "src/registry/examples/sentence-demo.tsx",
+          "type": "registry:page",
+          "target": "app/page.tsx"
+        }
+      ]
+    },
+    {
+      "name": "command-line-demo",
+      "type": "registry:block",
+      "title": "Command line example",
+      "description": "A few command lines, each word drawn by what it was read as.",
+      "registryDependencies": [
+        "https://cmd-facts.davidsling.in/r/command-line.json"
+      ],
+      "files": [
+        {
+          "path": "src/registry/examples/command-line-demo.tsx",
+          "type": "registry:page",
+          "target": "app/page.tsx"
+        }
+      ]
+    },
+    {
+      "name": "approve-demo",
+      "type": "registry:block",
+      "title": "Approval prompt example",
+      "description": "An approval prompt: the command line, and the sentence for it.",
+      "registryDependencies": [
+        "https://cmd-facts.davidsling.in/r/command-line.json",
+        "https://cmd-facts.davidsling.in/r/sentence.json",
+        "https://cmd-facts.davidsling.in/r/use-explain.json"
+      ],
+      "files": [
+        {
+          "path": "src/registry/examples/approve-demo.tsx",
+          "type": "registry:page",
+          "target": "app/page.tsx"
+        }
+      ]
+    },
+    {
+      "name": "sentence-render-value-demo",
+      "type": "registry:block",
+      "title": "Sentence with renderValue",
+      "description": "Drawing a sentence's values yourself, with a count in place of a long list.",
+      "dependencies": [
+        "cmd-facts@^0.5.0"
+      ],
+      "registryDependencies": [
+        "https://cmd-facts.davidsling.in/r/sentence.json"
+      ],
+      "files": [
+        {
+          "path": "src/registry/examples/sentence-render-value-demo.tsx",
+          "type": "registry:page",
+          "target": "app/page.tsx"
+        }
+      ]
+    },
+    {
+      "name": "command-line-render-part-demo",
+      "type": "registry:block",
+      "title": "Command line with renderPart",
+      "description": "Drawing a command line's words yourself, on top of the component's own classes.",
+      "registryDependencies": [
+        "utils",
+        "https://cmd-facts.davidsling.in/r/command-line.json"
+      ],
+      "files": [
+        {
+          "path": "src/registry/examples/command-line-render-part-demo.tsx",
+          "type": "registry:page",
+          "target": "app/page.tsx"
+        }
+      ]
     }
   ]
 }

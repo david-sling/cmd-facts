@@ -22,6 +22,8 @@ const tone = {
 }
 ```
 
+<OpenInV0 items="command-line" />
+
 A flag that widened the answer adds `rounded-sm bg-primary/15`, and the program another one hands over to adds a dotted underline; both are in `commandLinePartClassName`, just below the map.
 
 In `components/sentence.tsx`, each value is drawn by the `Value` element:
@@ -30,6 +32,8 @@ In `components/sentence.tsx`, each value is drawn by the `Value` element:
 <code className="rounded-sm bg-primary/10 px-1 py-0.5 font-mono text-[0.85em] text-primary">
 ```
 
+<OpenInV0 items="sentence" />
+
 Change these and every use of the component follows.
 
 ## Override one use
@@ -37,15 +41,31 @@ Change these and every use of the component follows.
 For one place that needs something else, pass `renderValue` to [`Sentence`](/docs/react/sentence) or `renderPart` to [`CommandLine`](/docs/react/command-line), and draw with whatever classes you like:
 
 ```tsx
-<Sentence
-  of={explanation}
-  renderValue={(v) => (
-    <code title={v.written.join('\n')} className="rounded bg-amber-400/10 px-1 font-mono text-amber-300">
-      {v.text}
-    </code>
-  )}
-/>
+import { explain } from 'cmd-facts'
+import { Sentence } from '@/components/sentence'
+
+const explanation = explain('rm notes.txt draft.txt old.txt backup.txt')
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-2xl p-8 text-xl">
+      <Sentence
+        of={explanation}
+        renderValue={(v) => (
+          <code
+            title={v.written.join('\n')}
+            className="rounded bg-amber-400/15 px-1 font-mono text-amber-700 dark:text-amber-300"
+          >
+            {v.values.length > 3 ? `${v.values.length} files` : v.text}
+          </code>
+        )}
+      />
+    </main>
+  )
+}
 ```
+
+<OpenInV0 items="sentence-render-value-demo" />
 
 `className` on either component goes to its outer element, merged with `cn`.
 

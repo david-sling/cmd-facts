@@ -2,6 +2,8 @@ import type { ComponentType } from 'react'
 import type { MDXComponents } from 'mdx/types'
 import GithubSlugger from 'github-slugger'
 
+import { openInV0Url } from '#/site'
+
 export { REPO_URL } from '#/site'
 
 type Frontmatter = { title: string; description: string }
@@ -30,8 +32,19 @@ const sources = import.meta.glob<string>('../docs/**/*.mdx', { eager: true, quer
 
 const slugOf = (path: string) => path.replace(/^\.\.\/docs\//, '').replace(/\.mdx$/, '').replace(/(^|\/)index$/, '')
 
+// A pasted page has no buttons: each one becomes the link it opens.
+const V0 = /^<OpenInV0 items="([^"]+)" \/>$/gm
+
 function body(source: string) {
-  return source.replace(/^---\n[\s\S]*?\n---\n+/, '').trim()
+  return source
+    .replace(/^---\n[\s\S]*?\n---\n+/, '')
+    .replace(V0, (_, items: string) =>
+      items
+        .split(/\s+/)
+        .map((name) => `[Open ${name} in v0](${openInV0Url(name)})`)
+        .join(' · '),
+    )
+    .trim()
 }
 
 function plain(text: string) {

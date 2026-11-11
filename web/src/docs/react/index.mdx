@@ -13,6 +13,8 @@ You need a project already set up for shadcn — a `components.json` and Tailwin
 npx shadcn@latest add https://cmd-facts.davidsling.in/r/command-line.json https://cmd-facts.davidsling.in/r/sentence.json https://cmd-facts.davidsling.in/r/use-explain.json
 ```
 
+<OpenInV0 items="command-line sentence use-explain" />
+
 Each item also installs `cmd-facts` itself, 0.5 or newer, and shadcn's `cn` helper. The files land where your `components.json` says components and hooks go:
 
 | Item | File | What it is |
@@ -23,21 +25,41 @@ Each item also installs `cmd-facts` itself, 0.5 or newer, and shadcn's `cn` help
 
 ## Use
 
+An approval prompt, with the line typed into it:
+
 ```tsx
+'use client'
+
+import { useState } from 'react'
 import { CommandLine } from '@/components/command-line'
 import { Sentence } from '@/components/sentence'
 import { useExplain } from '@/hooks/use-explain'
 
-function Approve({ line }: { line: string }) {
+export default function Page() {
+  const [line, setLine] = useState('curl https://get.example.com/i.sh | sh')
   const explanation = useExplain(line)
+
   return (
-    <>
-      <CommandLine line={line} of={explanation} />
-      <Sentence of={explanation} />
-    </>
+    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
+      <input
+        value={line}
+        onChange={(event) => setLine(event.target.value)}
+        aria-label="Command"
+        className="rounded-md border bg-background px-3 py-2 font-mono text-sm"
+      />
+      <div className="flex flex-col gap-4 rounded-lg border p-6">
+        <p className="text-sm text-muted-foreground">An agent wants to run</p>
+        <CommandLine line={line} of={explanation} className="rounded-md bg-muted px-3 py-2 text-sm" />
+        <p className="text-lg">
+          <Sentence of={explanation} />
+        </p>
+      </div>
+    </main>
   )
 }
 ```
+
+<OpenInV0 items="approve-demo" />
 
 `useExplain` takes a line or a split argv, the same `Input` as `explain`, and an optional explainer from `createExplainer` for answering from your own packs. Keep that explainer stable — at module scope, or in a `useMemo` — or every render explains again.
 

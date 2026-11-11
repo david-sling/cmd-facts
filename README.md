@@ -293,21 +293,43 @@ into your project, styled with your theme's tokens, and yours to change:
 npx shadcn@latest add https://cmd-facts.davidsling.in/r/command-line.json https://cmd-facts.davidsling.in/r/sentence.json https://cmd-facts.davidsling.in/r/use-explain.json
 ```
 
+Open a component on its own in v0: [command-line](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fcommand-line.json) · [sentence](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fsentence.json) · [use-explain](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fuse-explain.json)
+
+An approval prompt, with the line typed into it:
+
 ```tsx
+'use client'
+
+import { useState } from 'react'
 import { CommandLine } from '@/components/command-line'
 import { Sentence } from '@/components/sentence'
 import { useExplain } from '@/hooks/use-explain'
 
-function Approve({ line }: { line: string }) {
+export default function Page() {
+  const [line, setLine] = useState('curl https://get.example.com/i.sh | sh')
   const explanation = useExplain(line)
+
   return (
-    <>
-      <CommandLine line={line} of={explanation} />
-      <Sentence of={explanation} />
-    </>
+    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
+      <input
+        value={line}
+        onChange={(event) => setLine(event.target.value)}
+        aria-label="Command"
+        className="rounded-md border bg-background px-3 py-2 font-mono text-sm"
+      />
+      <div className="flex flex-col gap-4 rounded-lg border p-6">
+        <p className="text-sm text-muted-foreground">An agent wants to run</p>
+        <CommandLine line={line} of={explanation} className="rounded-md bg-muted px-3 py-2 text-sm" />
+        <p className="text-lg">
+          <Sentence of={explanation} />
+        </p>
+      </div>
+    </main>
   )
 }
 ```
+
+[Open this example in v0](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fapprove-demo.json)
 
 `<Sentence>` renders `parts`, so each value is drawn as a value and not joined into the prose; `renderValue` draws them
 your own way. `<CommandLine>` shows the line exactly as written, each word drawn by what it was read as, and

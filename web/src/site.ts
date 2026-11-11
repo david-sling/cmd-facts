@@ -28,3 +28,7 @@ export const REPO_URL = 'https://github.com/david-sling/cmd-facts'
 export const REPORT_URL = `${REPO_URL}/issues/new?template=inaccurate-explanation.yml`
 export const MISSING_URL = `${REPO_URL}/issues/new?template=missing-command.yml`
 export const REPORTS_URL = `${REPO_URL}/issues?q=is%3Aissue+label%3Ainaccurate-explanation`
+
+/** A shadcn registry item served by this site, as v0 opens it: v0 fetches the item's JSON and starts a chat from it. */
+export const registryItemUrl = (name: string) => `${SITE}/r/${name}.json`
+export const openInV0Url = (name: string) => `https://v0.dev/chat/api/open?url=${encodeURIComponent(registryItemUrl(name))}`

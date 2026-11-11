@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { BUILTIN, createExplainer, explain } from 'cmd-facts'
-import { CommandLine } from './command-line'
-import { Sentence } from './sentence'
-import { useExplain } from './use-explain'
+import { CommandLine } from '@/components/command-line'
+import { Sentence } from '@/components/sentence'
+import { useExplain } from '@/hooks/use-explain'
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<>{node}</>)
 const text = (markup: string) => markup.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
@@ -73,7 +73,7 @@ describe('useExplain', () => {
 
 describe('registry.json', () => {
   const registry = JSON.parse(readFileSync(new URL('../../registry.json', import.meta.url), 'utf8')) as {
-    items: { name: string; dependencies: string[]; files: { path: string }[] }[]
+    items: { name: string; type: string; dependencies?: string[]; files: { path: string }[] }[]
   }
   const core = JSON.parse(
     readFileSync(new URL('../../../packages/cmd-facts/package.json', import.meta.url), 'utf8'),
@@ -88,10 +88,76 @@ describe('registry.json', () => {
   it('asks for a core version this repo satisfies', () => {
     const [major, minor] = core.version.split('.').map(Number)
     for (const item of registry.items) {
-      const wanted = item.dependencies.find((d) => d.startsWith('cmd-facts@'))
+      const wanted = item.dependencies?.find((d) => d.startsWith('cmd-facts@'))
+      // every component asks for the core; an example asks only where it imports it itself
+      if (item.type === 'registry:block' && !wanted) continue
       expect(wanted, item.name).toBeDefined()
       const [, wMajor, wMinor] = /\^(\d+)\.(\d+)/.exec(wanted!)!.map(Number)
       expect(major === wMajor && minor! >= wMinor!, `${item.name} wants ${wanted}, core is ${core.version}`).toBe(true)
     }
+  })
+})
+
+describe('Open in v0', () => {
+  type Item = { name: string; type: string; registryDependencies?: string[]; files: { path: string; type: string; target?: string }[] }
+  const items = (
+    JSON.parse(readFileSync(new URL('../../registry.json', import.meta.url), 'utf8')) as { items: Item[] }
+  ).items
+  const names = new Set(items.map((i) => i.name))
+  const examples = items.filter((i) => i.type === 'registry:block')
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+  const source = (name: string) => read(`./examples/${name}.tsx`).trimEnd()
+
+  it('renders every example', async () => {
+    for (const item of examples) {
+      const { default: Page } = (await import(`./examples/${item.name}.tsx`)) as { default: () => React.ReactNode }
+      expect(html(<Page />), item.name).toContain('<main')
+    }
+  })
+
+  // v0 opens a project onto its root page, so an example is a page there and nothing else
+  it('serves every example as the page v0 opens onto', () => {
+    for (const item of examples) {
+      expect(item.files, item.name).toEqual([
+        { path: `src/registry/examples/${item.name}.tsx`, type: 'registry:page', target: 'app/page.tsx' },
+      ])
+    }
+  })
+
+  it('points examples at the components on this site', () => {
+    for (const item of examples)
+      for (const dep of item.registryDependencies ?? []) {
+        if (dep === 'utils') continue
+        const name = /^https:\/\/cmd-facts\.davidsling\.in\/r\/([a-z-]+)\.json$/.exec(dep)?.[1]
+        expect(name && names.has(name), `${item.name} → ${dep}`).toBe(true)
+      }
+  })
+
+  const pages = ['index', 'sentence', 'command-line', 'styling'].map((p) => [p, read(`../docs/react/${p}.mdx`)] as const)
+
+  it('names a registry item with every button', () => {
+    for (const [page, mdx] of pages)
+      for (const [, list] of mdx.matchAll(/<OpenInV0 items="([^"]+)" \/>/g))
+        for (const name of list!.split(/\s+/)) expect(names.has(name), `${page}: ${name}`).toBe(true)
+  })
+
+  // the code above a button is the example it opens, so what is read is what v0 gets
+  it('shows the example a button opens, exactly', () => {
+    let checked = 0
+    for (const [page, mdx] of pages)
+      for (const [, code, name] of mdx.matchAll(/```tsx\n([\s\S]*?)\n```\n\n<OpenInV0 items="([^"]+)" \/>/g)) {
+        if (!examples.some((e) => e.name === name)) continue
+        expect(code, `${page}: ${name}`).toBe(source(name!))
+        checked++
+      }
+    expect(checked).toBeGreaterThanOrEqual(5)
+  })
+
+  it('shows the README example it links to, exactly', () => {
+    const readme = read('../../../README.md')
+    const m = /```tsx\n([\s\S]*?)\n```\n\n\[Open this example in v0\]\(https:\/\/v0\.dev\/chat\/api\/open\?url=([^)]+)\)/.exec(readme)
+    expect(m).not.toBeNull()
+    const name = /\/r\/([a-z-]+)\.json$/.exec(decodeURIComponent(m![2]!))![1]!
+    expect(m![1]).toBe(source(name))
   })
 })

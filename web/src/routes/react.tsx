@@ -3,8 +3,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ArrowRight, Check, Copy, Github } from 'lucide-react'
 import { explain } from 'cmd-facts'
 import { CommandField } from '#/components/command-field'
-import { Sentence } from '#/registry/sentence'
-import sentenceSource from '#/registry/sentence.tsx?raw'
+import { Sentence } from '#/components/sentence'
+import sentenceSource from '#/components/sentence.tsx?raw'
+import demoSource from '#/registry/examples/sentence-demo.tsx?raw'
+import { OpenInV0 } from '#/components/open-in-v0'
 import { REPO_URL, SITE } from '#/site'
 
 const TITLE = 'cmd-facts for React — say what a command does'
@@ -79,18 +81,6 @@ function Code({ children, className = '' }: { children: string; className?: stri
   )
 }
 
-/** The playground written the way a consumer would write it, with the line typed above in it. */
-const usageCode = (line: string) => `import { explain } from 'cmd-facts'
-import { Sentence } from '@/components/sentence'
-
-const explanation = explain(
-  ${JSON.stringify(line)},
-)
-
-export function Approve() {
-  return <Sentence of={explanation} />
-}`
-
 function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false)
   return (
@@ -125,17 +115,18 @@ function Install() {
   )
 }
 
+// Each tab is a file as it is served from the registry, and opens in v0 as that same item.
 const TABS = [
-  { id: 'usage', label: 'usage.tsx' },
+  { id: 'sentence-demo', label: 'app/page.tsx', source: demoSource },
   { id: 'sentence', label: 'components/sentence.tsx', source: sentenceSource },
 ] as const
 
 function Playground() {
   const [line, setLine] = useState<string>(EXAMPLES[0])
-  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('usage')
+  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('sentence-demo')
   const explanation = explain(line)
   const shown = TABS.find((t) => t.id === tab)!
-  const code = 'source' in shown ? shown.source.trimEnd() : usageCode(line)
+  const code = shown.source.trimEnd()
 
   return (
     <div className="rounded-2xl border border-line bg-panel">
@@ -164,7 +155,8 @@ function Playground() {
 
         {/* beside the previews, so the code and what it draws are read together; long lines wrap rather than hide */}
         <div className="min-w-0 border-t border-line bg-white/[0.015] lg:border-t-0 lg:border-l">
-          <div role="tablist" aria-label="Code" className="flex gap-1 overflow-x-auto border-b border-line px-3 pt-3 sm:px-5">
+          <div className="flex items-center justify-between gap-3 border-b border-line pr-3 sm:pr-5">
+          <div role="tablist" aria-label="Code" className="flex gap-1 overflow-x-auto px-3 pt-3 sm:px-5">
             {TABS.map((t) => (
               <button
                 key={t.id}
@@ -179,6 +171,8 @@ function Playground() {
                 {t.label}
               </button>
             ))}
+          </div>
+          <OpenInV0 items={shown.id} className="shrink-0" />
           </div>
           <div className="relative px-5 py-5 sm:px-7">
             <div className="absolute top-5 right-5 sm:right-7">
@@ -224,8 +218,9 @@ function ReactPage() {
           file named like a reassurance cannot pass for one. It installs into your project through shadcn, styled with
           your theme, and the code is yours to change.
         </p>
-        <div className="mt-10">
+        <div className="mt-10 flex flex-col items-start gap-3">
           <Install />
+          <OpenInV0 items="sentence" />
         </div>
       </section>
 

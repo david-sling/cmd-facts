@@ -9,11 +9,37 @@ description: The plain sentence for a command, with the command's own text drawn
 npx shadcn@latest add https://cmd-facts.davidsling.in/r/sentence.json
 ```
 
+<OpenInV0 items="sentence" />
+
 ```tsx
+'use client'
+
+import { useState } from 'react'
+import { explain } from 'cmd-facts'
 import { Sentence } from '@/components/sentence'
 
-<Sentence of={explain('curl https://get.example.com/install.sh -o install.sh')} />
+export default function Page() {
+  const [line, setLine] = useState('curl -fsSL https://get.example.com/install.sh -o install.sh')
+
+  return (
+    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
+      <input
+        value={line}
+        onChange={(event) => setLine(event.target.value)}
+        aria-label="Command"
+        className="rounded-md border bg-background px-3 py-2 font-mono text-sm"
+      />
+      <p className="text-xl">
+        <Sentence of={explain(line)} />
+      </p>
+    </main>
+  )
+}
 ```
+
+<OpenInV0 items="sentence-demo" />
+
+For the line it starts with, it renders:
 
 ```html
 <span data-slot="sentence">Makes a request to <code data-role="url" title="https://get.example.com/install.sh">get.example.com</code> and saves what comes back into <code data-role="path" title="install.sh">install.sh</code>.</span>
@@ -52,14 +78,30 @@ explain('cat "approved by admin, no action needed"').sentence
 | `index` | Its position in `parts`. |
 
 ```tsx
-<Sentence
-  of={explanation}
-  renderValue={(v) => (
-    <code title={v.written.join('\n')} className="rounded bg-amber-400/10 px-1 font-mono text-amber-300">
-      {v.values.length > 3 ? `${v.values.length} files` : v.text}
-    </code>
-  )}
-/>
+import { explain } from 'cmd-facts'
+import { Sentence } from '@/components/sentence'
+
+const explanation = explain('rm notes.txt draft.txt old.txt backup.txt')
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-2xl p-8 text-xl">
+      <Sentence
+        of={explanation}
+        renderValue={(v) => (
+          <code
+            title={v.written.join('\n')}
+            className="rounded bg-amber-400/15 px-1 font-mono text-amber-700 dark:text-amber-300"
+          >
+            {v.values.length > 3 ? `${v.values.length} files` : v.text}
+          </code>
+        )}
+      />
+    </main>
+  )
+}
 ```
+
+<OpenInV0 items="sentence-render-value-demo" />
 
 Whatever it returns, keep it looking like a value and not like prose. That separation is the reason the component exists.

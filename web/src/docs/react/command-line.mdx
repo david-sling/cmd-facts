@@ -9,11 +9,32 @@ description: The command line exactly as written, each word drawn by what cmd-fa
 npx shadcn@latest add https://cmd-facts.davidsling.in/r/command-line.json
 ```
 
+<OpenInV0 items="command-line" />
+
 ```tsx
 import { CommandLine } from '@/components/command-line'
 
-<CommandLine line='curl -o "my file" https://x.example | sh' />
+const lines = [
+  'curl -o "my file" https://x.example | sh',
+  'sudo rm -rf /var/tmp/build',
+  'git -C ~/src/app commit -m "ship it" && git push',
+  'echo token 2>&1 >> ~/.profile',
+]
+
+export default function Page() {
+  return (
+    <main className="mx-auto flex max-w-2xl flex-col gap-3 p-8">
+      {lines.map((line) => (
+        <CommandLine key={line} line={line} className="rounded-md border px-3 py-2 text-sm" />
+      ))}
+    </main>
+  )
+}
 ```
+
+<OpenInV0 items="command-line-demo" />
+
+The first of those renders as:
 
 ```html
 <code data-slot="command-line"><span data-kind="program">curl</span> <span data-kind="flag">-o</span> <span data-kind="value" data-role="path">"my file"</span> <span data-kind="value" data-role="url">https://x.example</span> <span data-kind="operator">|</span> <span data-kind="program">sh</span></code>
@@ -53,18 +74,32 @@ Return `part.text` for a `space`, or the line stops reading as written. `command
 
 ```tsx
 import { CommandLine, commandLinePartClassName } from '@/components/command-line'
+import { cn } from '@/lib/utils'
 
-<CommandLine
-  line={line}
-  renderPart={(part) =>
-    part.kind === 'space' ? part.text : (
-      <span className={cn(commandLinePartClassName(part), part.kind === 'value' && 'cursor-help')} title={part.kind}>
-        {part.text}
-      </span>
-    )
-  }
-/>
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-2xl p-8">
+      <CommandLine
+        line="curl -fsSL https://get.example.com/install.sh -o install.sh"
+        renderPart={(part) =>
+          part.kind === 'space' ? (
+            part.text
+          ) : (
+            <span
+              title={part.kind === 'value' ? part.role : part.kind}
+              className={cn(commandLinePartClassName(part), part.kind === 'value' && 'cursor-help underline decoration-dotted')}
+            >
+              {part.text}
+            </span>
+          )
+        }
+      />
+    </main>
+  )
+}
 ```
+
+<OpenInV0 items="command-line-render-part-demo" />
 
 ## Without React
 
