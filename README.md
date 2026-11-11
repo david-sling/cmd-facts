@@ -76,7 +76,7 @@ console.log(sentence) // "Makes a request to get.example.com and saves what come
     { "index": 4, "value": "install.sh", "role": "path", "flag": "-o" }
   ],
   "escalated": ["-o"],
-  "attribution": [{ "pack": "@cmd-facts/builtin", "version": "0.4.0", "trusted": true, "commands": ["curl"] }]
+  "attribution": [{ "pack": "@cmd-facts/builtin", "version": "0.5.0", "trusted": true, "commands": ["curl"] }]
 }
 ```
 
@@ -506,7 +506,7 @@ draw on three. A pack that answered at two depths appears once, with both rows n
 
 ```json
 [
-  { "pack": "@cmd-facts/builtin", "version": "0.4.0", "trusted": true, "commands": ["sudo"] },
+  { "pack": "@cmd-facts/builtin", "version": "0.5.0", "trusted": true, "commands": ["sudo"] },
   { "pack": "@acme/tools", "version": "1.2.0", "trusted": false, "commands": ["flowctl"] },
   { "pack": "@acme/kube", "version": "2.4.0", "trusted": false, "commands": ["kubectl delete"] }
 ]
