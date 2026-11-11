@@ -312,6 +312,67 @@ describe('opacity', () => {
       expect(run(line).facts.opaque, line).toBe(true)
     }
   })
+
+  // Each of these names a program that runs on this computer, where the row alone would say nothing does.
+  it('names the program a setting or a transfer option runs here', () => {
+    const proxied = explain('ssh -o ProxyCommand=evil deploy@bastion')
+    expect(proxied.facts.opaque && proxied.facts.handsOverTo).toMatch(/on this one/)
+    expect(proxied.escalated).toEqual(['-o'])
+    expect(explain('ssh -F ./cfg deploy@bastion').escalated).toEqual(['-F'])
+
+    const clear = explain('git clone https://example.com/r.git')
+    expect(clear.facts.opaque).toBe(false)
+    for (const line of [
+      'git clone -u evil /tmp/r',
+      'git clone -c core.fsmonitor=evil https://example.com/r.git',
+      'git clone --template ./t https://example.com/r.git',
+      'git fetch --upload-pack evil',
+      'git push --receive-pack evil',
+    ]) {
+      const got = explain(line)
+      expect(got.facts.opaque, line).toBe(true)
+      expect(effectsOf(got.facts), line).toContain('execute')
+    }
+  })
+})
+
+describe('flags that reach past what the row describes', () => {
+  it('marks a line that hands over a password, a key or a file of secrets', () => {
+    for (const line of [
+      'ssh -i ~/.ssh/id_ed25519 deploy@bastion',
+      'unzip -P hunter2 a.zip',
+      'npm publish --otp 123456',
+      'node --env-file .env app.js',
+      'docker run --env-file .env ubuntu',
+      'curl -n https://example.com',
+      'curl --oauth2-bearer abc https://example.com',
+    ]) {
+      expect(explain(line).facts.touchesCredentials, line).toBe(true)
+    }
+    expect(explain('ssh deploy@bastion').facts.touchesCredentials).toBe(false)
+  })
+
+  it('says when a tunnel opens a door on this computer', () => {
+    expect(explain('ssh deploy@bastion').facts.network).toBe('known-host')
+    for (const line of ['ssh -L 8080:db:5432 deploy@bastion', 'ssh -D 1080 deploy@bastion']) {
+      expect(explain(line).facts.network, line).toBe('listens')
+    }
+  })
+
+  it('reads a curl settings file as able to send and save', () => {
+    const got = explain('curl -K ./opts https://example.com')
+    expect(effectsOf(got.facts)).toEqual(expect.arrayContaining(['transmit', 'write', 'create']))
+    expect(got.facts.reversible).toBe('no')
+  })
+
+  it('reads a packaged program given full control or a folder of this computer', () => {
+    const privileged = explain('docker run --privileged ubuntu')
+    expect(privileged.facts.privilege).toBe('root')
+    expect(effectsOf(privileged.facts)).toContain('elevate')
+    const mounted = explain('docker run -v /:/host ubuntu')
+    expect(effectsOf(mounted.facts)).toEqual(expect.arrayContaining(['read', 'write']))
+    expect(mounted.args[0]).toEqual({ index: 3, value: '/:/host', role: 'text', flag: '-v' })
+  })
 })
 
 describe('the command inside the command', () => {

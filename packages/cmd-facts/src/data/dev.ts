@@ -6,8 +6,16 @@ const SETUP_STEPS = 'the set-up steps the downloaded packages bring with them'
 
 const FETCH_VALUES = valuesOf('text', [
   '--depth', '--deepen', '--shallow-since', '--shallow-exclude', '--negotiation-tip', '--refmap', '-j', '--jobs',
-  '--submodule-prefix', '--upload-pack', '-o', '--server-option',
+  '--submodule-prefix', '-o', '--server-option',
 ])
+
+// The program that serves the other end of a transfer. Where the other end is a folder on this computer, it runs here.
+const TRANSFER_PROGRAM = (flags: string[]): FlagRule => ({
+  flags,
+  takesValue: true,
+  role: 'text',
+  facts: { effect: ['execute'], opaque: true, handsOverTo: 'the program named to serve the other end, which can run on this computer' },
+})
 
 export const GIT_ENTRY: Entry = {
   // A word git has no command of its own for can still be an alias the settings define, or a `git-<word>` program
@@ -75,11 +83,26 @@ export const GIT_ENTRY: Entry = {
       operands: ['url', 'path'],
       values: {
         ...valuesOf('text', [
-          '-b', '--branch', '-o', '--origin', '--depth', '--shallow-since', '--shallow-exclude', '--filter',
-          '--server-option', '-c', '--config', '-u', '--upload-pack',
+          '-b', '--branch', '-o', '--origin', '--depth', '--shallow-since', '--shallow-exclude', '--filter', '--server-option',
         ]),
-        ...valuesOf('path', ['--reference', '--reference-if-able', '--template', '--separate-git-dir']),
+        ...valuesOf('path', ['--reference', '--reference-if-able', '--separate-git-dir']),
       },
+      flags: [
+        TRANSFER_PROGRAM(['-u', '--upload-pack']),
+        {
+          // Settings written into the new copy are in force while it is first filled in, so one can name a program.
+          flags: ['-c', '--config'],
+          takesValue: true,
+          role: 'text',
+          facts: { effect: ['execute'], opaque: true, handsOverTo: 'the programs the given settings tell it to run' },
+        },
+        {
+          flags: ['--template'],
+          takesValue: true,
+          role: 'path',
+          facts: { effect: ['execute'], opaque: true, handsOverTo: 'the steps kept in the named folder, which run as the copy is set up' },
+        },
+      ],
     },
     fetch: {
       facts: fact('Collects the latest changes from the server without touching the files you see.', {
@@ -89,6 +112,7 @@ export const GIT_ENTRY: Entry = {
         docs: GIT,
       }),
       values: FETCH_VALUES,
+      flags: [TRANSFER_PROGRAM(['--upload-pack'])],
     },
     pull: {
       facts: fact('Collects the latest changes from the server and puts them into the files you see.', {
@@ -100,6 +124,7 @@ export const GIT_ENTRY: Entry = {
         docs: GIT,
       }),
       values: { ...FETCH_VALUES, ...valuesOf('text', ['--cleanup', '-s', '--strategy', '-X', '--strategy-option']) },
+      flags: [TRANSFER_PROGRAM(['--upload-pack'])],
     },
     push: {
       facts: fact('Sends the save points made here up to the server, where other people can see them.', {
@@ -109,7 +134,8 @@ export const GIT_ENTRY: Entry = {
         reversible: 'no',
         docs: GIT,
       }),
-      values: valuesOf('text', ['--repo', '-o', '--push-option', '--receive-pack', '--exec', '--recurse-submodules']),
+      values: valuesOf('text', ['--repo', '-o', '--push-option', '--recurse-submodules']),
+      flags: [TRANSFER_PROGRAM(['--receive-pack', '--exec'])],
     },
     add: {
       facts: fact('Marks changed files to be included in the next save point.', { ...LOCAL, reversible: 'yes', repeatSafe: true, effect: ['write'], docs: GIT }),
@@ -208,7 +234,7 @@ const packagerRows = (docs: string): Entry => ({
   facts: opaqueFact(
     'Works with the ready-made code packages a project is built on.',
     'the steps written inside the project and inside the packages it uses',
-    { privilege: 'none', touchesCredentials: false, effect: ['read', 'write', 'execute'], network: 'arbitrary', repeatSafe: false, docs },
+    { privilege: 'none', touchesCredentials: true, effect: ['read', 'write', 'execute'], network: 'arbitrary', repeatSafe: false, docs },
   ),
   sub: {
     install: {
@@ -298,6 +324,7 @@ const packagerRows = (docs: string): Entry => ({
         'the steps the project runs for itself before sending',
         { privilege: 'none', touchesCredentials: false, effect: ['read', 'transmit'], network: 'arbitrary', docs },
       ),
+      flags: [{ flags: ['--otp'], takesValue: true, role: 'text', facts: { touchesCredentials: true } }],
     },
     list: { facts: fact('Lists the ready-made code packages the project uses.', { ...LOOKS, docs }) },
     ls: { facts: fact('Lists the ready-made code packages the project uses.', { ...LOOKS, docs }) },
@@ -329,7 +356,7 @@ const nodePackager = (docs: string, values: Record<string, Role>, bare: string[]
 const NPM_VALUES: Record<string, Role> = {
   '--registry': 'url',
   ...valuesOf('path', ['--prefix', '--cache', '--userconfig', '--script-shell']),
-  ...valuesOf('text', ['-w', '--workspace', '--omit', '--include', '--tag', '--access', '--depth', '--audit-level', '--loglevel', '--otp']),
+  ...valuesOf('text', ['-w', '--workspace', '--omit', '--include', '--tag', '--access', '--depth', '--audit-level', '--loglevel']),
 }
 
 const PNPM_VALUES: Record<string, Role> = {
@@ -350,7 +377,7 @@ const BREW_INSTALL_VALUES: Record<string, Role> = {
 
 // The paths `-v` and `--mount` name are inside the packaged program as well as on this computer, so they stay text.
 const DOCKER_RUN_VALUES: Record<string, Role> = {
-  ...valuesOf('path', ['--cidfile', '--env-file', '--label-file']),
+  ...valuesOf('path', ['--cidfile', '--label-file']),
   ...valuesOf('text', [
     '--add-host', '-a', '--attach', '--blkio-weight', '--blkio-weight-device', '--cap-add', '--cap-drop', '--cgroup-parent',
     '--cgroupns', '--cpu-period', '--cpu-quota', '--cpu-rt-period', '--cpu-rt-runtime', '-c', '--cpu-shares', '--cpus',
@@ -362,10 +389,13 @@ const DOCKER_RUN_VALUES: Record<string, Role> = {
     '--log-opt', '--mac-address', '-m', '--memory', '--memory-reservation', '--memory-swap', '--memory-swappiness',
     '--mount', '--name', '--network', '--network-alias', '--oom-score-adj', '--pid', '--pids-limit', '--platform', '-p',
     '--publish', '--pull', '--restart', '--runtime', '--security-opt', '--shm-size', '--stop-signal', '--stop-timeout',
-    '--storage-opt', '--sysctl', '--tmpfs', '--ulimit', '-u', '--user', '--userns', '--uts', '-v', '--volume',
-    '--volume-driver', '--volumes-from', '-w', '--workdir',
+    '--storage-opt', '--sysctl', '--tmpfs', '--ulimit', '-u', '--user', '--userns', '--uts', '--volume-driver',
+    '--volumes-from', '-w', '--workdir',
   ]),
 }
+
+// A file of hidden settings, the kind that usually holds passwords and access keys for other services.
+const ENV_FILE: FlagRule = { flags: ['--env-file'], takesValue: true, role: 'path', facts: { touchesCredentials: true } }
 
 const PY = 'https://pip.pypa.io/en/stable/cli/'
 
@@ -522,9 +552,9 @@ export const DEV: Record<string, Entry> = {
       '-r': 'package',
       '--require': 'package',
       '--import': 'package',
-      '--env-file': 'path',
       '--watch-path': 'path',
     },
+    flags: [ENV_FILE],
   },
   python: {
     versioned: true,
@@ -627,7 +657,7 @@ export const DEV: Record<string, Entry> = {
     facts: opaqueFact(
       'Works with programs that run in their own sealed-off copy of a system.',
       'the packaged program, whose contents were decided by whoever built it',
-      { privilege: 'none', touchesCredentials: false, effect: ['read', 'write', 'execute'], network: 'arbitrary', repeatSafe: false, docs: 'https://docs.docker.com/reference/cli/docker/' },
+      { privilege: 'root', touchesCredentials: true, effect: ['read', 'write', 'execute', 'elevate'], network: 'arbitrary', repeatSafe: false, docs: 'https://docs.docker.com/reference/cli/docker/' },
     ),
     sub: {
       ps: {
@@ -651,6 +681,28 @@ export const DEV: Record<string, Entry> = {
         ),
         operands: ['package', 'command'],
         values: DOCKER_RUN_VALUES,
+        flags: [
+          ENV_FILE,
+          {
+            flags: ['--privileged'],
+            facts: {
+              effect: ['elevate'],
+              privilege: 'root',
+              note: 'It is given full control of the system it runs on, so it is no longer sealed off from this computer.',
+            },
+          },
+          {
+            // The text cannot say whether a folder of this computer or a store of the packaged program's own is meant,
+            // so both are read as the wider one.
+            flags: ['-v', '--volume', '--mount'],
+            takesValue: true,
+            role: 'text',
+            facts: {
+              effect: ['read', 'write'],
+              note: 'Folders on this computer that it is pointed at can be read and changed from inside it.',
+            },
+          },
+        ],
       },
       exec: {
         facts: opaqueFact(
@@ -659,7 +711,8 @@ export const DEV: Record<string, Entry> = {
           { privilege: 'none', touchesCredentials: false, effect: ['execute'], network: 'arbitrary', docs: 'https://docs.docker.com/reference/cli/docker/' },
         ),
         operands: ['text', 'command'],
-        values: { '--env-file': 'path', ...valuesOf('text', ['--detach-keys', '-e', '--env', '-u', '--user', '-w', '--workdir']) },
+        values: valuesOf('text', ['--detach-keys', '-e', '--env', '-u', '--user', '-w', '--workdir']),
+        flags: [ENV_FILE],
       },
       build: {
         facts: opaqueFact(

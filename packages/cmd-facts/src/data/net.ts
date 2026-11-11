@@ -1,6 +1,9 @@
 import { fact, opaqueFact, valuesOf } from '../entry.ts'
 import type { Entry } from '../entry.ts'
 
+const SSH_SETTINGS_RUN =
+  'whatever it is asked to run on the other computer, and any program its settings tell it to run on this one'
+
 export const NET: Record<string, Entry> = {
   ping: {
     facts: fact('Checks whether another computer on the network answers, and how long it takes.', {
@@ -46,8 +49,6 @@ export const NET: Record<string, Entry> = {
       '--proxy': 'host',
       '-D': 'path',
       '--dump-header': 'path',
-      '-K': 'path',
-      '--config': 'path',
       '--socks4': 'host',
       '--socks4a': 'host',
       '--socks5': 'host',
@@ -152,6 +153,19 @@ export const NET: Record<string, Entry> = {
         facts: { touchesCredentials: true },
       },
       {
+        // A settings file can carry any option this line could, including ones that send or save files.
+        flags: ['-K', '--config'],
+        takesValue: true,
+        role: 'path',
+        facts: {
+          effect: ['read', 'create', 'write', 'transmit'],
+          reversible: 'no',
+          repeatSafe: false,
+          note: 'The settings file it reads can tell it to send or save files that this line does not name.',
+        },
+      },
+      { flags: ['-n', '--netrc', '--netrc-optional'], facts: { touchesCredentials: true } },
+      {
         flags: ['-k', '--insecure'],
         facts: { note: 'This one does not check that the site answering is the site it claims to be.' },
       },
@@ -174,12 +188,30 @@ export const NET: Record<string, Entry> = {
     // A jump host (`-J`) and a bind address are left as text: the sentence names the first host on the line, and
     // that has to be the computer being connected to.
     values: {
-      '-i': 'path',
-      '-F': 'path',
       '-E': 'path',
       '-S': 'path',
       '-l': 'user',
-      ...valuesOf('text', ['-B', '-b', '-c', '-D', '-e', '-I', '-J', '-L', '-m', '-O', '-o', '-P', '-p', '-Q', '-R', '-W', '-w']),
+      ...valuesOf('text', ['-B', '-b', '-c', '-e', '-I', '-J', '-m', '-O', '-P', '-p', '-Q', '-R', '-W', '-w']),
     },
+    flags: [
+      { flags: ['-i'], takesValue: true, role: 'path', facts: { touchesCredentials: true } },
+      {
+        // A setting such as ProxyCommand or LocalCommand names a program that runs here, not on the other computer.
+        flags: ['-o'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['execute'], opaque: true, handsOverTo: SSH_SETTINGS_RUN },
+      },
+      { flags: ['-F'], takesValue: true, role: 'path', facts: { effect: ['execute'], opaque: true, handsOverTo: SSH_SETTINGS_RUN } },
+      {
+        flags: ['-L', '-D'],
+        takesValue: true,
+        role: 'text',
+        facts: {
+          network: 'listens',
+          note: 'It also opens a door on this computer: anything that connects to it is passed through to the other side.',
+        },
+      },
+    ],
   },
 }
