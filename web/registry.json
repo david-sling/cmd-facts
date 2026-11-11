@@ -212,13 +212,15 @@
       "type": "registry:block",
       "registryDependencies": [
         "https://cmd-facts.davidsling.in/r/badge.json",
+        "https://cmd-facts.davidsling.in/r/command-line.json",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "name": "sentence-by-role-demo",
       "title": "Sentence, one style per role",
-      "description": "Each value in the sentence drawn by what it is: a URL, a host, a file, a user.",
+      "description": "The command line, and under it each value in the sentence drawn by what it is, with an icon: a URL, a host, a file, a user.",
       "dependencies": [
-        "cmd-facts@^0.5.0"
+        "cmd-facts@^0.5.0",
+        "lucide-react"
       ],
       "files": [
         {
