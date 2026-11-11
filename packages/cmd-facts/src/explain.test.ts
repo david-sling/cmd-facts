@@ -85,6 +85,21 @@ describe('escalating flags', () => {
     expect(got.args).toEqual([{ index: 2, value: 'backup.tgz', role: 'path', flag: '-f' }])
   })
 
+  // `-X` is declared in `values`, not as a flag rule; inside a bundle its value must still not read as the address.
+  it('hands the next word to a value flag at the end of a bundle', () => {
+    expect(run('curl -sX POST https://example.com').sentence).toBe('Makes a request to example.com and shows what comes back.')
+    expect(roles('curl -sX POST https://example.com')).toEqual(['POST:text', 'https://example.com:url'])
+  })
+
+  it('reads the rest of a bundle as the value once a letter takes one', () => {
+    expect(run('curl -XPOST https://example.com').args[0]).toEqual({ index: 1, value: 'POST', role: 'text', flag: '-X' })
+    // The letters after `-X` are its value, so the `-T` and `-E` in `DELETE` do not widen anything.
+    const del = run('curl -XDELETE https://example.com')
+    expect(del.escalated).toEqual([])
+    expect(effectsOf(del.facts)).not.toContain('transmit')
+    expect(del.facts.touchesCredentials).toBe(false)
+  })
+
   // `tar xf a.tar` carries its flags as a bare first word, which must not read as a file the command was pointed at.
   it('reads an old-style mode word as the flags it bundles', () => {
     const got = run('tar xf a.tar')
@@ -219,6 +234,44 @@ describe('argument roles', () => {
 
   it('does not read a role out of the text of an argument', () => {
     expect(roles('ls https://example.com')).toEqual(['https://example.com:path'])
+  })
+
+  // Each of these once read a flag's value as the thing the command was pointed at.
+  it('gives a flag its value before counting operands', () => {
+    const said = (line: string) => explain(line).sentence
+    expect(said('ssh -i key.pem -L 8080:db:5432 deploy@bastion')).toBe('Connects to deploy@bastion and works on it from here.')
+    expect(said('ping -c 4 example.com')).toBe('Checks whether example.com answers, and how long it takes.')
+    expect(said('kill -s KILL 4821')).toBe('Stops the program running as 4821.')
+    expect(said('mkdir -m 700 secrets')).toBe('Makes a new, empty folder at secrets.')
+    expect(said('head -n 5 notes.txt')).toBe('Shows the first few lines of notes.txt.')
+    expect(roles('git clone -b main https://example.com/r.git')).toEqual(['main:text', 'https://example.com/r.git:url'])
+    expect(roles('pip install -r requirements.txt')).toEqual(['requirements.txt:path'])
+    expect(roles('docker run -e FOO=1 -v /:/host ubuntu sh')).toEqual(['FOO=1:text', '/:/host:text', 'ubuntu:package', 'sh:command'])
+  })
+
+  it('finds the command handed over past the options that come before it', () => {
+    expect(explain('sudo -g staff rm notes.txt').runs?.name).toBe('rm')
+    expect(explain('xargs -I {} rm {}').runs?.name).toBe('rm')
+    expect(explain('xargs -n 1 rm').runs?.name).toBe('rm')
+  })
+
+  it('reads a value flag inside a bundle as it would on its own', () => {
+    expect(explain('git commit -am "fix the build"').args).toEqual([
+      { index: 3, value: 'fix the build', role: 'text', flag: '-m' },
+    ])
+  })
+
+  it('steps over a package manager option to reach the subcommand', () => {
+    const got = explain('pnpm --filter web install')
+    expect(got.subcommand).toBe('install')
+    expect(got.facts.source).not.toBe('subcommand-miss')
+  })
+
+  // `-e` would move the pattern off the first operand, and a row cannot say that, so it stays undeclared. Undeclared
+  // is unread: neither word after it is named, and the line is not answered as a plain search.
+  it('leaves grep -e unread rather than guessing where the pattern went', () => {
+    expect(roles('grep -e foo notes.txt')).toEqual(['foo:unknown', 'notes.txt:unknown'])
+    expect(run('grep -e foo notes.txt').unread).toEqual(['-e'])
   })
 })
 

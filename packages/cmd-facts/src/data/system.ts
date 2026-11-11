@@ -1,4 +1,4 @@
-import { fact, opaqueFact, LOCAL, LOOKS } from '../entry.ts'
+import { fact, opaqueFact, valuesOf, LOCAL, LOOKS } from '../entry.ts'
 import type { Entry } from '../entry.ts'
 
 export const SYSTEM: Record<string, Entry> = {
@@ -23,13 +23,29 @@ export const SYSTEM: Record<string, Entry> = {
   },
   date: {
     facts: fact('Shows what day and time it is now.', { ...LOOKS, docs: 'man 1 date' }),
+    values: valuesOf('text', ['-d', '-f', '-r', '-t', '-v', '-z']),
   },
-  ps: { facts: fact('Lists the programs running on this computer.', { ...LOOKS, docs: 'man 1 ps' }) },
+  ps: {
+    facts: fact('Lists the programs running on this computer.', { ...LOOKS, docs: 'man 1 ps' }),
+    // The long options are the Linux `ps`; they are declared so a line written for it still reads its values.
+    values: {
+      ...valuesOf('pid', ['-p', '--pid', '--ppid']),
+      ...valuesOf('user', ['-U', '-u', '--User', '--user']),
+      ...valuesOf('text', ['-o', '-O', '-G', '-t', '--sid', '--tty', '--sort', '--cols', '--columns', '--lines', '--rows', '--width']),
+    },
+  },
   top: {
     facts: fact('Shows the programs running right now, and how much of the computer each one is using.', {
       ...LOOKS,
       docs: 'man 1 top',
     }),
+    // macOS `top` spells some of its options as whole words with one dash; those are declared whole.
+    values: {
+      '-pid': 'pid',
+      '-user': 'user',
+      '-U': 'user',
+      ...valuesOf('text', ['-s', '-i', '-c', '-l', '-n', '-o', '-O', '-stats']),
+    },
   },
   kill: {
     facts: fact('Stops a running program.', {
@@ -41,6 +57,7 @@ export const SYSTEM: Record<string, Entry> = {
       docs: 'man 1 kill',
     }),
     operands: ['pid'],
+    values: { '-s': 'signal' },
     flags: [
       {
         flags: ['-9', '-KILL'],
@@ -61,6 +78,10 @@ export const SYSTEM: Record<string, Entry> = {
       note: 'The list also shows which programs are connected to the network, and where.',
       docs: 'man 1 lsof',
     }),
+    operands: ['path'],
+    // Only the options whose value is required. `-i`, `-s`, `-r` and `-F` may stand alone, and `lsof -i -P` is the
+    // usual form, so declaring a value would read `-P` as an address. The `+` options are not read as options here.
+    values: { '-p': 'pid', '-u': 'user', ...valuesOf('text', ['-c', '-d', '-D']) },
   },
   env: {
     facts: opaqueFact(
@@ -75,6 +96,8 @@ export const SYSTEM: Record<string, Entry> = {
       },
     ),
     operands: ['command'],
+    // `-S` carries a whole command line in one word, which is not split here, so its value stays text.
+    values: { '-u': 'text', '-P': 'path', '-S': 'text' },
     nestedHere: true,
     assignmentsFirst: true,
   },
@@ -206,6 +229,7 @@ export const SYSTEM: Record<string, Entry> = {
           docs: 'man 1 launchctl',
         }),
         operands: ['path'],
+        values: { '-S': 'text', '-D': 'text' },
       },
       unload: {
         facts: fact('Tells macOS to stop a background program and to stop starting it.', {
@@ -215,6 +239,7 @@ export const SYSTEM: Record<string, Entry> = {
           docs: 'man 1 launchctl',
         }),
         operands: ['path'],
+        values: { '-S': 'text', '-D': 'text' },
       },
       bootstrap: {
         facts: fact('Starts a background program and sets macOS up to keep it running.', {
@@ -335,6 +360,7 @@ export const SYSTEM: Record<string, Entry> = {
   },
   softwareupdate: {
     facts: fact('Asks Apple which updates are available for macOS.', { effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true, network: 'known-host', docs: 'man 8 softwareupdate' }),
+    values: { '--product-types': 'text' },
     flags: [
       {
         // Left without `takesValue` on purpose: the name of an update is optional here, and `-i -a` is the common

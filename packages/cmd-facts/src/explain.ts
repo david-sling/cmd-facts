@@ -160,37 +160,47 @@ function unionByPack(outer: Attribution[], inner: Attribution[]): Attribution[] 
   return out
 }
 
-function flagsOf(rule: Rule, token: string): FlagRule[] {
+const BUNDLE = /^-[A-Za-z0-9]{2,}$/
+
+/** `read` is false where the table has not looked at the flag, or at one letter of the bundle, for this row. */
+type FlagRead = { matched: FlagRule[]; role?: Role; owner: string; inline?: string; read: boolean }
+
+const isPlain = (rule: Rule, flag: string) => (rule.plain ?? []).includes(flag)
+
+/**
+ * One flag word, read the way getopt reads it. A word the table declares whole is that one flag. Otherwise a bundle
+ * of short flags is read a letter at a time, and the first letter that takes a value ends it: what is left of the
+ * word is that value, or the next word is when nothing is left. `-sX POST` and `-sXPOST` both hand POST to `-X`,
+ * and none of the letters after `-X` is read as a flag of its own.
+ */
+function readFlag(rule: Rule, spelled: string): FlagRead {
+  const eq = spelled.indexOf('=')
+  const head = eq > 1 ? spelled.slice(0, eq) : spelled
+  const inline = eq > 1 ? spelled.slice(eq + 1) : undefined
   const rules = rule.flags ?? []
-  const exact = rules.filter((r) => r.flags.includes(token))
-  if (exact.length || rule.flagStyle === 'words') return exact
-  if (!/^-[A-Za-z0-9]{2,}$/.test(token)) return []
-  return [...token.slice(1)].flatMap((c) => rules.filter((r) => r.flags.includes(`-${c}`)))
+  const exact = rules.filter((r) => r.flags.includes(head))
+  const whole = exact.length > 0 || rule.values?.[head] !== undefined || isPlain(rule, head)
+  if (whole || rule.flagStyle === 'words' || !BUNDLE.test(head)) {
+    const taker = exact.findLast((m) => m.takesValue)
+    // The flag a value belongs to is reported as the table declares it.
+    return { matched: exact, role: taker?.role ?? rule.values?.[head], owner: taker?.flags[0] ?? head, inline, read: whole }
+  }
+  const matched: FlagRule[] = []
+  for (let k = 1; k < head.length; k++) {
+    const letter = `-${head[k]}`
+    const here = rules.filter((r) => r.flags.includes(letter))
+    if (!here.length && rule.values?.[letter] === undefined && !isPlain(rule, letter)) return { matched, owner: head, read: false }
+    matched.push(...here)
+    const taker = here.findLast((m) => m.takesValue)
+    const role = taker?.role ?? rule.values?.[letter]
+    if (role) return { matched, role, owner: taker?.flags[0] ?? letter, inline: spelled.slice(k + 1) || undefined, read: true }
+  }
+  return { matched, owner: head, read: true }
 }
 
 function roleAt(operands: Role[] | undefined, n: number): Role {
   if (!operands?.length) return 'unknown'
   return operands[Math.min(n, operands.length - 1)] ?? 'unknown'
-}
-
-const declared = (rule: Rule, flag: string) =>
-  (rule.flags ?? []).some((r) => r.flags.includes(flag)) || rule.values?.[flag] !== undefined || (rule.plain ?? []).includes(flag)
-
-const takes = (rule: Rule, flag: string) =>
-  (rule.flags ?? []).some((r) => r.takesValue && r.flags.includes(flag)) || rule.values?.[flag] !== undefined
-
-/**
- * Whether the table has looked at this flag for this row. A bundle (`-la`) is read only if every letter in it is,
- * up to a letter that takes a value, after which the rest of the word is that value.
- */
-function isRead(rule: Rule, head: string): boolean {
-  if (declared(rule, head)) return true
-  if (rule.flagStyle === 'words' || !/^-[A-Za-z0-9]{2,}$/.test(head)) return false
-  for (const c of head.slice(1)) {
-    if (!declared(rule, `-${c}`)) return false
-    if (takes(rule, `-${c}`)) return true
-  }
-  return true
 }
 
 function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
@@ -215,24 +225,16 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
     // `tar xf a.tar` carries its flags as a bare first word (the old option style), read as if it were `-xf`.
     const bare = rule.bareFlagsFirst === true && i === start && !literal && !isFlag(token) && /^[A-Za-z]+$/.test(token)
     if (!literal && (isFlag(token) || bare)) {
-      const spelled = bare ? `-${token}` : token
-      const eq = spelled.indexOf('=')
-      const head = eq > 1 ? spelled.slice(0, eq) : spelled
-      const inline = eq > 1 ? spelled.slice(eq + 1) : undefined
-      if (!isRead(rule, head)) {
+      const { matched, role, owner, inline, read } = readFlag(rule, bare ? `-${token}` : token)
+      if (!read) {
         unread.push(token)
         continue
       }
-      const matched = flagsOf(rule, head)
       for (const m of matched) {
         if (!Object.keys(m.facts).length) continue
         out = merge(out, { ...m.facts, source: 'curated+flags' })
         escalated.push(m.flags[0]!)
       }
-      const taker = matched.findLast((m) => m.takesValue)
-      const role = taker?.role ?? rule.values?.[head]
-      // The flag a value belongs to is reported as the table declares it, so a bundled `-xzf` still points at `-f`.
-      const owner = taker?.flags[0] ?? head
       if (role && inline !== undefined) args.push({ index: i, value: inline, role, flag: owner })
       else if (role && i + 1 < argv.length) {
         args.push({ index: ++i, value: argv[i]!, role, flag: owner })

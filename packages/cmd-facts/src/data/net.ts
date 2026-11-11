@@ -1,4 +1,4 @@
-import { fact, opaqueFact } from '../entry.ts'
+import { fact, opaqueFact, valuesOf } from '../entry.ts'
 import type { Entry } from '../entry.ts'
 
 export const NET: Record<string, Entry> = {
@@ -10,6 +10,10 @@ export const NET: Record<string, Entry> = {
       docs: 'man 8 ping',
     }),
     operands: ['host'],
+    // The source address (`-S`) stays text: the sentence names the first host on the line, the one being checked.
+    values: valuesOf('text', [
+      '-b', '-c', '-G', '-g', '-h', '-I', '-i', '-k', '-K', '-l', '-M', '-m', '-P', '-p', '-S', '-s', '-T', '-t', '-W', '-z',
+    ]),
   },
   curl: {
     facts: fact('Fetches whatever is at a web address and shows it.', {
@@ -44,6 +48,40 @@ export const NET: Record<string, Entry> = {
       '--dump-header': 'path',
       '-K': 'path',
       '--config': 'path',
+      '--socks4': 'host',
+      '--socks4a': 'host',
+      '--socks5': 'host',
+      '--socks5-hostname': 'host',
+      '--proxy1.0': 'host',
+      '--cacert': 'path',
+      '--capath': 'path',
+      '--crlfile': 'path',
+      '--proxy-cacert': 'path',
+      '--proxy-capath': 'path',
+      '--proxy-crlfile': 'path',
+      '--pubkey': 'path',
+      '--egd-file': 'path',
+      '--random-file': 'path',
+      '--etag-compare': 'path',
+      '--etag-save': 'path',
+      '--alt-svc': 'path',
+      '--libcurl': 'path',
+      '--trace': 'path',
+      '--trace-ascii': 'path',
+      '--unix-socket': 'path',
+      ...valuesOf('text', [
+          '-C', '--continue-at', '-P', '--ftp-port', '-r', '--range', '-Y', '--speed-limit', '-y', '--speed-time',
+          '-t', '--telnet-option', '-z', '--time-cond', '--abstract-unix-socket', '--cert-type', '--ciphers',
+          '--connect-to', '--delegation', '--dns-interface', '--dns-ipv4-addr', '--dns-ipv6-addr', '--dns-servers',
+          '--doh-url', '--engine', '--expect100-timeout', '--ftp-account', '--ftp-alternative-to-user', '--ftp-method',
+          '--ftp-ssl-ccc-mode', '--happy-eyeballs-timeout-ms', '--hostpubmd5', '--interface', '--keepalive-time',
+          '--key-type', '--krb', '--limit-rate', '--local-port', '--login-options', '--mail-auth', '--mail-from',
+          '--mail-rcpt', '--max-filesize', '--max-redirs', '--noproxy', '--pinnedpubkey', '--proto', '--proto-default',
+          '--proto-redir', '--proxy-cert-type', '--proxy-ciphers', '--proxy-header', '--proxy-key-type',
+          '--proxy-pinnedpubkey', '--proxy-service-name', '--proxy-tls13-ciphers', '--proxy-tlsauthtype', '--retry',
+          '--retry-delay', '--retry-max-time', '--service-name', '--socks5-gssapi-service', '--tftp-blksize',
+          '--tls-max', '--tls13-ciphers', '--tlsauthtype',
+      ]),
     },
     flags: [
       {
@@ -77,7 +115,7 @@ export const NET: Record<string, Entry> = {
         },
       },
       {
-        flags: ['-d', '--data', '--data-binary', '--data-raw', '-F', '--form'],
+        flags: ['-d', '--data', '--data-binary', '--data-raw', '--data-ascii', '--data-urlencode', '--json', '-F', '--form', '--form-string'],
         takesValue: true,
         role: 'text',
         facts: {
@@ -99,13 +137,16 @@ export const NET: Record<string, Entry> = {
         },
       },
       {
-        flags: ['-b', '--cookie'],
+        flags: [
+          '-b', '--cookie', '-U', '--proxy-user', '--oauth2-bearer', '--pass', '--proxy-pass', '--tlsuser', '--tlspassword',
+          '--proxy-tlsuser', '--proxy-tlspassword',
+        ],
         takesValue: true,
         role: 'text',
         facts: { touchesCredentials: true },
       },
       {
-        flags: ['-c', '--cookie-jar', '-E', '--cert', '--key'],
+        flags: ['-c', '--cookie-jar', '-E', '--cert', '--key', '--proxy-cert', '--proxy-key', '--netrc-file'],
         takesValue: true,
         role: 'path',
         facts: { touchesCredentials: true },
@@ -130,5 +171,15 @@ export const NET: Record<string, Entry> = {
       },
     ),
     operands: ['host', 'command'],
+    // A jump host (`-J`) and a bind address are left as text: the sentence names the first host on the line, and
+    // that has to be the computer being connected to.
+    values: {
+      '-i': 'path',
+      '-F': 'path',
+      '-E': 'path',
+      '-S': 'path',
+      '-l': 'user',
+      ...valuesOf('text', ['-B', '-b', '-c', '-D', '-e', '-I', '-J', '-L', '-m', '-O', '-o', '-P', '-p', '-Q', '-R', '-W', '-w']),
+    },
   },
 }
