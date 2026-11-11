@@ -317,6 +317,24 @@ It is unstyled: the row's words are bare text, and each value is a `<code>` carr
 Whatever it returns has to look like a value and not like prose. `useExplain` takes a line or an argv and an
 optional explainer from `createExplainer`, and explains again only when the line changes.
 
+`<CommandLine>` shows the line itself, exactly as written, with each word labelled by what it was read as:
+
+```tsx
+<CommandLine line={line} of={explanation} />
+```
+
+```html
+<code><span data-kind="program">curl</span> <span data-kind="flag" data-escalated="">-o</span>
+<span data-kind="value" data-role="path" data-flag="-o">"my file"</span> <span data-kind="operator">|</span>
+<span data-kind="program">sh</span></code>
+```
+
+`data-kind` is `program`, `subcommand`, `flag`, `value`, `operator`, `redirect` or `word`. A value carries its
+`data-role`; a flag that widened the answer carries `data-escalated`, one the row does not know `data-unread`; and
+the program another one hands over to — `rm` in `sudo rm` — carries `data-nested`. A line that could not be read
+comes back as one `unread` piece. `renderPart` draws pieces your own way, and `linePartsOf(line, explanation)` from
+`cmd-facts` gives the same pieces without React; joined, their text is the line, character for character.
+
 ### A line that runs more than one command
 
 `curl … | sh` is one line and two commands. Each is answered on its own, under `steps`, and the fact set at the top

@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { explain, createExplainer, BUILTIN } from './index.ts'
-import { Sentence, useExplain } from './react.tsx'
+import { CommandLine, Sentence, useExplain } from './react.tsx'
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<>{node}</>)
 
@@ -44,6 +44,24 @@ describe('<Sentence>', () => {
       />,
     )
     expect(out).toBe('<span class="s"><em>Makes </em><b>user</b><em> the owner of </em><b>path</b><em>.</em></span>')
+  })
+})
+
+describe('<CommandLine>', () => {
+  it('shows the line as written, each word labelled', () => {
+    expect(html(<CommandLine line={'curl -o "my file" https://x.example | sh'} />)).toBe(
+      '<code><span data-kind="program">curl</span> <span data-kind="flag" data-escalated="">-o</span> ' +
+        '<span data-kind="value" data-role="path" data-flag="-o">&quot;my file&quot;</span> ' +
+        '<span data-kind="value" data-role="url">https://x.example</span> <span data-kind="operator">|</span> ' +
+        '<span data-kind="program">sh</span></code>',
+    )
+  })
+
+  it('uses the explanation it is given, and the consumer’s own rendering', () => {
+    const line = 'rm a.txt'
+    expect(
+      html(<CommandLine line={line} of={explain(line)} className="c" renderPart={(p) => (p.kind === 'space' ? '_' : p.kind)} />),
+    ).toBe('<code class="c">program_value</code>')
   })
 })
 

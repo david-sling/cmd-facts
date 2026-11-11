@@ -3,6 +3,7 @@ import { explain as builtin } from './index.ts'
 import type { Explainer, Explanation, Input } from './explain.ts'
 import type { Role } from './entry.ts'
 import { listOf, type Part } from './tell.ts'
+import { linePartsOf, type LinePart } from './cmdline.ts'
 
 /**
  * One value off the command line, ready to render. `text` is what goes in the sentence; `written` is what was typed,
@@ -71,6 +72,43 @@ export function Sentence({ of, renderValue = defaultValue, renderText, className
         </Fragment>
       ))}
     </span>
+  )
+}
+
+export type CommandLineProps = {
+  /** The line as it was written. */
+  line: string
+  /** The answer for this line, where you already have one. Otherwise it is explained here, with `explainer`. */
+  of?: Explanation
+  explainer?: Explainer
+  /** How a piece is drawn. The default is a `<span>` carrying `data-kind` and, where they apply, `data-role`, `data-flag`, `data-escalated`, `data-unread` and `data-nested`; spaces stay bare text. */
+  renderPart?: (part: LinePart, index: number) => ReactNode
+  className?: string
+}
+
+const defaultPart = (part: LinePart): ReactNode => {
+  if (part.kind === 'space') return part.text
+  const data: Record<string, string> = { 'data-kind': part.kind }
+  if ('role' in part) data['data-role'] = part.role
+  if ('flag' in part && part.flag) data['data-flag'] = part.flag
+  if ('escalated' in part && part.escalated) data['data-escalated'] = ''
+  if ('unread' in part && part.unread) data['data-unread'] = ''
+  if ('nested' in part && part.nested) data['data-nested'] = ''
+  return <span {...data}>{part.text}</span>
+}
+
+/**
+ * The command line exactly as written, with each word labelled by what it was read as: the program, its flags, the
+ * arguments and their roles, operators and redirections. Unstyled: a `<code>` of `<span data-kind>`s.
+ */
+export function CommandLine({ line, of, explainer = builtin, renderPart = defaultPart, className }: CommandLineProps) {
+  const parts = useMemo(() => linePartsOf(line, of ?? explainer(line)), [line, of, explainer])
+  return (
+    <code className={className}>
+      {parts.map((part, index) => (
+        <Fragment key={index}>{renderPart(part, index)}</Fragment>
+      ))}
+    </code>
   )
 }
 

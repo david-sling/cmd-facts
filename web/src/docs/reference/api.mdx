@@ -48,12 +48,14 @@ See [The fact fields](/docs/facts).
 | `tellOf` | `(e: Explanation) => Part[]` |
 | `flatten` | `(parts: Part[]) => string` |
 | `listOf` | `(values: string[]) => string` — several values as one phrase, the way `flatten` lists them. |
+| `linePartsOf` | `(line: string, e: Explanation) => LinePart[]` — the line as written, each word labelled program, flag, value, operator…; joined, the text is the line. |
 
 From `cmd-facts/react`:
 
 | Export | Signature |
 |---|---|
 | `Sentence` | `({ of, renderValue?, renderText?, className? }) => JSX.Element` — `parts` rendered, values as `<code data-role>`. |
+| `CommandLine` | `({ line, of?, explainer?, renderPart?, className? }) => JSX.Element` — the line as written, each word a `<span data-kind>`. |
 | `useExplain` | `(input: Input, explainer?: Explainer) => Explanation` — memoised on the line. |
 
 See [Showing it to a person](/docs/sentence).

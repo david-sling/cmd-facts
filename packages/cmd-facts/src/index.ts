@@ -6,6 +6,8 @@ export type { ArgSlot, Attribution, Explainer, Explanation, Input } from './expl
 export { partsOf, tellOf, flatten, listOf } from './tell.ts'
 export type { Part } from './tell.ts'
 export { tokenize } from './line.ts'
+export { linePartsOf } from './cmdline.ts'
+export type { LinePart, LineWord } from './cmdline.ts'
 export type { Tokens } from './line.ts'
 export { effectsOf, isComplete, merge, sortEffects, EFFECTS, REVERSIBLE, NETWORK, PRIVILEGE, CONFIDENCE, RANK } from './facts.ts'
 export type { Blind, Confidence, Effect, Facts, Network, Overlay, Privilege, Reversible, Segment, Slot, Source, Transparent } from './facts.ts'
