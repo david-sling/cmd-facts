@@ -26,12 +26,17 @@
       "types": "./dist/data/index.d.ts",
       "default": "./dist/data/index.js"
     },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    },
     "./schema": "./schema/pack.schema.json"
   },
   "files": [
     "dist",
     "src",
     "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
     "schema"
   ],
   "scripts": {
@@ -41,9 +46,21 @@
     "figcheck": "node scripts/figcheck.ts",
     "typecheck": "tsc --noEmit"
   },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@withfig/autocomplete": "^2.692.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "typescript": "^6.0.2",
     "vitest": "^4.1.11"
   }

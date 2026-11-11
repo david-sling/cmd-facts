@@ -1,6 +1,7 @@
 {
   "include": [
     "src/**/*.ts",
+    "src/**/*.tsx",
     "scripts/**/*.ts"
   ],
   "compilerOptions": {
@@ -20,6 +21,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
     "resolveJsonModule": true,
+    // Only src/react.tsx has JSX; the rest of the library never imports React.
+    "jsx": "react-jsx",
     "types": [
       "node"
     ]

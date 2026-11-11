@@ -3,7 +3,7 @@ import { BUILTIN } from './data/index.ts'
 
 export { createExplainer, basename, UNKNOWN, UNREAD_LINE } from './explain.ts'
 export type { ArgSlot, Attribution, Explainer, Explanation, Input } from './explain.ts'
-export { partsOf, tellOf, flatten } from './tell.ts'
+export { partsOf, tellOf, flatten, listOf } from './tell.ts'
 export type { Part } from './tell.ts'
 export { tokenize } from './line.ts'
 export type { Tokens } from './line.ts'

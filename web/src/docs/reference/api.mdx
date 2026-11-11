@@ -3,12 +3,13 @@ title: API reference
 description: Every export of cmd-facts, with its signature and the page that explains it.
 ---
 
-`cmd-facts` is ESM only and needs Node 20 or newer. It has no runtime dependencies.
+`cmd-facts` is ESM only and needs Node 20 or newer. It has no runtime dependencies; `cmd-facts/react` needs React 18 or newer, as an optional peer.
 
 ```ts
 import { explain } from 'cmd-facts'           // the curated table, wired and trusted
 import { explain } from 'cmd-facts/facts'     // the fact helpers alone
 import pack from 'cmd-facts/schema'           // the JSON schema for authoring a pack
+import { Sentence } from 'cmd-facts/react'    // the sentence as React elements
 ```
 
 ## Explaining
@@ -46,6 +47,14 @@ See [The fact fields](/docs/facts).
 | `partsOf` | `(facts: Facts, args: ArgSlot[]) => Part[]` |
 | `tellOf` | `(e: Explanation) => Part[]` |
 | `flatten` | `(parts: Part[]) => string` |
+| `listOf` | `(values: string[]) => string` — several values as one phrase, the way `flatten` lists them. |
+
+From `cmd-facts/react`:
+
+| Export | Signature |
+|---|---|
+| `Sentence` | `({ of, renderValue?, renderText?, className? }) => JSX.Element` — `parts` rendered, values as `<code data-role>`. |
+| `useExplain` | `(input: Input, explainer?: Explainer) => Explanation` — memoised on the line. |
 
 See [Showing it to a person](/docs/sentence).
 

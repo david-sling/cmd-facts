@@ -284,6 +284,39 @@ fallback for ever.
 
 Rows without `tell` keep answering with `says`, so coverage can grow a row at a time.
 
+### In React
+
+`cmd-facts/react` renders `parts` so a component does not have to. React is an optional peer dependency; nothing
+else in the package imports it.
+
+```tsx
+import { Sentence, useExplain } from 'cmd-facts/react'
+
+function Approval({ line }: { line: string }) {
+  const explanation = useExplain(line)
+  return <Sentence of={explanation} />
+}
+```
+
+```html
+<span>Makes a request to <code data-role="url" title="https://get.example.com/install.sh">get.example.com</code>
+and saves what comes back into <code data-role="path" data-flag="-o" title="install.sh">install.sh</code>.</span>
+```
+
+It is unstyled: the row's words are bare text, and each value is a `<code>` carrying its role, with what was typed in
+`title` where the row shortened it. Style `code[data-role]`, or draw values yourself — `renderValue` gets the joined
+`text`, the `values`, what was `written`, the `role` and the `flag`:
+
+```tsx
+<Sentence
+  of={explanation}
+  renderValue={(v) => <Chip role={v.role} tooltip={v.written}>{v.text}</Chip>}
+/>
+```
+
+Whatever it returns has to look like a value and not like prose. `useExplain` takes a line or an argv and an
+optional explainer from `createExplainer`, and explains again only when the line changes.
+
 ### A line that runs more than one command
 
 `curl … | sh` is one line and two commands. Each is answered on its own, under `steps`, and the fact set at the top
