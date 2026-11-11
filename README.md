@@ -286,54 +286,37 @@ Rows without `tell` keep answering with `says`, so coverage can grow a row at a 
 
 ### In React
 
-`cmd-facts/react` renders `parts` so a component does not have to. React is an optional peer dependency; nothing
-else in the package imports it.
+The React components are not in this package. They are a [shadcn](https://ui.shadcn.com) registry, so they are copied
+into your project, styled with your theme's tokens, and yours to change:
+
+```bash
+npx shadcn@latest add https://cmd-facts.vercel.app/r/command-line.json https://cmd-facts.vercel.app/r/sentence.json https://cmd-facts.vercel.app/r/use-explain.json
+```
 
 ```tsx
-import { Sentence, useExplain } from 'cmd-facts/react'
+import { CommandLine } from '@/components/command-line'
+import { Sentence } from '@/components/sentence'
+import { useExplain } from '@/hooks/use-explain'
 
-function Approval({ line }: { line: string }) {
+function Approve({ line }: { line: string }) {
   const explanation = useExplain(line)
-  return <Sentence of={explanation} />
+  return (
+    <>
+      <CommandLine line={line} of={explanation} />
+      <Sentence of={explanation} />
+    </>
+  )
 }
 ```
 
-```html
-<span>Makes a request to <code data-role="url" title="https://get.example.com/install.sh">get.example.com</code>
-and saves what comes back into <code data-role="path" data-flag="-o" title="install.sh">install.sh</code>.</span>
-```
-
-It is unstyled: the row's words are bare text, and each value is a `<code>` carrying its role, with what was typed in
-`title` where the row shortened it. Style `code[data-role]`, or draw values yourself — `renderValue` gets the joined
-`text`, the `values`, what was `written`, the `role` and the `flag`:
-
-```tsx
-<Sentence
-  of={explanation}
-  renderValue={(v) => <Chip role={v.role} tooltip={v.written}>{v.text}</Chip>}
-/>
-```
-
-Whatever it returns has to look like a value and not like prose. `useExplain` takes a line or an argv and an
-optional explainer from `createExplainer`, and explains again only when the line changes.
-
-`<CommandLine>` shows the line itself, exactly as written, with each word labelled by what it was read as:
-
-```tsx
-<CommandLine line={line} of={explanation} />
-```
-
-```html
-<code><span data-kind="program">curl</span> <span data-kind="flag" data-escalated="">-o</span>
-<span data-kind="value" data-role="path" data-flag="-o">"my file"</span> <span data-kind="operator">|</span>
-<span data-kind="program">sh</span></code>
-```
-
-`data-kind` is `program`, `subcommand`, `flag`, `value`, `operator`, `redirect` or `word`. A value carries its
-`data-role`; a flag that widened the answer carries `data-escalated`, one the row does not know `data-unread`; and
-the program another one hands over to — `rm` in `sudo rm` — carries `data-nested`. A line that could not be read
-comes back as one `unread` piece. `renderPart` draws pieces your own way, and `linePartsOf(line, explanation)` from
-`cmd-facts` gives the same pieces without React; joined, their text is the line, character for character.
+`<Sentence>` renders `parts`, so each value is drawn as a value and not joined into the prose; `renderValue` draws them
+your own way. `<CommandLine>` shows the line exactly as written, each word drawn by what it was read as, and
+`renderPart` takes that over. Both are built on what this package exports for any renderer: `parts` on every
+explanation, and `linePartsOf(line, explanation)`, which returns the line in pieces — `program`, `subcommand`,
+`flag`, `value` with its `role`, `operator`, `redirect`, `word` — that join back to the line character for
+character. A flag that widened the answer carries `escalated`, one the row does not know `unread`, and the program
+another one hands over to (`rm` in `sudo rm`) `nested`. A line that could not be read comes back as one `unread`
+piece. See [cmd-facts.vercel.app/react](https://cmd-facts.vercel.app/react).
 
 ### A line that runs more than one command
 

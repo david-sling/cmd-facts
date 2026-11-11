@@ -1,0 +1,48 @@
+---
+title: React components
+description: Two components and a hook, installed into your own project through shadcn rather than shipped in the package.
+---
+
+The React components are not part of `cmd-facts`. They are a [shadcn](https://ui.shadcn.com) registry: `shadcn add` copies them into your project, where they are styled with your theme's tokens and are yours to change. The package stays free of React, and nothing here is a dependency you cannot read.
+
+## Install
+
+You need a project already set up for shadcn — a `components.json` and Tailwind. Then add all three:
+
+```bash
+npx shadcn@latest add https://cmd-facts.vercel.app/r/command-line.json https://cmd-facts.vercel.app/r/sentence.json https://cmd-facts.vercel.app/r/use-explain.json
+```
+
+Each item also installs `cmd-facts` itself, 0.5 or newer, and shadcn's `cn` helper. The files land where your `components.json` says components and hooks go:
+
+| Item | File | What it is |
+| --- | --- | --- |
+| `sentence` | `components/sentence.tsx` | The plain sentence, each value drawn as a value. See [Sentence](/docs/react/sentence). |
+| `command-line` | `components/command-line.tsx` | The line exactly as written, each word drawn by what it was read as. See [Command line](/docs/react/command-line). |
+| `use-explain` | `hooks/use-explain.ts` | `explain()`, recomputed only when the line changes. |
+
+## Use
+
+```tsx
+import { CommandLine } from '@/components/command-line'
+import { Sentence } from '@/components/sentence'
+import { useExplain } from '@/hooks/use-explain'
+
+function Approve({ line }: { line: string }) {
+  const explanation = useExplain(line)
+  return (
+    <>
+      <CommandLine line={line} of={explanation} />
+      <Sentence of={explanation} />
+    </>
+  )
+}
+```
+
+`useExplain` takes a line or a split argv, the same `Input` as `explain`, and an optional explainer from `createExplainer` for answering from your own packs. Keep that explainer stable — at module scope, or in a `useMemo` — or every render explains again.
+
+Try it on [the React page](/react), and see [Styling](/docs/react/styling) for where the colours come from.
+
+## Not on React
+
+Both components are drawn from what the package exports for any renderer: `parts` on every explanation, and `linePartsOf(line, explanation)`. A Vue, Svelte or server-rendered page builds the same thing from those. See [Showing it to a person](/docs/sentence) and the [API reference](/docs/reference/api).

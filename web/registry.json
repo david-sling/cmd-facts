@@ -1,0 +1,33 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry.json",
+  "name": "cmd-facts",
+  "homepage": "https://cmd-facts.vercel.app/react",
+  "items": [
+    {
+      "name": "command-line",
+      "type": "registry:component",
+      "title": "Command line",
+      "description": "A command line exactly as written, each word drawn by what cmd-facts read it as: program, flag, value, operator, redirection.",
+      "dependencies": ["cmd-facts@^0.5.0"],
+      "registryDependencies": ["utils"],
+      "files": [{ "path": "src/registry/command-line.tsx", "type": "registry:component" }]
+    },
+    {
+      "name": "sentence",
+      "type": "registry:component",
+      "title": "Sentence",
+      "description": "The plain-English sentence for a command, with the command's own text drawn apart from the words around it.",
+      "dependencies": ["cmd-facts@^0.5.0"],
+      "registryDependencies": ["utils"],
+      "files": [{ "path": "src/registry/sentence.tsx", "type": "registry:component" }]
+    },
+    {
+      "name": "use-explain",
+      "type": "registry:hook",
+      "title": "useExplain",
+      "description": "explain() for a component, recomputed only when the line changes.",
+      "dependencies": ["cmd-facts@^0.5.0"],
+      "files": [{ "path": "src/registry/use-explain.ts", "type": "registry:hook" }]
+    }
+  ]
+}

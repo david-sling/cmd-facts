@@ -37,11 +37,18 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # The site's registry components and its typecheck read cmd-facts the way a consumer does, from dist.
+      - name: Build the library
+        run: pnpm --filter cmd-facts build
+
       - name: Test
         run: pnpm -r test
 
       - name: Typecheck
         run: pnpm -r typecheck
+
+      - name: Build the shadcn registry
+        run: pnpm --filter web registry:build
 
       # Fails only where the table and Fig's specs disagree on whether a flag takes a value. Flags the table has
       # not declared yet are reported, not failed on.
@@ -77,7 +84,7 @@ jobs:
         run: |
           contents="$(tar -tzf "$RUNNER_TEMP"/cmd-facts-*.tgz)"
           echo "$contents"
-          if echo "$contents" | grep -qE '\.test\.tsx?$'; then
+          if echo "$contents" | grep -q '\.test\.ts$'; then
             echo 'Tarball contains test files' >&2
             exit 1
           fi
@@ -109,20 +116,3 @@ jobs:
           console.log('imported and answered on', process.version)
           JS
           node check.mjs
-
-      # React is an optional peer: the entry above has to work without it, and `cmd-facts/react`
-      # has to resolve and render once it is there.
-      - name: Render a sentence through cmd-facts/react
-        run: |
-          cd "$RUNNER_TEMP/consumer"
-          npm install react react-dom
-          cat > react.mjs <<'JS'
-          import { createElement } from 'react'
-          import { renderToStaticMarkup } from 'react-dom/server'
-          import { explain } from 'cmd-facts'
-          import { Sentence } from 'cmd-facts/react'
-          const out = renderToStaticMarkup(createElement(Sentence, { of: explain('rm a.txt') }))
-          if (!out.includes('<code data-role="path"')) throw new Error(`unexpected markup: ${out}`)
-          console.log(out)
-          JS
-          node react.mjs

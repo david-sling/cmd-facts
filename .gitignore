@@ -16,3 +16,6 @@ dist
 
 # Sketches from the design pass, superseded by the built page
 .impeccable/mocks/
+
+# The shadcn registry, built from web/registry.json by `pnpm --filter web registry:build`
+web/public/r/

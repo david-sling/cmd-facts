@@ -20,6 +20,7 @@ export type Doc = Frontmatter & {
 export const SECTIONS: Array<{ title: string; pages: string[] }> = [
   { title: 'Start here', pages: ['', 'quickstart'] },
   { title: 'Reading an answer', pages: ['explanation', 'facts', 'sentence', 'lines'] },
+  { title: 'React', pages: ['react', 'react/sentence', 'react/command-line', 'react/styling'] },
   { title: 'Packs', pages: ['packs/using', 'packs/writing'] },
   { title: 'Reference', pages: ['reference/api', 'reference/limits'] },
 ]

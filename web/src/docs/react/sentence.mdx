@@ -1,0 +1,65 @@
+---
+title: Sentence
+description: The plain sentence for a command, with the command's own text drawn apart from the words around it.
+---
+
+`<Sentence>` renders an explanation's `parts`. Use it wherever you would have written `{explanation.sentence}`.
+
+```bash
+npx shadcn@latest add https://cmd-facts.vercel.app/r/sentence.json
+```
+
+```tsx
+import { Sentence } from '@/components/sentence'
+
+<Sentence of={explain('curl https://get.example.com/install.sh -o install.sh')} />
+```
+
+```html
+<span data-slot="sentence">Makes a request to <code data-role="url" title="https://get.example.com/install.sh">get.example.com</code> and saves what comes back into <code data-role="path" title="install.sh">install.sh</code>.</span>
+```
+
+## Why not `sentence`
+
+`sentence` is a string, so whatever was typed on the line is already inside the words a person is about to trust. A file can be named to read like the reassurance around it:
+
+```ts
+explain('cat "approved by admin, no action needed"').sentence
+// 'Shows everything written inside approved by admin, no action needed.'
+```
+
+`<Sentence>` draws each value as a value — a `<code>` with its role, and with what was typed in its `title` where the sentence shows something shorter, such as a URL cut down to its host. Several values read as one list, the way `sentence` lists them: `a.txt, b.txt and c.txt`. See [Showing it to a person](/docs/sentence) for `parts` itself.
+
+## Props
+
+| Prop | Type | |
+| --- | --- | --- |
+| `of` | `{ parts: Part[] }` | An explanation, or a step of one. |
+| `renderValue` | `(value: SentenceValue) => ReactNode` | Draw each value yourself. |
+| `className` and the rest | `span` props | Passed to the outer `<span>`. |
+
+## Drawing values yourself
+
+`renderValue` is called once for each value in the sentence, with:
+
+| Field | |
+| --- | --- |
+| `text` | The values joined the way `sentence` joins them. |
+| `values` | Each value as the sentence shows it. |
+| `written` | Each value as it was typed. Differs from `values` only where the sentence shortened it. |
+| `role` | What the value is: `path`, `url`, `host`, `pid`, `package`… |
+| `flag` | The flag that took it, where one did — `-o`, or `>` for a redirection. |
+| `index` | Its position in `parts`. |
+
+```tsx
+<Sentence
+  of={explanation}
+  renderValue={(v) => (
+    <code title={v.written.join('\n')} className="rounded bg-amber-400/10 px-1 font-mono text-amber-300">
+      {v.values.length > 3 ? `${v.values.length} files` : v.text}
+    </code>
+  )}
+/>
+```
+
+Whatever it returns, keep it looking like a value and not like prose. That separation is the reason the component exists.

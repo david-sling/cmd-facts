@@ -51,7 +51,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     // the docs set data-docs-side on <html> before paint, so the sidebar does not swing shut
     // on the way in; React sees an attribute its own render did not put there
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

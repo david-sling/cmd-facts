@@ -1,0 +1,71 @@
+---
+title: Command line
+description: The command line exactly as written, each word drawn by what cmd-facts read it as.
+---
+
+`<CommandLine>` shows a person the line they are approving with its program, flags, arguments and operators told apart. It changes nothing in the text: quotes, spacing and line breaks come back as they were written.
+
+```bash
+npx shadcn@latest add https://cmd-facts.vercel.app/r/command-line.json
+```
+
+```tsx
+import { CommandLine } from '@/components/command-line'
+
+<CommandLine line='curl -o "my file" https://x.example | sh' />
+```
+
+```html
+<code data-slot="command-line"><span data-kind="program">curl</span> <span data-kind="flag">-o</span> <span data-kind="value" data-role="path">"my file"</span> <span data-kind="value" data-role="url">https://x.example</span> <span data-kind="operator">|</span> <span data-kind="program">sh</span></code>
+```
+
+Without `of`, it explains the line itself. Pass `of` where you already hold the answer — from `useExplain`, say — so the line is not read twice.
+
+## What each word is
+
+| `kind` | What it is |
+| --- | --- |
+| `program` | The program a command runs. `nested` where another command hands over to it, as `rm` in `sudo rm`. |
+| `subcommand` | A word that picks the row, as `commit` in `git commit`. |
+| `flag` | A flag. `escalated` where it widened what the command can do; `unread` where the row does not know it. |
+| `value` | An argument, with its `role`, and `flag` where a flag took it. A redirection's target is a `path`. |
+| `operator` | What joins one command to the next: `\|`, `&&`, `\|\|`, `;` or `&`. |
+| `redirect` | Where output is sent: `>`, `2>>`, `&>`, `2>&1`. |
+| `word` | A word the row reads as nothing in particular. |
+| `space` | What sits between words. |
+| `unread` | The whole line, where it could not be read — a substitution, or a quote that never closes. |
+
+Every piece but `space` and `unread` carries `step`, which command of the line it belongs to.
+
+## Props
+
+| Prop | Type | |
+| --- | --- | --- |
+| `line` | `string` | The line as it was written. |
+| `of` | `Explanation` | The answer for this same line, where you have it. |
+| `explainer` | `Explainer` | What to explain with when `of` is left out. Defaults to `explain`. |
+| `renderPart` | `(part: LinePart, index: number) => ReactNode` | Draw each piece yourself. |
+| `className` and the rest | `code` props | Passed to the outer `<code>`. |
+
+## Drawing pieces yourself
+
+Return `part.text` for a `space`, or the line stops reading as written. `commandLinePartClassName(part)` gives the component's own classes for a piece, for a `renderPart` that wants the defaults and something more:
+
+```tsx
+import { CommandLine, commandLinePartClassName } from '@/components/command-line'
+
+<CommandLine
+  line={line}
+  renderPart={(part) =>
+    part.kind === 'space' ? part.text : (
+      <span className={cn(commandLinePartClassName(part), part.kind === 'value' && 'cursor-help')} title={part.kind}>
+        {part.text}
+      </span>
+    )
+  }
+/>
+```
+
+## Without React
+
+The pieces come from `linePartsOf(line, explanation)` in `cmd-facts`. Joined, their `text` is the line, character for character, so any renderer can draw the same thing.
