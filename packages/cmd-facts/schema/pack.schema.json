@@ -224,7 +224,11 @@
           "type": "array",
           "items": { "$ref": "#/$defs/flagRule" }
         },
-        "sub": { "type": "object", "additionalProperties": { "$ref": "#/$defs/rule" } }
+        "sub": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[^\\s-]\\S*( [^\\s-]\\S*)*$" },
+          "additionalProperties": { "$ref": "#/$defs/rule" }
+        }
       }
     }
   }

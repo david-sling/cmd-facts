@@ -69,7 +69,7 @@ Beyond `facts`, a row describes just enough grammar for the line to be read.
 | `values` | Flags that take a value whose role matters, where the flag changes nothing else. |
 | `plain` | Flags that were looked at and change nothing the fields carry, and take no value: `rm -v`, `curl -s`. |
 | `flagStyle` | `posix` by default; `words` turns off single-dash bundling for programs whose flags are whole words, such as `find -exec`. |
-| `sub` | Subcommands, each a row of its own. |
+| `sub` | Subcommands, each a row of its own. A key may run to several words, as `'pr create'` does, and the longest key the words after the program spell out answers. |
 | `versioned` | The program answers to a version-suffixed name too: `python3` reaches the `python` row. |
 | `nestedHere` | This command hands over to another one carried as separate words on the same line. |
 | `assignmentsFirst` | The command carries leading `NAME=value` settings before the command, as `env` does. |
@@ -103,7 +103,7 @@ const problems = validate(pack)   // Problem[] — each { where, says }
 
 - A row that deletes cannot say it can be put back.
 - A row that transmits cannot claim it touches no network.
-- A base row has to reach as far as each of its subcommands does with its flags, since it is what a line the table cannot read falls back to. An opaque base row keeps its effects as a floor.
+- A base row has to reach as far as each of its subcommands does with its flags, since it is what a line the table cannot read falls back to, and a subcommand has to reach as far as each longer one under it: `pr` answers for `pr lock` when the table holds `pr create` but not `pr lock`. An opaque row keeps its effects as a floor.
 - A flag cannot be both `plain` and something that changes the facts or takes a value.
 - An opaque row has to name what it hands over to.
 

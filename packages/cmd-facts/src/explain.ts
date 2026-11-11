@@ -329,24 +329,45 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
 
   const word = argv[cursor]
   const wantsSub = entry.sub !== undefined && word !== undefined && !isFlag(word)
-  const sub = wantsSub ? entry.sub![word] : undefined
+  // A subcommand can run to several words (`gh pr create`), and the longest one the table holds answers. The words
+  // are looked up as the table's own keys only, so `git constructor` is a subcommand the table does not hold.
+  let spoken = wantsSub ? 1 : 0
+  let subKey: string | undefined
+  if (wantsSub) {
+    const words: string[] = []
+    for (let i = cursor; i < argv.length && !isFlag(argv[i]!); i++) words.push(argv[i]!)
+    for (let k = words.length; k > 0 && subKey === undefined; k--) {
+      const candidate = words.slice(0, k).join(' ')
+      if (Object.hasOwn(entry.sub!, candidate)) [subKey, spoken] = [candidate, k]
+    }
+  }
+  const sub = subKey !== undefined ? entry.sub![subKey] : undefined
   const rule: Rule = sub ?? entry
-  const start = wantsSub ? cursor + 1 : cursor
+  // Where the table holds longer subcommands under the one that answered (`s3 cp` under `s3`), the word after it is
+  // one more step of the subcommand, and one the table does not hold.
+  const after = argv[cursor + spoken]
+  const deeper =
+    subKey !== undefined && after !== undefined && !isFlag(after) && Object.keys(entry.sub!).some((k) => k.startsWith(`${subKey} `))
+  const start = cursor + spoken + (deeper ? 1 : 0)
   // A word the table holds no row for, and a leading option it does not declare, both leave the exact subcommand
-  // unresolved, so the base row answers at `derived` either way.
+  // unresolved, so the base row (or the shorter subcommand) answers at `derived` either way.
   const missed = entry.sub !== undefined && word !== undefined && !sub
   const seed = (base: Facts) =>
     preRules.reduce(
       (acc, g) => merge(acc, { ...g.facts, source: 'curated+flags' as const }),
       trimmed ? merge(base, { source: 'name-fallback' }) : base,
     )
-  const widest = (source: 'subcommand-miss' | 'unread') => merge(reach(entry), { confidence: 'derived', source })
+  // What stands in for this subcommand where the line is not read in full: the longest shorter subcommand the table
+  // holds (`s3` for `s3 cp`), or the program's own row. `validate()` holds each to everything the ones under it reach.
+  const shorter = subKey?.split(' ').map((_, k, all) => all.slice(0, all.length - 1 - k).join(' ')).find((w) => w && Object.hasOwn(entry.sub!, w))
+  const standIn = deeper ? { key: subKey!, rule: sub! } : shorter ? { key: shorter, rule: entry.sub![shorter]! } : { key: undefined, rule: entry as Rule }
+  const widest = (source: 'subcommand-miss' | 'unread') => merge(reach(standIn.rule), { confidence: 'derived', source })
 
   // The row answers for the line only where the table has read every word of it. A flag it has not looked at, or a
-  // word where it expects none, could be doing anything the program can do, so the line is answered from the
-  // program's widest row instead, the same as an unrecognised subcommand.
-  const first = parse(argv, start, rule, seed(sub ? sub.facts : missed ? widest('subcommand-miss') : entry.facts))
-  const fell = missed ? 'subcommand-miss' : 'unread'
+  // word where it expects none, could be doing anything the program can do, so the line is answered from the row
+  // that stands in for this one instead, the same as an unrecognised subcommand.
+  const fell = missed || deeper ? 'subcommand-miss' : 'unread'
+  const first = parse(argv, start, rule, seed(sub && !deeper ? sub.facts : sub || missed ? widest('subcommand-miss') : entry.facts))
   const stepped = first.unread.length ? parse(argv, start, rule, seed(widest(fell))) : first
   const unread = stepped.unread.length ? { unread: stepped.unread } : {}
   const parsed = {
@@ -356,10 +377,12 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
     escalated: [...new Set([...preRules.map((g) => g.flags[0]!), ...stepped.escalated])],
     ...unread,
   }
-  const head = { program, name, key, origin: origin.pack, ...(wantsSub ? { subcommand: word } : {}) }
-  // The row that answered, not the words on the line: an unrecognised subcommand was answered by the base row.
+  const head = { program, name, key, origin: origin.pack, ...(wantsSub ? { subcommand: deeper ? `${subKey} ${after}` : (subKey ?? word) } : {}) }
+  // The row that answered, not the words on the line: an unrecognised subcommand was answered by the base row, and a
+  // line read only in part by the row standing in for its subcommand.
+  const answered = stepped.unread.length && !deeper ? standIn.key : subKey
   const own: Attribution[] = [
-    { pack: origin.pack, version: origin.version, trusted: origin.trusted, commands: [sub && !stepped.unread.length ? `${key} ${word}` : key] },
+    { pack: origin.pack, version: origin.version, trusted: origin.trusted, commands: [answered !== undefined ? `${key} ${answered}` : key] },
   ]
 
   const wanted = nestedAt(argv, parsed.args, rule)

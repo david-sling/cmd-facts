@@ -183,6 +183,23 @@ describe('a base row stands in for its subcommands', () => {
     }
     expect(says(packOf({ k: entry }))).toEqual([])
   })
+
+  it('holds a shorter subcommand to the same for the longer ones under it', () => {
+    const cautious = fact('Talks to a cluster.', { effect: ['read'], privilege: 'none', touchesCredentials: false, repeatSafe: true, reversible: 'unknown', network: 'known-host' })
+    const entry: Entry = {
+      facts: cautious,
+      sub: {
+        pods: { facts: fact('Works with pods.', { effect: ['read'], reversible: 'yes', privilege: 'none', touchesCredentials: false, repeatSafe: true, network: 'known-host' }) },
+        'pods delete': { facts: fact('Removes a pod.', { privilege: 'none', touchesCredentials: false, repeatSafe: true, effect: ['delete'], reversible: 'no', network: 'known-host' }) },
+      },
+    }
+    expect(says(packOf({ k: entry }))).toContainEqual(expect.stringContaining('`pods` says it is yes to put back'))
+  })
+
+  it('refuses a subcommand key that is not words split by single spaces', () => {
+    const entry: Entry = { facts: fact('Talks to a cluster.', { ...LOOKS }), sub: { 'pods  get': { facts: fact('Lists pods.', { ...LOOKS }) }, '-x': { facts: fact('Lists pods.', { ...LOOKS }) } } }
+    expect(says(packOf({ k: entry })).filter((m) => m.includes('one or more words'))).toHaveLength(2)
+  })
 })
 
 describe('the flags a row has read', () => {

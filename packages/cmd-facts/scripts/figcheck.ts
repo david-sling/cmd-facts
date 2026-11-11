@@ -23,11 +23,11 @@
 import { pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
 import allSpecNames from '@withfig/autocomplete'
-import { DEV, FILES, LANG, NET, SECRETS, SYSTEM } from '../src/data/index.ts'
+import { CLOUD, DEV, FILES, LANG, NET, SECRETS, SYSTEM } from '../src/data/index.ts'
 import type { Entry, FlagRule, Rule } from '../src/entry.ts'
 
 // The rows written by hand, without the same-program aliases: an alias's grammar belongs to the row it points at.
-const CURATED: Record<string, Entry> = { ...FILES, ...SYSTEM, ...NET, ...SECRETS, ...DEV, ...LANG }
+const CURATED: Record<string, Entry> = { ...FILES, ...SYSTEM, ...NET, ...SECRETS, ...DEV, ...LANG, ...CLOUD }
 
 // The slice of a Fig spec this check reads. Everything else a spec carries is completion UI.
 type FigOption = { name: string | string[]; args?: FigArg | FigArg[] }
@@ -132,6 +132,20 @@ const FIG_WRONG = new Set([
   'cargo remove --manifest-path',
   ...['-Werror', '-Wno-error'].map((f) => `cmake ${f}`), // Take a value only after `=`.
   ...['-0', '-F', '-K', '-T', '-x'].map((f) => `ruby ${f}`), // Take a value only attached: `ruby -F :` loads a file named `:`.
+  // gh: each takes a value in gh's own `--help`; Fig declares no args.
+  ...['-l', '--language', '-q', '--jq', '--json', '-t', '--template'].map((f) => `gh repo list ${f}`),
+  'gh gist view -f',
+  'gh ssh-key add -t',
+  'kubectl --dry-run', // `--dry-run` alone means `--dry-run=client`; a value only counts after `=`.
+  'kubectl --cascade', // The same: `--cascade` alone means `--cascade=background`.
+  // Go's flag package reads the next word as the value of any option that is not a switch: `-out plan.bin` works.
+  'terraform plan -out',
+  'terraform plan -target',
+  // op takes a password recipe only after `=`: `--generate-password=letters,20`.
+  'op item create --generate-password',
+  'op item edit --generate-password',
+  // vercel: each takes a value in vercel's own `--help`; Fig declares no args.
+  ...['-e', '--env', '-b', '--build-env', '--listen'].map((f) => `vercel ${f}`),
 ])
 
 /** A bundle Fig spells out as its own option (`git commit -am`) is covered when its last letter takes a value. */
@@ -213,14 +227,16 @@ async function main() {
     if (entry.sub) {
       const figSubs = spec.subcommands ?? []
       for (const [word, rule] of Object.entries(entry.sub)) {
-        const figSub = figSubs.find((s) => namesOf(s.name).includes(word))
+        // A key of several words (`pr create`) walks Fig's nested subcommands one word at a time.
+        let figSub: FigSpec | undefined = spec
+        for (const part of word.split(' ')) figSub = figSub?.subcommands?.find((s) => namesOf(s.name).includes(part))
         if (!figSub) {
           lines.push(`  [${word}] not a subcommand fig lists`)
           continue
         }
         report(`[${word}]`, compare(declaredOf(rule), figSub.options ?? [], `${name} ${word}`))
       }
-      const covered = Object.keys(entry.sub).length
+      const covered = Object.keys(entry.sub).filter((k) => !k.includes(' ')).length
       if (figSubs.length) lines.push(`  subcommands: ${covered} covered of ${figSubs.length} in fig`)
     }
 

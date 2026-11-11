@@ -33,6 +33,7 @@ type Bad = (where: string, says: string) => void
 const PACK_NAME = /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/
 // A command name is the program basename `explain()` will look it up by, so a slash or a space could never match.
 const COMMAND_NAME = /^[A-Za-z0-9][\w.+-]*$/
+const SUB_KEY = /^[^\s-]\S*( [^\s-]\S*)*$/
 
 const has = <T extends string>(all: T[], v: unknown): v is T => all.includes(v as T)
 
@@ -60,8 +61,15 @@ export function validate(pack: Pack): Problem[] {
     checkRule(bad, name, entry)
     checkGlobals(bad, name, entry)
     for (const [word, sub] of Object.entries(entry.sub ?? {})) {
+      if (!SUB_KEY.test(word)) bad(`${name} ${word}`, 'A subcommand is one or more words split by single spaces, none starting with a dash.')
       checkRule(bad, `${name} ${word}`, sub)
       checkStandIn(bad, `${name} ${word}`, reach(entry), reach(sub))
+      // A shorter subcommand answers for the longer ones under it that the table does not hold, as the base row does.
+      const words = word.split(' ')
+      for (let k = 1; k < words.length; k++) {
+        const shorter = words.slice(0, k).join(' ')
+        if (Object.hasOwn(entry.sub!, shorter)) checkStandIn(bad, `${name} ${word}`, reach(entry.sub![shorter]!), reach(sub), `\`${shorter}\``)
+      }
     }
   }
   return problems
@@ -223,20 +231,20 @@ function checkRule(bad: Bad, where: string, rule: Rule) {
  * The base row is what a line falls back to wherever the table has not read all of it: an unrecognised subcommand, or
  * a flag nobody has looked at. So with its flags it has to reach at least as far as every subcommand does with theirs.
  */
-function checkStandIn(bad: Bad, where: string, base: Facts, sub: Facts) {
+function checkStandIn(bad: Bad, where: string, base: Facts, sub: Facts, row = 'The base row') {
   if (!base || !sub) return
   // An opaque base row already admits it can do more than it names, and that nothing it does can be promised back,
   // so its effects stay a floor. A clear one claims a complete list, and that list has to hold for every subcommand.
   if (!base.opaque) {
     if (RANK.reversible[base.reversible] < RANK.reversible[sub.reversible]) {
-      bad(where, `The base row says it is ${base.reversible} to put back, and this subcommand is ${sub.reversible}.`)
+      bad(where, `${row} says it is ${base.reversible} to put back, and this subcommand is ${sub.reversible}.`)
     }
     const missing = effectsOf(sub).filter((e) => !effectsOf(base).includes(e))
-    if (missing.length) bad(where, `The base row does not name ${missing.join(', ')}, which this subcommand does.`)
+    if (missing.length) bad(where, `${row} does not name ${missing.join(', ')}, which this subcommand does.`)
   }
-  if (!sub.repeatSafe && base.repeatSafe) bad(where, 'The base row says it is safe to repeat, and this subcommand is not.')
-  if (sub.touchesCredentials && !base.touchesCredentials) bad(where, 'The base row does not reach secrets, and this subcommand does.')
-  if (sub.opaque && !base.opaque) bad(where, 'The base row is clear, and this subcommand hands over.')
-  if (RANK.network[base.network] < RANK.network[sub.network]) bad(where, 'The base row claims less network reach than this subcommand has.')
-  if (RANK.privilege[base.privilege] < RANK.privilege[sub.privilege]) bad(where, 'The base row claims less privilege than this subcommand needs.')
+  if (!sub.repeatSafe && base.repeatSafe) bad(where, `${row} says it is safe to repeat, and this subcommand is not.`)
+  if (sub.touchesCredentials && !base.touchesCredentials) bad(where, `${row} does not reach secrets, and this subcommand does.`)
+  if (sub.opaque && !base.opaque) bad(where, `${row} is clear, and this subcommand hands over.`)
+  if (RANK.network[base.network] < RANK.network[sub.network]) bad(where, `${row} claims less network reach than this subcommand has.`)
+  if (RANK.privilege[base.privilege] < RANK.privilege[sub.privilege]) bad(where, `${row} claims less privilege than this subcommand needs.`)
 }

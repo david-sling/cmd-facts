@@ -92,7 +92,7 @@ export function buildRegistry(opts: RegistryOptions): Registry {
 
   const table = new Map<string, { entry: Entry; origin: Origin }>()
   for (const [name, held] of claims) {
-    const winner = override[name]
+    const winner = Object.hasOwn(override, name) ? override[name] : undefined
     let chosen = held[0]!
     if (winner !== undefined) {
       const picked = held.find((c) => c.origin.pack === winner)

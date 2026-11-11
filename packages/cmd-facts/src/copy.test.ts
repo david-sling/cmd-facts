@@ -153,8 +153,8 @@ describe('handsOverTo', () => {
 
 describe('the register itself', () => {
   // Explaining `ls` as "lists" tells a reader who did not know what `ls` meant nothing at all. Naming the language a
-  // program runs is the exception: there it is the useful half of the sentence.
-  const NAMES_ITSELF = ['python', 'pip', 'ruby', 'perl', 'php', 'java', 'swift', 'go']
+  // program runs, or the service it works with, is the exception: there it is the useful half of the sentence.
+  const NAMES_ITSELF = ['python', 'pip', 'ruby', 'perl', 'php', 'java', 'swift', 'go', 'vercel', 'doppler']
 
   it('does not explain a program by repeating its name', () => {
     for (const { name, facts } of ALL) {

@@ -122,7 +122,8 @@ describe('trust is the consumer’s decision, not the pack’s', () => {
 })
 
 describe('attribution follows the whole chain', () => {
-  const explain = createExplainer({ packs: [BUILTIN, TOOLS, KUBE], trust: [BUILTIN.name] })
+  // The built-in table answers for kubectl too, so the pack has to be named as the one that wins it.
+  const explain = createExplainer({ packs: [BUILTIN, TOOLS, KUBE], trust: [BUILTIN.name], override: { kubectl: KUBE.name } })
   const line = explain({ program: '/usr/bin/sudo', argv: ['sudo', 'flowctl', 'kubectl', 'delete', 'pod', 'web-1'] })
 
   it('names every pack behind the top-level fact set, outermost first', () => {
@@ -181,7 +182,7 @@ describe('the depth limit is visible', () => {
 
 describe('the registry says what it loaded', () => {
   it('lists every pack, which is not the same as what answered a line', () => {
-    const explain = createExplainer({ packs: [BUILTIN, KUBE], trust: [BUILTIN.name] })
+    const explain = createExplainer({ packs: [BUILTIN, KUBE], trust: [BUILTIN.name], override: { kubectl: KUBE.name } })
     expect(explain.registry.packs).toEqual([
       { pack: BUILTIN.name, version: BUILTIN.version, trusted: true },
       { pack: '@acme/kube', version: '2.4.0', trusted: false },

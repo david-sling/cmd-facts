@@ -1,5 +1,6 @@
 import { fact, opaqueFact, valuesOf, LOCAL, LOOKS } from '../entry.ts'
-import type { Entry, FlagRule, Role, Rule } from '../entry.ts'
+import type { Entry, FlagRule, Rule } from '../entry.ts'
+import { everywhere } from './shared.ts'
 
 // Every program here runs code the line does not show: a file, a project's own build steps, or the set-up steps a
 // downloaded package brings. So every row is blind, and what it hands over to is named in the same plain words.
@@ -30,30 +31,6 @@ const runtime = (language: string, docs: string, inline: string[] = [], extra: P
       : []),
     ...(extra.flags ?? []),
   ],
-})
-
-/**
- * Options a tool reads wherever they are on the line, given to the base row and to every subcommand, so that their
- * values are never read as the thing the line runs or installs. A flag a subcommand already declares is left to it,
- * and `except` names the ones a subcommand spells the same but reads as a switch (`conda list -c`).
- */
-const everywhere = (
-  entry: Entry,
-  values: Record<string, Role>,
-  flags: FlagRule[] = [],
-  except: Record<string, string[]> = {},
-): Entry => ({
-  ...entry,
-  values: { ...values, ...entry.values },
-  flags: [...(entry.flags ?? []), ...flags],
-  sub: Object.fromEntries(
-    Object.entries(entry.sub ?? {}).map(([word, rule]) => {
-      const own = new Set([...(rule.flags ?? []).flatMap((f) => f.flags), ...(except[word] ?? [])])
-      const given = Object.fromEntries(Object.entries(values).filter(([flag]) => !own.has(flag)))
-      const added = flags.filter((f) => !f.flags.some((x) => own.has(x)))
-      return [word, { ...rule, values: { ...given, ...rule.values }, flags: [...(rule.flags ?? []), ...added] }]
-    }),
-  ),
 })
 
 /** The base row of a tool that works with a project's packages: it can reach anything its subcommands can. */
