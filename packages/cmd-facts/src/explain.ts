@@ -235,6 +235,7 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
   const unread: string[] = []
   let out = facts
   let operand = 0
+  let lastOperand = -1
   let literal = false
   let nested = false
   // Where each operand landed in `args`, so a flag that changes their roles can still do so once the line is read.
@@ -252,7 +253,10 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
       continue
     }
     // `tar xf a.tar` carries its flags as a bare first word (the old option style), read as if it were `-xf`.
-    const bare = rule.bareFlagsFirst === true && i === start && !literal && !isFlag(token) && /^[A-Za-z]+$/.test(token)
+    const placed =
+      (rule.bareFlagsFirst === true && i === start) ||
+      (rule.bareFlagAfter !== undefined && operand === rule.bareFlagAfter && lastOperand === i - 1 && !unread.length)
+    const bare = placed && !literal && !isFlag(token) && /^[A-Za-z]+$/.test(token)
     if (!literal && (isFlag(token) || bare)) {
       const { matched, role, owner, inline, attachedOnly, read } = readFlag(rule, bare ? `-${token}` : token)
       if (!read) {
@@ -281,6 +285,7 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
       continue
     }
     const role = roleAt(rule.operands, operand++)
+    lastOperand = i
     positional.push(args.length)
     args.push({ index: i, value: token, role })
     if (role === 'command') nested = true

