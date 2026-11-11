@@ -51,7 +51,7 @@ For one place that needs something else, pass `renderValue` to [`Sentence`](/doc
 
 import { useMemo, useState } from 'react'
 import { linePartsOf, type Explanation, type Role } from 'cmd-facts'
-import { Cpu, FileText, Globe, MousePointer2, Server, User } from 'lucide-react'
+import { Cpu, FileText, Globe, MousePointer2, RotateCcw, Server, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { CommandLine } from '@/components/command-line'
 import { Sentence } from '@/components/sentence'
@@ -179,7 +179,13 @@ export default function Page() {
         </CardContent>
         <CardFooter className="justify-end gap-2">
           {decision ? (
-            <p className="text-sm text-muted-foreground">{decision === 'allowed' ? 'Allowed.' : 'Denied.'}</p>
+            <>
+              <p className="text-sm text-muted-foreground">{decision === 'allowed' ? 'Allowed.' : 'Denied.'}</p>
+              <Button variant="outline" size="sm" onClick={() => setDecision(null)}>
+                <RotateCcw aria-hidden />
+                Reset
+              </Button>
+            </>
           ) : (
             <>
               <Button variant="outline" onClick={() => setDecision('denied')}>

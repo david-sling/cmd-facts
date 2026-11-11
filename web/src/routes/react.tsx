@@ -5,6 +5,8 @@ import { CommandField } from '#/components/command-field'
 import { Sentence } from '#/components/sentence'
 import sentenceSource from '#/components/sentence.tsx?raw'
 import demoSource from '#/registry/examples/sentence-demo.tsx?raw'
+import ApprovalPrompt from '#/registry/examples/sentence-by-role-demo'
+import approvalSource from '#/registry/examples/sentence-by-role-demo.tsx?raw'
 import { OpenInV0 } from '#/components/open-in-v0'
 import { REPO_URL, SITE, registryItemUrl } from '#/site'
 
@@ -125,6 +127,37 @@ const TABS = [
   { id: 'sentence', label: 'components/sentence.tsx', source: sentenceSource },
 ] as const
 
+/**
+ * The page's lead: an approval prompt built from both components, live beside the one file that draws it. Its code is
+ * the registry example exactly, so what is read here is what Open in v0 hands over.
+ */
+function Showcase() {
+  const code = approvalSource.trimEnd()
+  return (
+    <div className="grid overflow-hidden rounded-2xl border border-line bg-panel lg:grid-cols-2">
+      <div className="flex min-w-0 items-center justify-center px-2 py-6 sm:px-6 lg:py-10">
+        <div className="w-full">
+          <ApprovalPrompt />
+        </div>
+      </div>
+      <div className="min-w-0 border-t border-line bg-white/[0.015] lg:border-t-0 lg:border-l">
+        <div className="flex items-center justify-between gap-3 border-b border-line py-2 pr-3 pl-5 sm:pr-5 sm:pl-7">
+          <span className="font-mono text-[12px] text-pink">app/page.tsx</span>
+          <OpenInV0 item="sentence-by-role-demo" className="shrink-0" />
+        </div>
+        <div className="relative px-5 py-5 sm:px-7">
+          <div className="absolute top-5 right-5 sm:right-7">
+            <CopyButton text={code} label="Copy app/page.tsx" />
+          </div>
+          <Code className="max-h-[38rem] overflow-y-auto border-none bg-transparent px-0 py-0 pr-8 break-words whitespace-pre-wrap">
+            {code}
+          </Code>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Playground() {
   const [line, setLine] = useState<string>(EXAMPLES[0])
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('sentence-demo')
@@ -229,7 +262,20 @@ function ReactPage() {
       </section>
 
       <section className="mx-4 mt-16 sm:mx-8 lg:mx-14">
-        <Playground />
+        <Showcase />
+        <p className="mt-4 text-[14px] text-ink-3">
+          An approval prompt from both components. Point at a value, or a word in the command, to see its pair.
+        </p>
+      </section>
+
+      <section className="mx-4 mt-24 sm:mx-8 lg:mx-14">
+        <p className="eyebrow">The least you need</p>
+        <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.6rem)] font-light leading-[1.08] tracking-[-0.03em] text-ink">
+          One component, one prop.
+        </h2>
+        <div className="mt-10">
+          <Playground />
+        </div>
         <p className="mt-4 text-[14px] text-ink-3">Type any line, or pick one of the examples.</p>
       </section>
 
