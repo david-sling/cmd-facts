@@ -1,5 +1,5 @@
 import { effectsOf, merge } from './facts.ts'
-import type { Facts } from './facts.ts'
+import type { Effect, Facts } from './facts.ts'
 import { buildRegistry } from './registry.ts'
 import type { Registry, RegistryOptions } from './registry.ts'
 import { reach } from './entry.ts'
@@ -229,7 +229,7 @@ function roleAt(operands: Role[] | undefined, n: number): Role {
   return operands[Math.min(n, operands.length - 1)] ?? 'unknown'
 }
 
-function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
+function parse(argv: string[], start: number, rule: Rule, facts: Facts, open: ReadonlySet<number>) {
   const args: ArgSlot[] = []
   const escalated: string[] = []
   const unread: string[] = []
@@ -252,6 +252,13 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
       literal = true
       continue
     }
+    // A word the shell expands is not the word that arrives: it can be a flag, or several words. After `--` nothing
+    // it becomes is read as a flag, so there it is only an operand whose text is not known.
+    if (open.has(i) && !literal) {
+      unread.push(token)
+      args.push({ index: i, value: token, role: 'unknown' })
+      continue
+    }
     // `tar xf a.tar` carries its flags as a bare first word (the old option style), read as if it were `-xf`.
     const placed =
       (rule.bareFlagsFirst === true && i === start) ||
@@ -272,6 +279,8 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
       if (role && inline !== undefined) args.push({ index: i, value: inline, role, flag: owner })
       else if (role && !attachedOnly && i + 1 < argv.length) {
         args.push({ index: ++i, value: argv[i]!, role, flag: owner })
+        // Unquoted, the value can split, and what is left over is read as more of the line.
+        if (open.has(i)) unread.push(argv[i]!)
         if (role === 'command') nested = true
       }
       continue
@@ -296,6 +305,19 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
 }
 
 const MAX_DEPTH = 4
+const SOCKET = /^\/dev\/(tcp|udp)\/[^/]+\/[^/]+$/
+const NONE: ReadonlySet<number> = new Set()
+
+/** How many words the longest subcommand a table holds runs to. Asked on every line, so it is kept per table. */
+const depths = new WeakMap<object, number>()
+function deepest(sub: Record<string, Rule>): number {
+  let held = depths.get(sub)
+  if (held === undefined) {
+    held = Object.keys(sub).reduce((most, key) => Math.max(most, key.split(' ').length), 0)
+    depths.set(sub, held)
+  }
+  return held
+}
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
 
 function nestedAt(argv: string[], args: ArgSlot[], rule: Rule): number | undefined {
@@ -312,9 +334,10 @@ const told = (facts: Facts, args: ArgSlot[]): { sentence: string; parts: Part[] 
   return { sentence: flatten(parts), parts }
 }
 
-function at(registry: Registry, program: string, argv: string[], depth: number): Explanation {
+function at(registry: Registry, program: string, argv: string[], depth: number, open: ReadonlySet<number> = NONE): Explanation {
   const name = basename(program)
-  const found = registry.lookup(name)
+  // A program name the shell expands is not the name of what runs, whatever its last few letters spell.
+  const found = open.has(0) ? undefined : registry.lookup(name)
   if (!found) {
     const args: ArgSlot[] = argv.slice(1).map((value, n) => ({ index: n + 1, value, role: 'unknown' as Role }))
     return { program, name, key: null, origin: null, facts: UNKNOWN, ...told(UNKNOWN, args), args, escalated: [], attribution: [] }
@@ -357,7 +380,10 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
   let stuck = false
   if (wantsSub) {
     let i = cursor
-    while (i < argv.length) {
+    // One word past the longest subcommand the table holds is all that is ever looked at, so the rest of the line is
+    // left for `parse`. Reading on would join every word so far once per flag, which no line needs.
+    const most = deepest(entry.sub!) + 1
+    while (i < argv.length && steps.length < most) {
       const token = argv[i]!
       if (!isFlag(token)) {
         steps.push({ word: token, at: i++ })
@@ -418,8 +444,8 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
   // word where it expects none, could be doing anything the program can do, so the line is answered from the row
   // that stands in for this one instead, the same as an unrecognised subcommand.
   const fell = missed || partial ? 'subcommand-miss' : 'unread'
-  const first = parse(argv, start, rule, seed(sub && !partial ? sub.facts : sub || missed ? widest('subcommand-miss') : entry.facts))
-  const stepped = first.unread.length ? parse(argv, start, rule, seed(widest(fell))) : first
+  const first = parse(argv, start, rule, seed(sub && !partial ? sub.facts : sub || missed ? widest('subcommand-miss') : entry.facts), open)
+  const stepped = first.unread.length ? parse(argv, start, rule, seed(widest(fell)), open) : first
   const unread = stepped.unread.length ? { unread: stepped.unread } : {}
   const parsed = {
     // A flag that widened the answer on the way does not make it a row written for this line.
@@ -443,7 +469,8 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
     return { ...head, ...parsed, ...told(parsed.facts, parsed.args), attribution: own, ...stopped }
   }
 
-  const inner = at(registry, argv[offset]!, argv.slice(offset), depth + 1)
+  const within = new Set([...open].filter((n) => n >= offset).map((n) => n - offset))
+  const inner = at(registry, argv[offset]!, argv.slice(offset), depth + 1, within)
   const shifted = inner.args.map((a) => ({ ...a, index: a.index + offset }))
   const innerFacts = merge(inner.facts, { confidence: 'derived', source: 'nested' })
   const runs: Explanation = { ...inner, facts: innerFacts, ...told(innerFacts, shifted), args: shifted }
@@ -490,12 +517,24 @@ const sentOf = (r: { op: string; fd?: string }): string => {
  * meant for a file the command was pointed at.
  */
 function stepOf(registry: Registry, step: Step): Explanation {
-  const e = at(registry, step.argv[0]!, step.argv, 0)
+  const read = at(registry, step.argv[0]!, step.argv, 0, new Set(step.open))
+  // A bare name on a line is the program the shell finds for it. A path is a file somebody chose, and nothing here
+  // has looked at that file: `./ls` and `/tmp/build/ls` share a last word with `ls` and nothing else. The row still
+  // answers, as the best account of what a program of that name does, but not as one that was checked. A consumer
+  // that has resolved the program itself hands in `{ program, argv }` and keeps the row's own confidence.
+  const named = step.argv[0]!.includes('/') && read.key !== null
+  const e = named ? { ...read, facts: merge(read.facts, { confidence: 'derived', source: 'name-fallback' }) } : read
   const joined = step.after ? { after: step.after } : {}
   if (!step.redirects.length) return { ...e, ...joined }
 
   const writes = step.redirects.filter((r) => r.op !== '<')
   let facts = e.facts
+  // The shell itself opens a connection for these two names, whatever the program is: `echo x > /dev/tcp/host/80`
+  // sends `x` to that host. That is the line's grammar, like the redirection, not a reading of an argument.
+  const sockets = step.redirects.filter((r) => SOCKET.test(r.path))
+  if (sockets.length) {
+    facts = merge(facts, { network: 'arbitrary', ...(sockets.some((r) => r.op !== '<') ? { effect: ['transmit'] as Effect[] } : {}) })
+  }
   if (writes.length) {
     facts = merge(facts, {
       effect: ['create', 'write'],

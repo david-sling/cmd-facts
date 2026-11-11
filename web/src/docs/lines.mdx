@@ -44,7 +44,7 @@ wrote.sentence
 // 'Lists the names of the files and folders kept in ~/Documents. What it prints is written to listing.txt.'
 ```
 
-The written path joins `args` with the operator as written as its `flag` (`>`, `2>>`, `&>`), but only after the sentence has been built — otherwise `cat notes.txt > copy.txt` would read as though `copy.txt` were another file being shown. The stream comes back as `fd`: `'2'` for errors, `'&'` for both at once, and the sentence says which one went where. `2>&1` and `>&2` point one stream at another that is already open, so nothing lands on disk and no redirection is recorded: the command keeps its own row. `>|` overwrites even where the shell was set not to, and reads as `>`.
+The written path joins `args` with the operator as written as its `flag` (`>`, `2>>`, `&>`), but only after the sentence has been built — otherwise `cat notes.txt > copy.txt` would read as though `copy.txt` were another file being shown. The stream comes back as `fd`: `'2'` for errors, `'&'` for both at once, and the sentence says which one went where. A path of the form `/dev/tcp/host/port` or `/dev/udp/host/port` is a connection the shell opens itself, so the step's `network` becomes `arbitrary`, with `transmit` where something is written to it. `2>&1` and `>&2` point one stream at another that is already open, so nothing lands on disk and no redirection is recorded: the command keeps its own row. `>|` overwrites even where the shell was set not to, and reads as `>`.
 
 ## The command inside the command
 

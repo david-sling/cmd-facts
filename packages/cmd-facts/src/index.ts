@@ -18,6 +18,7 @@ export type { Found, Origin, Registry, RegistryOptions } from './registry.ts'
 export { rows } from './rows.ts'
 export type { Row } from './rows.ts'
 export { BUILTIN, COMMANDS } from './data/index.ts'
+export { VERSION } from './version.ts'
 
 /**
  * The curated table, wired the way most consumers want it. Anything else — a pack of your own, a command silenced,

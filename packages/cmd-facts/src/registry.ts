@@ -35,6 +35,27 @@ export type RegistryOptions = {
 
 const VERSION_SUFFIX = /^([A-Za-z_][A-Za-z_-]*?)[0-9][0-9.]*$/
 
+/**
+ * A pack is copied before it is checked, and the copy is what gets checked and loaded. The pack a consumer handed in
+ * stays theirs to change, and changing it afterwards changes nothing here: a row cannot be rewritten once someone has
+ * decided to trust it, and a pack cannot show one table to `validate()` and another to the lookup. The copy is plain
+ * data, so a pack carrying a function is refused at this point rather than run later.
+ */
+function copyOf(pack: Pack): Pack {
+  try {
+    return structuredClone(pack)
+  } catch {
+    throw new Error(`\`${String(pack?.name)}\` is not a pack this library will load: a pack is data and only data.`)
+  }
+}
+
+export function freeze<T>(value: T, seen = new Set<unknown>()): T {
+  if (value === null || typeof value !== 'object' || seen.has(value)) return value
+  seen.add(value)
+  for (const inner of Object.values(value)) freeze(inner, seen)
+  return Object.freeze(value)
+}
+
 const stampRule = <T extends Rule>(rule: T): T => ({ ...rule, facts: merge(rule.facts, { confidence: 'derived', source: 'plugin' }) })
 
 /**
@@ -55,7 +76,7 @@ const stamp = (entry: Entry, trusted: boolean): Entry => {
  * someone is looking at an approval prompt.
  */
 export function buildRegistry(opts: RegistryOptions): Registry {
-  const packs = opts.packs ?? []
+  const packs = (opts.packs ?? []).map(copyOf)
   const trust = new Set(opts.trust ?? [])
   const exclude = new Set(opts.exclude ?? [])
   const override = opts.override ?? {}
@@ -96,13 +117,33 @@ export function buildRegistry(opts: RegistryOptions): Registry {
     let chosen = held[0]!
     if (winner !== undefined) {
       const picked = held.find((c) => c.origin.pack === winner)
-      if (!picked) throw new Error(`\`override\` gives \`${name}\` to \`${winner}\`, which does not claim it.`)
-      chosen = picked
+      // The winner may hold the name through a versioned row instead (`python` for `python3`), settled below.
+      const through = VERSION_SUFFIX.exec(name)?.[1]
+      const reaches = through !== undefined && (claims.get(through) ?? []).some((c) => c.origin.pack === winner && c.entry.versioned)
+      if (!picked && !reaches) throw new Error(`\`override\` gives \`${name}\` to \`${winner}\`, which does not claim it.`)
+      if (picked) chosen = picked
     } else if (held.length > 1) {
       const names = held.map((c) => `\`${c.origin.pack}\``).join(' and ')
       throw new Error(`\`${name}\` is claimed by ${names}. Name the one that wins in \`override\`, or silence it with \`exclude\`.`)
     }
-    table.set(name, { entry: stamp(chosen.entry, chosen.origin.trusted), origin: chosen.origin })
+    table.set(name, { entry: freeze(stamp(chosen.entry, chosen.origin.trusted)), origin: chosen.origin })
+  }
+
+  // A versioned row answers for its name with a number on the end, so a row for `python3` in one pack takes that
+  // name from a `python` row in another just as surely as a second `python` row would. It is settled the same way.
+  for (const [name, own] of [...table]) {
+    const stem = VERSION_SUFFIX.exec(name)?.[1]
+    const wider = stem !== undefined ? table.get(stem) : undefined
+    if (!wider?.entry.versioned || wider.origin.pack === own.origin.pack) continue
+    const winner = Object.hasOwn(override, name) ? override[name] : undefined
+    if (winner === own.origin.pack) continue
+    if (winner === wider.origin.pack) {
+      table.delete(name)
+      continue
+    }
+    throw new Error(
+      `\`${name}\` is claimed by \`${own.origin.pack}\`, and \`${wider.origin.pack}\` already answers for it through \`${stem}\`. Name the one that wins in \`override\`, or silence it with \`exclude\`.`,
+    )
   }
 
   const lookup = (name: string): Found | undefined => {

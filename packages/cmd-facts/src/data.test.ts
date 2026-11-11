@@ -128,3 +128,14 @@ describe('coverage', () => {
     expect(facts.every((f) => f.says.length > 0)).toBe(true)
   })
 })
+
+describe('the built-in pack says which release it is', () => {
+  it('carries the version in the manifest', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { VERSION } = await import('./version.ts')
+    const { BUILTIN } = await import('./data/index.ts')
+    const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as { version: string }
+    expect(VERSION).toBe(manifest.version)
+    expect(BUILTIN.version).toBe(manifest.version)
+  })
+})

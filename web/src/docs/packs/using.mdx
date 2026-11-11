@@ -24,9 +24,11 @@ export const explain = createExplainer({
 | `packs` | The packs to answer from, in order. No default and no discovery; pass `BUILTIN` to get the curated table. |
 | `trust` | Pack names whose rows keep the confidence they were written with. Everything else arrives `derived`. |
 | `exclude` | Command names nobody answers for. They resolve to the widest floor, not to a substitute. |
-| `override` | Command name to the pack that wins it. Required before any pack can shadow a row another pack holds, as `@acme/kube` does the built-in `kubectl` row here. |
+| `override` | Command name to the pack that wins it. Required before any pack can shadow a row another pack holds, as `@acme/kube` does the built-in `kubectl` row here. That includes a name another pack answers through a version suffix: a row for `python3` needs `override: { python3: … }` next to the built-in `python`. |
 
 Everything a pack can influence is settled when `createExplainer` is called: packs are validated, conflicts resolved, excluded names dropped, untrusted rows lowered. A misconfigured registry throws at startup rather than at the moment someone is looking at an approval prompt, and the explainer it returns reads a flat table.
+
+Each pack is copied when it is loaded, and the copy is what is checked and read. Changing a pack object afterwards changes no explainer already built from it, and a pack that carries a function is refused. `BUILTIN` is frozen.
 
 A pack is data and only data: no functions, no matchers, no hook into parsing. A pack that could run code during a lookup would see the command line, and nothing here is allowed to read meaning out of argument text.
 
@@ -50,7 +52,7 @@ Trusting a pack accepts its silences as well as its claims. The dangerous shape 
 
 ```json
 [
-  { "pack": "@cmd-facts/builtin", "version": "0.0.0", "trusted": true, "commands": ["sudo"] },
+  { "pack": "@cmd-facts/builtin", "version": "0.3.0", "trusted": true, "commands": ["sudo"] },
   { "pack": "@acme/tools", "version": "1.2.0", "trusted": false, "commands": ["flowctl"] },
   { "pack": "@acme/kube", "version": "2.4.0", "trusted": false, "commands": ["kubectl delete"] }
 ]
@@ -62,7 +64,7 @@ Gate on `confidence`, which is lowered to match the weakest link in the chain: i
 
 ```ts
 explain.registry.packs
-// [{ pack: '@cmd-facts/builtin', version: '0.0.0', trusted: true }, …]
+// [{ pack: '@cmd-facts/builtin', version: '0.3.0', trusted: true }, …]
 ```
 
 ## Excluding and overriding

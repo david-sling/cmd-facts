@@ -189,3 +189,75 @@ describe('the registry says what it loaded', () => {
     ])
   })
 })
+
+describe('a versioned row holds its numbered names too', () => {
+  const looks = fact('Shows which version is installed.', { ...LOOKS })
+  const numbered: Pack = { name: '@acme/py', version: '1.0.0', commands: { python3: { facts: looks, plain: ['-c'] } } }
+  const line = { program: '/usr/bin/python3', argv: ['python3', '-c', 'x'] }
+
+  it('refuses a row that would take one from another pack without being named', () => {
+    expect(() => createExplainer({ packs: [BUILTIN, numbered], trust: [BUILTIN.name] })).toThrow(
+      /`python3` is claimed by `@acme\/py`, and `@cmd-facts\/builtin` already answers for it through `python`/,
+    )
+  })
+
+  it('is settled either way by `override`, or by `exclude`', () => {
+    const base = { packs: [BUILTIN, numbered], trust: [BUILTIN.name] }
+    expect(createExplainer({ ...base, override: { python3: '@acme/py' } })(line).origin).toBe('@acme/py')
+    const kept = createExplainer({ ...base, override: { python3: BUILTIN.name } })(line)
+    expect(kept.origin).toBe(BUILTIN.name)
+    expect(kept.facts.opaque).toBe(true)
+    expect(createExplainer({ ...base, exclude: ['python3'] })(line).key).toBe('python')
+  })
+
+  it('leaves alone a numbered name no versioned row reaches, and one pack holding both', () => {
+    const free: Pack = { ...numbered, commands: { git2: { facts: looks } } }
+    expect(createExplainer({ packs: [BUILTIN, free] })({ program: 'git2', argv: ['git2'] }).origin).toBe('@acme/py')
+    const both: Pack = { ...numbered, commands: { snake: { facts: looks, versioned: true }, snake3: { facts: looks } } }
+    expect(createExplainer({ packs: [both] })({ program: 'snake3', argv: ['snake3'] }).key).toBe('snake3')
+  })
+})
+
+describe('a pack is copied when it is loaded', () => {
+  const pack = (): Pack => ({ name: '@acme/own', version: '1.0.0', commands: { deploy: { facts: fact('Lists what is deployed.', { ...LOOKS }) } } })
+  const line = { program: 'deploy', argv: ['deploy', '--wipe'] }
+
+  it('so changing it afterwards changes nothing already built', () => {
+    const mine = pack()
+    const explain = createExplainer({ packs: [mine], trust: [mine.name] })
+    mine.commands['deploy']!.plain = ['--wipe']
+    mine.commands['deploy']!.facts.says = 'Anything at all.'
+    const e = explain(line)
+    expect(e.unread).toEqual(['--wipe'])
+    expect(e.facts.says).toBe('Lists what is deployed.')
+  })
+
+  it('and hands out rows nobody can write to', () => {
+    const explain = createExplainer(BUILT_IN_ONLY)
+    const row = explain.registry.lookup('rm')!.entry
+    expect(Object.isFrozen(row)).toBe(true)
+    expect(Object.isFrozen(row.facts)).toBe(true)
+    expect(() => ((row.facts as { says: string }).says = 'x')).toThrow(TypeError)
+  })
+
+  it('refuses a pack that carries anything but data', () => {
+    const sly = pack()
+    ;(sly.commands['deploy'] as unknown as Record<string, unknown>)['match'] = () => true
+    expect(() => createExplainer({ packs: [sly] })).toThrow(/data and only data/)
+  })
+
+  it('checks the same table it loads, whatever the pack returns the second time it is asked', () => {
+    let asked = 0
+    const good = pack().commands
+    const sly = { name: '@acme/sly', version: '1.0.0', get commands() { return asked++ ? { rm: good['deploy']! } : good } } as Pack
+    const explain = createExplainer({ packs: [sly] })
+    expect(asked).toBe(1)
+    expect(explain.registry.lookup('rm')).toBeUndefined()
+  })
+
+  it('and the built-in table is frozen where everyone imports it from', () => {
+    expect(Object.isFrozen(BUILTIN)).toBe(true)
+    expect(Object.isFrozen(BUILTIN.commands)).toBe(true)
+    expect(Object.isFrozen(BUILTIN.commands['rm']!.facts)).toBe(true)
+  })
+})

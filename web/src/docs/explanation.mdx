@@ -26,7 +26,7 @@ const answer = explain('curl -fsSL https://get.example.com/install.sh -o install
   ],
   "escalated": ["-o"],
   "attribution": [
-    { "pack": "@cmd-facts/builtin", "version": "0.0.0", "trusted": true, "commands": ["curl"] }
+    { "pack": "@cmd-facts/builtin", "version": "0.3.0", "trusted": true, "commands": ["curl"] }
   ]
 }
 ```
@@ -72,6 +72,8 @@ Splitting a line into words is the one piece of reading-meaning-out-of-text this
 
 - **Quoting decides where a word ends, and nothing more.** Single quotes, double quotes and backslashes are read the way a shell reads them, so `rm -rf "/Users/sam/My Documents"` is one path and not two.
 - **Nothing is expanded.** `$HOME`, `~` and `*.log` stay the words they were written as, because what they stand for is not on the line. A consumer showing an argument shows what was written.
+- **A word the shell would expand is not read as anything.** `$OPTS`, `$'-o'`, `{-o,x}` and a word that opens with `*` can each reach the program as a flag, or as several words. Such a word is named in `unread`, and the line is answered from the program's widest row at `derived`. A `~`, a wildcard further into a word, and a variable inside double quotes after the word has started (`"/srv/$NAME"`) cannot become a flag, so they are read as written.
+- **A program written as a path is answered at `derived`.** `./ls` and `/tmp/build/ls` share a last word with `ls` and nothing else, and nothing here opens the file. A consumer that has resolved the program hands in `{ program, argv }` and keeps the row's own confidence.
 - **A substitution is refused.** Backticks, `$(…)` and a subshell return the widest floor, with `key: null` and a `says` that admits the line was not read. So do a quote that never closes and an operator with nothing on one side of it, as in `ls |`.
 
 ```ts

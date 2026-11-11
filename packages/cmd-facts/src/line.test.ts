@@ -257,3 +257,153 @@ describe('a redirection is the line’s doing, not the program’s', () => {
     expect(explain('echo hi >| x').key).toBe('echo')
   })
 })
+
+describe('words the shell would expand', () => {
+  const openOf = (line: string) => stepsOf(line)[0]?.open ?? []
+
+  it('names the position of a word that is not what the program will receive', () => {
+    expect(openOf('curl $OPTS https://example.com')).toEqual([1])
+    expect(openOf("curl $'-o' /tmp/x https://example.com")).toEqual([1])
+    expect(openOf('curl $"-o" /tmp/x https://example.com')).toEqual([1])
+    expect(openOf('curl {-o,/tmp/x} https://example.com')).toEqual([1])
+    expect(openOf('ls a{1..3}')).toEqual([1])
+    expect(openOf('cat *')).toEqual([1])
+    expect(openOf('cat *.log')).toEqual([1])
+    expect(openOf('echo [abc]')).toEqual([1])
+    expect(openOf('curl "$OPTS" https://example.com')).toEqual([1])
+    expect(openOf('rm -rf $HOME/x')).toEqual([2])
+  })
+
+  it('leaves alone a word that can only arrive starting the way it was written', () => {
+    for (const line of [
+      'rm ~/x',
+      'cat ./*.log',
+      'cat src/*.ts',
+      "ls '$HOME' \\$HOME",
+      'ls "/srv/$NAME"',
+      'curl --output="$F" https://example.com',
+      'echo $',
+      'echo a$ b',
+      'find . -name x -exec rm {} +',
+      'xargs -I{} rm {}',
+      "ls '{a,b}' \\{a,b\\}",
+    ]) {
+      expect(openOf(line), line).toEqual([])
+    }
+  })
+
+  it('carries no `open` at all where nothing expands, and keeps one per step', () => {
+    expect(stepsOf('ls -la')[0]).toEqual({ argv: ['ls', '-la'], redirects: [] })
+    expect(stepsOf('ls $A | cat b | cat $C').map((s) => s.open)).toEqual([[1], undefined, [1]])
+  })
+
+  it('joins two lines at a backslash, in or out of double quotes', () => {
+    expect(argvOf('curl \\\n-o /tmp/x https://example.com')).toEqual(['curl', '-o', '/tmp/x', 'https://example.com'])
+    expect(argvOf('curl "\\\n-o" /tmp/x')).toEqual(['curl', '-o', '/tmp/x'])
+    expect(argvOf('ls a\\\nb')).toEqual(['ls', 'ab'])
+  })
+
+  // Each of these reaches curl as `-o /tmp/x`, so none of them may read as a request that only shows what came back.
+  it('never answers for such a line from the row as written', () => {
+    const plain = explain('curl https://example.com')
+    expect(plain.facts.confidence).toBe('verified')
+    for (const line of [
+      "curl $'-o' /tmp/x https://example.com",
+      'curl $"-o" /tmp/x https://example.com',
+      'curl {-o,/tmp/x} https://example.com',
+      'curl $OPTS https://example.com',
+      'curl "$OPTS" https://example.com',
+      'curl -o $F https://example.com',
+    ]) {
+      const e = explain(line)
+      expect(e.facts.confidence, line).toBe('derived')
+      expect(e.facts.source, line).toBe('unread')
+      expect(e.unread?.length, line).toBe(1)
+      expect(effectsOf(e.facts), line).toEqual(expect.arrayContaining(['write', 'create']))
+    }
+    const joined = explain('curl \\\n-o /tmp/x https://example.com')
+    expect(joined.escalated).toEqual(['-o'])
+    expect(effectsOf(joined.facts)).toContain('write')
+  })
+
+  it('reads an expanded word after `--` as an operand, since nothing there is a flag', () => {
+    const e = explain('rm -- $X')
+    expect(e.unread).toBeUndefined()
+    expect(e.facts.confidence).toBe('verified')
+  })
+
+  it('does not know a program whose name the shell expands', () => {
+    for (const line of ['$DIR/ls -la', "$'ls' -la", '{ls,-la}']) expect(explain(line).key, line).toBeNull()
+  })
+
+  it('follows the word into a command that is handed over to', () => {
+    const e = explain('sudo rm $X')
+    expect(e.runs?.unread).toEqual(['$X'])
+    expect(e.facts.confidence).toBe('derived')
+    expect(explain('sudo $X').runs).toBeUndefined()
+  })
+})
+
+describe('a line far longer than any command', () => {
+  // The subcommand walk used to re-join every word read so far at each flag, which made ten kilobytes take fifteen
+  // seconds. The bound is loose on purpose: it has to hold on a slow runner, and the old cost was hours at this size.
+  it('is answered in time that grows with its length', () => {
+    for (const line of ['git log ' + '-p x '.repeat(20000), 'npm install ' + '-D x '.repeat(20000), 'git ' + 'a '.repeat(50000)]) {
+      const began = performance.now()
+      explain(line)
+      expect(performance.now() - began).toBeLessThan(2000)
+    }
+    const began = performance.now()
+    explain({ program: 'git', argv: ['git', 'log', ...Array.from({ length: 40000 }, (_, n) => (n % 2 ? 'x' : '-p'))] })
+    expect(performance.now() - began).toBeLessThan(2000)
+  })
+
+  it('still finds the subcommand, and the word after it, where the table holds longer ones', () => {
+    expect(explain('gh pr create --title x').subcommand).toBe('pr create')
+    expect(explain('aws s3 cp a b').subcommand).toBe('s3 cp')
+    expect(explain('docker compose -f prod.yml down').subcommand).toBe('compose down')
+    expect(explain('git stash pop x y z').subcommand).toBe(explain('git stash pop').subcommand)
+  })
+})
+
+describe('a program written as a path', () => {
+  it('is answered from the row its last word names, but not as a checked answer', () => {
+    for (const line of ['./ls -la', '/tmp/build/ls -la', 'bin/ls', '/bin/ls']) {
+      const e = explain(line)
+      expect(e.key, line).toBe('ls')
+      expect(e.facts.confidence, line).toBe('derived')
+      expect(e.facts.source, line).toBe('name-fallback')
+    }
+    expect(explain('ls -la').facts.confidence).toBe('verified')
+  })
+
+  it('keeps the confidence of the row where the consumer resolved the program itself', () => {
+    expect(explain({ program: '/bin/ls', argv: ['ls', '-la'] }).facts.confidence).toBe('verified')
+  })
+
+  it('stays unknown where the name was never known', () => {
+    expect(explain('./nothing-here').facts.confidence).toBe('unknown')
+  })
+
+  it('holds for each step of a longer line', () => {
+    const e = explain('ls | ./cat')
+    expect(e.steps!.map((s) => s.facts.confidence)).toEqual(['verified', 'derived'])
+  })
+})
+
+describe('a redirection the shell turns into a connection', () => {
+  it('reaches the network, and sends where it writes', () => {
+    const out = explain('echo hi > /dev/tcp/203.0.113.9/80')
+    expect(out.facts.network).toBe('arbitrary')
+    expect(effectsOf(out.facts)).toContain('transmit')
+    const back = explain('cat < /dev/udp/203.0.113.9/53')
+    expect(back.facts.network).toBe('arbitrary')
+    expect(effectsOf(back.facts)).not.toContain('transmit')
+  })
+
+  it('is only those two names, written in full', () => {
+    for (const line of ['echo hi > /dev/null', 'echo hi > /dev/tcp', 'echo hi > /dev/tcp/host', 'echo hi > dev/tcp/host/80', 'echo hi > /dev/tcp/a/b/c']) {
+      expect(explain(line).facts.network, line).toBe('none')
+    }
+  })
+})

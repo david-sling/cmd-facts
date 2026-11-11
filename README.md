@@ -70,7 +70,7 @@ console.log(sentence) // "Makes a request to get.example.com and saves what come
     { "index": 4, "value": "install.sh", "role": "path", "flag": "-o" }
   ],
   "escalated": ["-o"],
-  "attribution": [{ "pack": "@cmd-facts/builtin", "version": "0.0.0", "trusted": true, "commands": ["curl"] }]
+  "attribution": [{ "pack": "@cmd-facts/builtin", "version": "0.3.0", "trusted": true, "commands": ["curl"] }]
 }
 ```
 
@@ -98,6 +98,13 @@ Splitting a line into words is the one piece of reading-meaning-out-of-text this
   way a shell reads them, so `rm -rf "/Users/sam/My Documents"` is one path and not two.
 - **Nothing is expanded.** `$HOME`, `~` and `*.log` stay the words they were written as, because what they stand for
   is not on the line. A consumer showing an argument shows what was written.
+- **A word the shell would expand is not read as anything.** `$OPTS`, `$'-o'`, `{-o,x}` and a word that opens with
+  `*` can each reach the program as a flag, or as several words. Such a word is named in `unread`, and the line is
+  answered from the program's widest row at `derived`. A `~`, a wildcard further into a word, and a variable inside
+  double quotes after the word has started (`"/srv/$NAME"`) cannot become a flag, so they are read as written.
+- **A program written as a path is answered at `derived`.** `./ls` and `/tmp/build/ls` share a last word with `ls` and
+  nothing else, and nothing here opens the file. A consumer that has resolved the program hands in
+  `{ program, argv }` and keeps the row's own confidence.
 - **A line that runs several commands is read as several commands.** `curl … | sh`, `a && b`, `a; b`, `a & b` come
   back as `steps`, each answered in full, with the operator that joined them. See below.
 - **A redirection is read as what the line does with the output.** `> file` is a write the program itself knows
@@ -315,7 +322,8 @@ wrote.sentence
 The written path joins `args` with the operator as written as its `flag` (`>`, `2>>`, `&>`), but only after the
 sentence has been built — otherwise `cat notes.txt > copy.txt` would read as though `copy.txt` were another file being
 shown. The stream comes back as `fd`: `'2'` for errors, `'&'` for both at once, and the sentence says which one went
-where. `2>&1` and `>&2` point one stream at another that is already open, so nothing lands on disk and no redirection
+where. A path of the form `/dev/tcp/host/port` or `/dev/udp/host/port` is a connection the shell opens itself, so the
+step's `network` becomes `arbitrary`, with `transmit` where something is written to it. `2>&1` and `>&2` point one stream at another that is already open, so nothing lands on disk and no redirection
 is recorded: the command keeps its own row. `>|` overwrites even where the shell was set not to, and reads as `>`.
 
 ### `confidence` and `source`
@@ -384,11 +392,14 @@ const explain = createExplainer({
 | `packs` | The packs to answer from, in order. No default and no discovery; pass `BUILTIN` to get the curated table. |
 | `trust` | Pack names whose rows keep the confidence they were written with. Everything else arrives `derived`. |
 | `exclude` | Command names nobody answers for. They resolve to `UNKNOWN`, the widest floor, not to a substitute. |
-| `override` | Command name to the pack that wins it. Required before any pack can shadow a row another pack holds, as `@acme/kube` does the built-in `kubectl` row here. |
+| `override` | Command name to the pack that wins it. Required before any pack can shadow a row another pack holds, as `@acme/kube` does the built-in `kubectl` row here. That includes a name another pack answers through a version suffix: a row for `python3` needs `override: { python3: … }` next to the built-in `python`. |
 
 Everything a pack can influence is settled when `createExplainer` is called: packs are validated, conflicts resolved,
 excluded names dropped, untrusted rows lowered. A misconfigured registry throws at startup rather than at the moment
 someone is looking at an approval prompt, and the explainer it returns reads a flat table.
+
+Each pack is copied when it is loaded, and the copy is what is checked and read. Changing a pack object afterwards
+changes no explainer already built from it, and a pack that carries a function is refused. `BUILTIN` is frozen.
 
 A pack is data and only data: no functions, no matchers, no hook into parsing. A pack that could run code during a
 lookup would see the command line, and nothing here is allowed to read meaning out of argument text.
@@ -411,7 +422,7 @@ draw on three. A pack that answered at two depths appears once, with both rows n
 
 ```json
 [
-  { "pack": "@cmd-facts/builtin", "version": "0.0.0", "trusted": true, "commands": ["sudo"] },
+  { "pack": "@cmd-facts/builtin", "version": "0.3.0", "trusted": true, "commands": ["sudo"] },
   { "pack": "@acme/tools", "version": "1.2.0", "trusted": false, "commands": ["flowctl"] },
   { "pack": "@acme/kube", "version": "2.4.0", "trusted": false, "commands": ["kubectl delete"] }
 ]
