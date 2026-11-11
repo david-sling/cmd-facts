@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { ArrowUpRight, Check, Copy, Github } from 'lucide-react'
-import { explain } from 'cmd-facts'
-import { CommandLine, Sentence } from 'cmd-facts/react'
+import { explain, type LinePart } from 'cmd-facts'
+import { CommandLine, Sentence, type ValueProps } from 'cmd-facts/react'
 import { CommandField } from '#/components/command-field'
 import { REPO_URL, SITE } from '#/site'
 
@@ -35,41 +35,39 @@ const EXAMPLES = [
   'ls -Z ~/Documents',
 ] as const
 
-// The components ship no styles. These are the Tailwind classes this page gives them, and the same lists are printed
-// in the playground's code, so what is shown is what is running. `*:` reaches each piece the component renders, and
-// `data-[kind=…]` / `data-escalated` pick which ones a class applies to.
-const LINE_CLASSES = [
-  'text-zinc-300',
-  '*:data-[kind=program]:font-medium',
-  '*:data-[kind=program]:text-white',
-  '*:data-nested:underline',
-  '*:data-nested:decoration-dotted',
-  '*:data-[kind=flag]:text-pink-400',
-  '*:data-escalated:rounded',
-  '*:data-escalated:bg-pink-400/15',
-  '*:data-[kind=value]:text-sky-300',
-  '*:data-[kind=operator]:text-zinc-500',
-  '*:data-[kind=redirect]:text-zinc-500',
-  '*:data-unread:text-red-400',
-  '*:data-unread:underline',
-  '*:data-unread:decoration-wavy',
-]
-const SENTENCE_CLASSES = [
-  '*:rounded',
-  '*:bg-pink-400/10',
-  '*:px-1',
-  '*:font-mono',
-  '*:text-[0.85em]',
-  '*:text-pink-400',
-]
-const LINE = LINE_CLASSES.join(' ')
-const SAID = SENTENCE_CLASSES.join(' ')
+// The components ship no styles; the playground draws each piece itself with renderPart and renderValue and plain
+// Tailwind classes. `playgroundCode` below prints this same code, so keep the two in step.
+const tone: Record<Exclude<LinePart['kind'], 'space'>, string> = {
+  program: 'font-medium text-white',
+  subcommand: 'text-white',
+  flag: 'text-pink-400',
+  value: 'text-sky-300',
+  operator: 'text-zinc-500',
+  redirect: 'text-zinc-500',
+  word: 'text-zinc-300',
+  unread: 'text-red-400',
+}
+
+const renderPart = (part: LinePart) =>
+  part.kind === 'space' ? (
+    part.text
+  ) : (
+    <span className={part.kind === 'flag' && part.escalated ? 'rounded bg-pink-400/15 text-pink-400' : tone[part.kind]}>
+      {part.text}
+    </span>
+  )
+
+const renderValue = (v: ValueProps) => (
+  <code title={v.written.join('\n')} className="rounded bg-pink-400/10 px-1 font-mono text-[0.85em] text-pink-400">
+    {v.text}
+  </code>
+)
 
 const KINDS: { kind: string; line: string; says: string }[] = [
-  { kind: 'program', line: 'git', says: 'The program a command runs. `data-nested` where another command hands over to it, as rm in sudo rm.' },
+  { kind: 'program', line: 'git', says: 'The program a command runs. `nested` where another command hands over to it, as rm in sudo rm.' },
   { kind: 'subcommand', line: 'commit', says: 'A word that picks the row, as commit in git commit.' },
-  { kind: 'flag', line: '-o', says: '`data-escalated` where the flag widened what the command can do; `data-unread` where the row does not know it.' },
-  { kind: 'value', line: 'install.sh', says: 'An argument, with its `data-role` — path, url, host, pid, package… — and `data-flag` where a flag took it.' },
+  { kind: 'flag', line: '-o', says: '`escalated` where the flag widened what the command can do; `unread` where the row does not know it.' },
+  { kind: 'value', line: 'install.sh', says: 'An argument, with its `role` — path, url, host, pid, package… — and `flag` where a flag took it.' },
   { kind: 'operator', line: '&&', says: 'What joins one command to the next: |, &&, ||, ; or &.' },
   { kind: 'redirect', line: '2>&1 >>', says: 'Where output is sent. The target after it is a path value.' },
 ]
@@ -104,26 +102,6 @@ function highlight(code: string) {
   for (const m of code.matchAll(TOKEN)) {
     if (m.index > at) out.push(code.slice(at, m.index))
     const group = [m[1], m[2], m[3], m[4]].findIndex((g) => g !== undefined)
-    // a class list: each variant prefix dimmed, so the utility that does the work is what stands out
-    if (group === 1 && code.slice(0, m.index).endsWith('className=')) {
-      out.push(
-        <span key={m.index} className={TONE[1]}>
-          {m[0].split(/(\s+)/).map((word, i) => {
-            const cut = word.lastIndexOf(':') + 1
-            return cut > 0 ? (
-              <span key={i}>
-                <span className="text-ink-3">{word.slice(0, cut)}</span>
-                {word.slice(cut)}
-              </span>
-            ) : (
-              word
-            )
-          })}
-        </span>,
-      )
-      at = m.index + m[0].length
-      continue
-    }
     out.push(
       <span key={m.index} className={TONE[group]}>
         {m[0]}
@@ -147,11 +125,18 @@ function Code({ children, className = '' }: { children: string; className?: stri
 
 /** The component the playground is, written the way a consumer would write it, with the line typed above in it. */
 // Set narrow on purpose: it sits beside the previews, and a prop per line keeps it from wrapping mid-tag.
-const playgroundCode = (line: string) => `import {
-  CommandLine,
-  Sentence,
-  useExplain,
-} from 'cmd-facts/react'
+const playgroundCode = (line: string) => `import { CommandLine, Sentence, useExplain } from 'cmd-facts/react'
+
+const tone = {
+  program: 'font-medium text-white',
+  subcommand: 'text-white',
+  flag: 'text-pink-400',
+  value: 'text-sky-300',
+  operator: 'text-zinc-500',
+  redirect: 'text-zinc-500',
+  word: 'text-zinc-300',
+  unread: 'text-red-400',
+}
 
 function Approve() {
   const line =
@@ -162,11 +147,30 @@ function Approve() {
       <CommandLine
         line={line}
         of={explanation}
-        className="${LINE_CLASSES.join('\n          ')}"
+        renderPart={(part) =>
+          part.kind === 'space' ? part.text : (
+            <span
+              className={
+                part.kind === 'flag' && part.escalated
+                  ? 'rounded bg-pink-400/15 text-pink-400'
+                  : tone[part.kind]
+              }
+            >
+              {part.text}
+            </span>
+          )
+        }
       />
       <Sentence
         of={explanation}
-        className="${SENTENCE_CLASSES.join('\n          ')}"
+        renderValue={(v) => (
+          <code
+            title={v.written.join('\\n')}
+            className="rounded bg-pink-400/10 px-1 font-mono text-[0.85em] text-pink-400"
+          >
+            {v.text}
+          </code>
+        )}
       />
     </>
   )
@@ -238,15 +242,15 @@ function Playground() {
       <div className="grid border-t border-line lg:grid-cols-2">
         <div className="min-w-0">
         <div className="min-w-0 px-5 py-6 sm:px-7">
-          <p className="eyebrow normal-case tracking-[0.04em]">&lt;CommandLine line={'{line}'} /&gt;</p>
+          <p className="eyebrow normal-case tracking-[0.04em]">&lt;CommandLine renderPart /&gt;</p>
           <div className="mt-4 font-mono text-[15px] leading-relaxed break-words whitespace-pre-wrap sm:text-[18px]">
-            <CommandLine line={line} of={explanation} className={LINE} />
+            <CommandLine line={line} of={explanation} renderPart={renderPart} />
           </div>
         </div>
         <div className="min-w-0 border-t border-line px-5 py-6 sm:px-7">
-          <p className="eyebrow normal-case tracking-[0.04em]">&lt;Sentence of={'{explanation}'} /&gt;</p>
+          <p className="eyebrow normal-case tracking-[0.04em]">&lt;Sentence renderValue /&gt;</p>
           <p className="mt-4 text-[19px] font-light leading-snug text-ink sm:text-[22px]">
-            <Sentence of={explanation} className={SAID} />
+            <Sentence of={explanation} renderValue={renderValue} />
           </p>
         </div>
         </div>
@@ -271,7 +275,7 @@ function Spoof() {
       <figure className="rounded-xl border border-pink/30 bg-panel px-5 py-4">
         <figcaption className="eyebrow normal-case tracking-[0.04em]">&lt;Sentence /&gt;</figcaption>
         <p className="mt-3 text-[17px] font-light leading-snug text-ink">
-          <Sentence of={e} className={SAID} />
+          <Sentence of={e} renderValue={renderValue} />
         </p>
       </figure>
     </div>
@@ -344,10 +348,8 @@ function ReactPage() {
             <div key={kind} className="grid gap-1 px-5 py-4 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-6">
               <dt className="font-mono text-[13px]">
                 <span className="text-ink">{kind}</span>
-                <span className={`${LINE} ml-3`}>
-                  <span data-kind={kind} {...(kind === 'flag' ? { 'data-escalated': '' } : {})}>
-                    {line}
-                  </span>
+                <span className={`ml-3 ${kind === 'flag' ? 'rounded bg-pink-400/15 text-pink-400' : tone[kind as keyof typeof tone]}`}>
+                  {line}
                 </span>
               </dt>
               <dd className="text-[15px] text-ink-2">{ticks(says)}</dd>
@@ -356,40 +358,21 @@ function ReactPage() {
         </dl>
       </Section>
 
-      <Section eyebrow="Styling" title="Style the attributes, or render it yourself.">
+      <Section eyebrow="Styling" title="Draw each piece yourself, or style the defaults.">
         <p>
-          Nothing ships with a stylesheet. Every piece carries attributes saying what it is, and this page colours them
-          with nothing but the Tailwind classes in the playground’s code:{' '}
-          <span className="font-mono text-[0.9em] text-ink">*:</span> reaches each piece, and{' '}
-          <span className="font-mono text-[0.9em] text-ink">data-[kind=flag]</span> or{' '}
-          <span className="font-mono text-[0.9em] text-ink">data-escalated</span> picks which. Plain CSS works on the
-          same attributes:
+          Nothing ships with a stylesheet. The playground draws every piece itself:{' '}
+          <span className="font-mono text-[0.9em] text-ink">renderPart</span> gets each word of the line with what it
+          was read as, and <span className="font-mono text-[0.9em] text-ink">renderValue</span> gets each value of the
+          sentence — its text, every value, what was typed, its role and flag. Return any element, with whatever
+          classes you like; keep a value looking like a value, not like prose.
+        </p>
+        <p>
+          Leave them out and the defaults render plain elements that carry what each piece is as attributes, for a
+          stylesheet to pick up:
         </p>
         <Code>{`[data-kind='flag'] { color: hotpink }
 [data-escalated] { background: rgb(255 105 180 / 0.15) }
 [data-kind='value'][data-role='url'] { color: skyblue }`}</Code>
-        <p>
-          Where a value needs to be more than text — a chip, a link to the file, a count instead of forty names — take
-          over the drawing. Keep it looking like a value, not like prose.
-        </p>
-        <Code>{`import { Sentence, CommandLine, useExplain } from 'cmd-facts/react'
-
-function Approve({ line }: { line: string }) {
-  const explanation = useExplain(line)
-  return (
-    <>
-      <CommandLine line={line} of={explanation} />
-      <Sentence
-        of={explanation}
-        renderValue={(v) => (
-          <Chip role={v.role} title={v.written.join('\\n')}>
-            {v.values.length > 3 ? \`\${v.values.length} files\` : v.text}
-          </Chip>
-        )}
-      />
-    </>
-  )
-}`}</Code>
       </Section>
 
       <Section eyebrow="API" title="Four exports.">
