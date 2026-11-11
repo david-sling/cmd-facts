@@ -176,7 +176,7 @@ function Playground() {
               </button>
             ))}
           </div>
-          <OpenInV0 items={shown.id} className="shrink-0" />
+          <OpenInV0 item={shown.id} className="shrink-0" />
           </div>
           <div className="relative px-5 py-5 sm:px-7">
             <div className="absolute top-5 right-5 sm:right-7">
@@ -224,7 +224,7 @@ function ReactPage() {
         </p>
         <div className="mt-10 flex flex-col items-start gap-3">
           <Install />
-          <OpenInV0 items="sentence" />
+          <OpenInV0 item="sentence" />
         </div>
       </section>
 

@@ -34,7 +34,7 @@ export function ComponentPreview({ name, children }: { name: string; children: R
             </button>
           ))}
         </div>
-        <OpenInV0 items={name} />
+        <OpenInV0 item={name} />
       </div>
       <div role="tabpanel" id={`${name}-Preview`} aria-labelledby={`${name}-Preview-tab`} hidden={tab !== 'Preview'} className="docs-preview-stage">
         <Example />
