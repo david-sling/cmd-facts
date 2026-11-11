@@ -6,7 +6,7 @@ import { Sentence } from '#/components/sentence'
 import sentenceSource from '#/components/sentence.tsx?raw'
 import demoSource from '#/registry/examples/sentence-demo.tsx?raw'
 import { OpenInV0 } from '#/components/open-in-v0'
-import { REPO_URL, SITE } from '#/site'
+import { REPO_URL, SITE, registryItemUrl } from '#/site'
 
 const TITLE = 'cmd-facts for React — say what a command does'
 const DESCRIPTION =
@@ -38,7 +38,7 @@ const EXAMPLES = [
 ] as const
 
 // The sentence alone; the docs install the rest. The item also pulls in cmd-facts itself and shadcn's `cn` helper.
-const INSTALL = `npx shadcn@latest add ${SITE}/r/sentence.json`
+const INSTALL = `npx shadcn@latest add ${registryItemUrl('sentence')}`
 
 /** Where everything this page leaves out is explained. */
 const DOCS = [

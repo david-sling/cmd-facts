@@ -10,7 +10,7 @@
     "generate-routes": "vite build",
     "build": "pnpm registry:build && vite build",
     "preview": "vite preview",
-    "registry:build": "shadcn build -o public/r",
+    "registry:build": "shadcn build -o public/r && node scripts/registry-origin.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
