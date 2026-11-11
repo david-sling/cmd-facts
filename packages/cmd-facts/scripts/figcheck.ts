@@ -118,6 +118,15 @@ const FIG_WRONG = new Set([
   ...['-a', '-b', '-c', '-u'].map((f) => `pmset ${f}`), // Switches choosing which power source a setting applies to.
   'sysctl -e', // A switch.
   'pkill -q', // A switch on macOS; only GNU's `--queue` takes a value.
+  'codesign --timestamp', // `--timestamp [=URL]` in man codesign: the server is given only after `=`.
+  'gh auth login --with-token', // "Read token from standard input": a switch.
+  'go env -u', // Switches: the names and NAME=VALUE pairs after them are operands, one or more.
+  'go env -w',
+  'less -#', // `-# [N]` / `--shift=[N]` in `less --help`: takes the next word.
+  'less --shift',
+  'sort --parallel', // `[--parallel thread_no]` in macOS `sort --help`; GNU takes `--parallel=N`.
+  // poetry publish: each takes a value in poetry's own docs; Fig's spec leaves the args off.
+  ...['--repository', '--username', '--password', '--cert', '--client-cert'].map((f) => `poetry publish ${f}`),
   'nc -l', // A switch: the port to wait on is the operand.
   'codesign --extract-certificates', // The prefix is optional, so it only counts after `=`.
   'traceroute -w', // Takes the time to wait; Fig declares no args.
