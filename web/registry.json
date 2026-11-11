@@ -61,6 +61,8 @@
       "title": "Sentence example",
       "description": "What a command does, in one line: <Sentence command=\"\u2026\" />.",
       "registryDependencies": [
+        "badge",
+        "utils",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -77,6 +79,7 @@
       "title": "Command line example",
       "description": "A few command lines, each word drawn by what it was read as.",
       "registryDependencies": [
+        "utils",
         "https://cmd-facts.davidsling.in/r/command-line.json"
       ],
       "files": [
@@ -93,8 +96,10 @@
       "title": "Approval prompt example",
       "description": "An approval prompt: the command line, and the sentence for it.",
       "registryDependencies": [
-        "input",
+        "badge",
         "card",
+        "input",
+        "utils",
         "https://cmd-facts.davidsling.in/r/command-line.json",
         "https://cmd-facts.davidsling.in/r/sentence.json",
         "https://cmd-facts.davidsling.in/r/use-explain.json"
@@ -114,6 +119,7 @@
       "description": "Drawing a sentence's values yourself, with a count in place of a long list.",
       "registryDependencies": [
         "badge",
+        "utils",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -152,6 +158,7 @@
       "registryDependencies": [
         "badge",
         "tooltip",
+        "utils",
         "https://cmd-facts.davidsling.in/r/command-line.json",
         "https://cmd-facts.davidsling.in/r/sentence.json",
         "https://cmd-facts.davidsling.in/r/use-explain.json"
@@ -172,6 +179,7 @@
       "registryDependencies": [
         "badge",
         "tooltip",
+        "utils",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -188,7 +196,9 @@
       "title": "Ransom note",
       "description": "Every value cut out of magazines, one letter at a time.",
       "registryDependencies": [
+        "badge",
         "tooltip",
+        "utils",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -208,8 +218,10 @@
         "cmd-facts@^0.5.0"
       ],
       "registryDependencies": [
+        "badge",
         "separator",
         "tooltip",
+        "utils",
         "https://cmd-facts.davidsling.in/r/command-line.json",
         "https://cmd-facts.davidsling.in/r/sentence.json",
         "https://cmd-facts.davidsling.in/r/use-explain.json"

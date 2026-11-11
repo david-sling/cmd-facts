@@ -151,6 +151,20 @@ describe('Open in v0', () => {
       }
   })
 
+  // v0 installs an example's own shadcn items but not those of the components it pulls in by URL, so an example
+  // names them itself: without badge listed here, v0 builds sentence.tsx with nothing at @/components/ui/badge
+  it('lists the shadcn items of every component an example pulls in', () => {
+    const byName = new Map(items.map((i) => [i.name, i]))
+    for (const item of examples) {
+      const deps = item.registryDependencies ?? []
+      for (const dep of deps) {
+        const used = byName.get(/\/r\/([a-z-]+)\.json$/.exec(dep)?.[1] ?? '')
+        for (const own of used?.registryDependencies ?? [])
+          if (!own.includes('/')) expect(deps, `${item.name} → ${used!.name} → ${own}`).toContain(own)
+      }
+    }
+  })
+
   const pages = ['index', 'sentence', 'command-line', 'styling', 'examples'].map((p) => [p, read(`../docs/react/${p}.mdx`)] as const)
 
   it('names a registry item with every button and preview', () => {
