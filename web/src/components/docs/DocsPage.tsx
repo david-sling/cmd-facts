@@ -8,6 +8,7 @@ import { REPORT_URL } from '#/site'
 import type { Doc, Heading } from '#/lib/docs'
 import { OpenInV0 } from '#/components/open-in-v0'
 import { ComponentPreview } from '#/components/docs/ComponentPreview'
+import { DocsSearch } from '#/components/docs/DocsSearch'
 
 function useCopy() {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
@@ -63,7 +64,7 @@ function CodeBlock(props: ComponentProps<'pre'>) {
 const components: MDXComponents = {
   pre: CodeBlock,
   // a docs page places these right under the code they open; see OpenInV0
-  OpenInV0: ({ items }: { items: string }) => <OpenInV0 items={items} className="-mt-2 mb-6" />,
+  OpenInV0: ({ item }: { item: string }) => <OpenInV0 item={item} className="-mt-2 mb-6" />,
   ComponentPreview,
   table: (props) => (
     <div className="docs-table">
@@ -202,6 +203,7 @@ export function DocsPage({ doc }: { doc: Doc }) {
           </Link>
         </div>
         <div className="docs-top-end">
+          <DocsSearch />
           <a className="docs-gh" href={REPO_URL} target="_blank" rel="noreferrer" aria-label="cmd-facts on GitHub">
             <Github aria-hidden />
           </a>
