@@ -3,4 +3,4 @@
  * `package.json` would not load on every Node this runs on. A test holds it to the manifest, so a release that
  * forgets to move it does not publish.
  */
-export const VERSION = '0.3.0'
+export const VERSION = '0.4.0'

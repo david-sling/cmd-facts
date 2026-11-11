@@ -52,7 +52,7 @@ Trusting a pack accepts its silences as well as its claims. The dangerous shape 
 
 ```json
 [
-  { "pack": "@cmd-facts/builtin", "version": "0.3.0", "trusted": true, "commands": ["sudo"] },
+  { "pack": "@cmd-facts/builtin", "version": "0.4.0", "trusted": true, "commands": ["sudo"] },
   { "pack": "@acme/tools", "version": "1.2.0", "trusted": false, "commands": ["flowctl"] },
   { "pack": "@acme/kube", "version": "2.4.0", "trusted": false, "commands": ["kubectl delete"] }
 ]
@@ -64,7 +64,7 @@ Gate on `confidence`, which is lowered to match the weakest link in the chain: i
 
 ```ts
 explain.registry.packs
-// [{ pack: '@cmd-facts/builtin', version: '0.3.0', trusted: true }, …]
+// [{ pack: '@cmd-facts/builtin', version: '0.4.0', trusted: true }, …]
 ```
 
 ## Excluding and overriding
