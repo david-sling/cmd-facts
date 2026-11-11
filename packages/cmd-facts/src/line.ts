@@ -5,6 +5,11 @@
  *
  * It expands nothing: a `$HOME` or a `*` stays the literal word it was written as, because what those stand for is
  * not on the line. And it refuses a substitution outright, because the value of one is not on the line either.
+ *
+ * A word the shell would expand is still not the word the program receives, though. `$OPTS`, `$'-o'`, `{-o,x}` and a
+ * leading `*` can each arrive as a flag, or as several words, so the position of every such word is reported in
+ * `open` and nothing is claimed about what it is. A `~` and a wildcard further into a word are left alone: they
+ * become paths that start the way the word was written, so they cannot turn into a flag.
  */
 
 /** How a command was joined to the one before it. */
@@ -23,6 +28,12 @@ export type Step = {
   /** The operator that joined this command to the one before it. Absent on the first. */
   after?: Op
   redirects: Redirect[]
+  /**
+   * Indexes into `argv` of the words the shell would expand before the program sees them: a variable, a `$'…'`
+   * string, a brace list, a word that opens with a wildcard. The word here is what was written, not what arrives.
+   * Absent where there are none.
+   */
+  open?: number[]
 }
 
 export type Tokens = { ok: true; steps: Step[] } | { ok: false; why: 'unterminated' | 'empty' | 'substitution' }
@@ -30,6 +41,12 @@ export type Tokens = { ok: true; steps: Step[] } | { ok: false; why: 'unterminat
 // Inside double quotes a backslash only escapes these; before anything else it stays a backslash.
 const ESCAPABLE = '"\\`$\n'
 const DIGITS = /^[0-9]+$/
+// What can follow a `$` to make it stand for something else: a name, `{`, a special parameter, or a quote (`$'…'`).
+const EXPANDS = /[A-Za-z0-9_{@*#?!$'"-]/
+// `{a,b}` and `{1..3}` become several words. `{}` on its own does not, and is what `find -exec` and `xargs -I` use.
+const BRACES = /\{[^{}]*(,|\.\.)[^{}]*\}/
+// A word that opens with a wildcard can match a file whose name starts with a dash.
+const LEADING_GLOB = /^([*?]|\[.*\])/
 
 export function tokenize(line: string): Tokens {
   const steps: Step[] = []
@@ -37,25 +54,38 @@ export function tokenize(line: string): Tokens {
   let redirects: Redirect[] = []
   let after: Op | undefined
   let word = ''
+  let open: number[] = []
+  // The word as the shell sees its unquoted characters, with a quoted or escaped one blanked out.
+  let bare = ''
+  let expands = false
   let started = false
   let quote: '"' | "'" | null = null
   let pending: { op: Redirect['op']; at: number; fd?: string } | null = null
 
   const endWord = () => {
     if (!started) return
+    const opened = expands || BRACES.test(bare) || LEADING_GLOB.test(bare)
+    bare = ''
+    expands = false
     if (pending) {
       redirects.push({ op: pending.op, path: word, ...(pending.fd ? { fd: pending.fd } : {}) })
       pending = null
     } else {
+      if (opened) open.push(argv.length)
       argv.push(word)
     }
     word = ''
     started = false
   }
 
+  const push = () => {
+    steps.push({ argv, ...(after ? { after } : {}), redirects, ...(open.length ? { open } : {}) })
+    open = []
+  }
+
   const endStep = (next: Op) => {
     endWord()
-    if (argv.length || redirects.length) steps.push({ argv, ...(after ? { after } : {}), redirects })
+    if (argv.length || redirects.length) push()
     argv = []
     redirects = []
     after = next
@@ -67,7 +97,10 @@ export function tokenize(line: string): Tokens {
 
     if (quote === "'") {
       if (c === "'") quote = null
-      else word += c
+      else {
+        word += c
+        bare += ' '
+      }
       continue
     }
 
@@ -77,11 +110,19 @@ export function tokenize(line: string): Tokens {
         continue
       }
       if (c === '\\' && next !== undefined && ESCAPABLE.includes(next)) {
-        word += next
+        // A backslash before a line break joins the two lines, and neither character is part of the word.
+        if (next !== '\n') {
+          word += next
+          bare += ' '
+        }
         i++
         continue
       }
+      // A variable inside double quotes arrives as one word, so it only matters where it opens the word: there it
+      // can still be a flag. Further in, as in `"$HOME/x"` after a `--out=`, the word starts the way it was written.
+      if (c === '$' && word === '' && next !== undefined && EXPANDS.test(next)) expands = true
       word += c
+      bare += ' '
       continue
     }
 
@@ -92,7 +133,13 @@ export function tokenize(line: string): Tokens {
     }
     if (c === '\\') {
       if (next === undefined) return { ok: false, why: 'unterminated' }
+      // A backslash before a line break joins the two lines: `curl \⏎-o x` is `curl -o x`.
+      if (next === '\n') {
+        i++
+        continue
+      }
       word += next
+      bare += ' '
       started = true
       i++
       continue
@@ -145,6 +192,7 @@ export function tokenize(line: string): Tokens {
       const fd = started && DIGITS.test(word) ? word : undefined
       if (fd !== undefined) {
         word = ''
+        bare = ''
         started = false
       } else {
         endWord()
@@ -157,7 +205,9 @@ export function tokenize(line: string): Tokens {
       continue
     }
 
+    if (c === '$' && next !== undefined && EXPANDS.test(next)) expands = true
     word += c
+    bare += c
     started = true
   }
 
@@ -165,7 +215,7 @@ export function tokenize(line: string): Tokens {
   endWord()
   if (pending) return { ok: false, why: 'unterminated' }
   const trailing = after !== undefined && !argv.length && !redirects.length
-  if (argv.length || redirects.length) steps.push({ argv, ...(after ? { after } : {}), redirects })
+  if (argv.length || redirects.length) push()
 
   if (!steps.length) return { ok: false, why: 'empty' }
   // A command on one side of an operator and nothing on the other, as in `ls |` or `| ls`, is not a line this can
