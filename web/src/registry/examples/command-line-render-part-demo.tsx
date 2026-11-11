@@ -1,5 +1,5 @@
 import { CommandLine, commandLinePartClassName } from '@/components/command-line'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 
 export default function Page() {
   return (

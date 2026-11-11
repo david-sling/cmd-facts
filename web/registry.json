@@ -4,15 +4,97 @@
   "homepage": "https://cmd-facts.davidsling.in/react",
   "items": [
     {
+      "name": "badge",
+      "type": "registry:ui",
+      "title": "Badge",
+      "description": "shadcn/ui's badge, as this site uses it.",
+      "dependencies": [
+        "cn",
+        "radix-ui",
+        "class-variance-authority"
+      ],
+      "files": [
+        {
+          "path": "src/components/ui/badge.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/badge.tsx"
+        }
+      ]
+    },
+    {
+      "name": "card",
+      "type": "registry:ui",
+      "title": "Card",
+      "description": "shadcn/ui's card, as this site uses it.",
+      "dependencies": [
+        "cn"
+      ],
+      "files": [
+        {
+          "path": "src/components/ui/card.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/card.tsx"
+        }
+      ]
+    },
+    {
+      "name": "input",
+      "type": "registry:ui",
+      "title": "Input",
+      "description": "shadcn/ui's input, as this site uses it.",
+      "dependencies": [
+        "cn"
+      ],
+      "files": [
+        {
+          "path": "src/components/ui/input.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/input.tsx"
+        }
+      ]
+    },
+    {
+      "name": "separator",
+      "type": "registry:ui",
+      "title": "Separator",
+      "description": "shadcn/ui's separator, as this site uses it.",
+      "dependencies": [
+        "cn",
+        "radix-ui"
+      ],
+      "files": [
+        {
+          "path": "src/components/ui/separator.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/separator.tsx"
+        }
+      ]
+    },
+    {
+      "name": "tooltip",
+      "type": "registry:ui",
+      "title": "Tooltip",
+      "description": "shadcn/ui's tooltip, as this site uses it.",
+      "dependencies": [
+        "cn",
+        "radix-ui"
+      ],
+      "files": [
+        {
+          "path": "src/components/ui/tooltip.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/tooltip.tsx"
+        }
+      ]
+    },
+    {
       "name": "command-line",
       "type": "registry:component",
       "title": "Command line",
       "description": "A command line exactly as written, each word drawn by what cmd-facts read it as: program, flag, value, operator, redirection.",
       "dependencies": [
-        "cmd-facts@^0.5.0"
-      ],
-      "registryDependencies": [
-        "utils"
+        "cmd-facts@^0.5.0",
+        "cn"
       ],
       "files": [
         {
@@ -27,11 +109,11 @@
       "title": "Sentence",
       "description": "The plain-English sentence for a command, with the command's own text drawn apart from the words around it.",
       "dependencies": [
-        "cmd-facts@^0.5.0"
+        "cmd-facts@^0.5.0",
+        "cn"
       ],
       "registryDependencies": [
-        "utils",
-        "badge"
+        "https://cmd-facts.davidsling.in/r/badge.json"
       ],
       "files": [
         {
@@ -61,6 +143,7 @@
       "title": "Sentence example",
       "description": "What a command does, in one line: <Sentence command=\"\u2026\" />.",
       "registryDependencies": [
+        "https://cmd-facts.davidsling.in/r/badge.json",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -93,8 +176,9 @@
       "title": "Approval prompt example",
       "description": "An approval prompt: the command line, and the sentence for it.",
       "registryDependencies": [
-        "input",
-        "card",
+        "https://cmd-facts.davidsling.in/r/badge.json",
+        "https://cmd-facts.davidsling.in/r/card.json",
+        "https://cmd-facts.davidsling.in/r/input.json",
         "https://cmd-facts.davidsling.in/r/command-line.json",
         "https://cmd-facts.davidsling.in/r/sentence.json",
         "https://cmd-facts.davidsling.in/r/use-explain.json"
@@ -113,7 +197,7 @@
       "title": "Sentence with renderValue",
       "description": "Drawing a sentence's values yourself, with a count in place of a long list.",
       "registryDependencies": [
-        "badge",
+        "https://cmd-facts.davidsling.in/r/badge.json",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -130,7 +214,6 @@
       "title": "Command line with renderPart",
       "description": "Drawing a command line's words yourself, on top of the component's own classes.",
       "registryDependencies": [
-        "utils",
         "https://cmd-facts.davidsling.in/r/command-line.json"
       ],
       "files": [
@@ -139,6 +222,9 @@
           "type": "registry:page",
           "target": "app/page.tsx"
         }
+      ],
+      "dependencies": [
+        "cn"
       ]
     },
     {
@@ -150,8 +236,8 @@
         "cmd-facts@^0.5.0"
       ],
       "registryDependencies": [
-        "badge",
-        "tooltip",
+        "https://cmd-facts.davidsling.in/r/badge.json",
+        "https://cmd-facts.davidsling.in/r/tooltip.json",
         "https://cmd-facts.davidsling.in/r/command-line.json",
         "https://cmd-facts.davidsling.in/r/sentence.json",
         "https://cmd-facts.davidsling.in/r/use-explain.json"
@@ -170,8 +256,8 @@
       "title": "Redacted",
       "description": "The sentence as a classified document: every value blacked out, declassified on hover.",
       "registryDependencies": [
-        "badge",
-        "tooltip",
+        "https://cmd-facts.davidsling.in/r/badge.json",
+        "https://cmd-facts.davidsling.in/r/tooltip.json",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -188,7 +274,8 @@
       "title": "Ransom note",
       "description": "Every value cut out of magazines, one letter at a time.",
       "registryDependencies": [
-        "tooltip",
+        "https://cmd-facts.davidsling.in/r/badge.json",
+        "https://cmd-facts.davidsling.in/r/tooltip.json",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -208,8 +295,9 @@
         "cmd-facts@^0.5.0"
       ],
       "registryDependencies": [
-        "separator",
-        "tooltip",
+        "https://cmd-facts.davidsling.in/r/badge.json",
+        "https://cmd-facts.davidsling.in/r/separator.json",
+        "https://cmd-facts.davidsling.in/r/tooltip.json",
         "https://cmd-facts.davidsling.in/r/command-line.json",
         "https://cmd-facts.davidsling.in/r/sentence.json",
         "https://cmd-facts.davidsling.in/r/use-explain.json"

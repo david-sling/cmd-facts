@@ -5,6 +5,7 @@ import { BUILTIN, createExplainer, explain } from 'cmd-facts'
 import { CommandLine } from '@/components/command-line'
 import { Sentence } from '@/components/sentence'
 import { useExplain } from '@/hooks/use-explain'
+import { openInV0Url, V0_OPENS } from '@/site'
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<>{node}</>)
 const text = (markup: string) => markup.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
@@ -103,8 +104,8 @@ describe('registry.json', () => {
     const [major, minor] = core.version.split('.').map(Number)
     for (const item of registry.items) {
       const wanted = item.dependencies?.find((d) => d.startsWith('cmd-facts@'))
-      // every component asks for the core; an example asks only where it imports it itself
-      if (item.type === 'registry:block' && !wanted) continue
+      // every component asks for the core; an example asks only where it imports it itself, and shadcn's never do
+      if (item.type === 'registry:ui' || (item.type === 'registry:block' && !wanted)) continue
       expect(wanted, item.name).toBeDefined()
       const [, wMajor, wMinor] = /\^(\d+)\.(\d+)/.exec(wanted!)!.map(Number)
       expect(major === wMajor && minor! >= wMinor!, `${item.name} wants ${wanted}, core is ${core.version}`).toBe(true)
@@ -138,17 +139,48 @@ describe('Open in v0', () => {
     }
   })
 
-  it('points examples at components this site serves or has', () => {
-    for (const item of examples)
-      for (const dep of item.registryDependencies ?? []) {
-        // a bare name is shadcn's own item; the site has it installed, or the preview could not draw the example
-        if (!dep.includes('/')) {
-          if (dep !== 'utils') expect(() => read(`../components/ui/${dep}.tsx`), `${item.name} → ${dep}`).not.toThrow()
-          continue
-        }
-        const name = /^https:\/\/cmd-facts\.davidsling\.in\/r\/([a-z-]+)\.json$/.exec(dep)?.[1]
-        expect(name && names.has(name), `${item.name} → ${dep}`).toBe(true)
+  // v0 skips shadcn's items named by bare name, and writes those named by URL to their path in shadcn's own repository
+  // (registry/new-york-v4/ui/…), so this site serves the shadcn components it uses, each with the target it belongs at
+  const OURS = /^https:\/\/cmd-facts\.davidsling\.in\/r\/([a-z-]+)\.json$/
+  const SHADCN = items.filter((i) => i.type === 'registry:ui')
+
+  it('points every item at items this site serves', () => {
+    for (const item of items)
+      for (const dep of item.registryDependencies ?? [])
+        expect(names.has(OURS.exec(dep)?.[1] ?? ''), `${item.name} → ${dep}`).toBe(true)
+  })
+
+  it("installs shadcn's components where shadcn would", () => {
+    expect(SHADCN.map((i) => i.name).sort()).toEqual(['badge', 'card', 'input', 'separator', 'tooltip'])
+    for (const item of SHADCN)
+      expect(item.files, item.name).toEqual([
+        { path: `src/components/ui/${item.name}.tsx`, type: 'registry:ui', target: `components/ui/${item.name}.tsx` },
+      ])
+  })
+
+  // v0 installs an example's own shadcn items but not those of the components it pulls in by URL, so an example
+  // names them itself: without badge listed here, v0 builds sentence.tsx with nothing at @/components/ui/badge
+  it('lists the shadcn items of every component an example pulls in', () => {
+    const byName = new Map(items.map((i) => [i.name, i]))
+    for (const item of examples) {
+      const deps = item.registryDependencies ?? []
+      for (const dep of deps) {
+        const used = byName.get(OURS.exec(dep)?.[1] ?? '')
+        for (const own of used?.registryDependencies ?? [])
+          if (SHADCN.some((i) => own.endsWith(`/r/${i.name}.json`)))
+            expect(deps, `${item.name} → ${used!.name} → ${own}`).toContain(own)
       }
+    }
+  })
+
+  // opened bare, v0 renders `<Component />` from a default export, so a component's button opens an example that uses it
+  it('opens every component onto an example that installs it', () => {
+    for (const item of items.filter((i) => i.type === 'registry:component' || i.type === 'registry:hook')) {
+      const opens = items.find((i) => i.name === V0_OPENS[item.name])
+      expect(opens?.type, item.name).toBe('registry:block')
+      expect(opens!.registryDependencies, item.name).toContain(`https://cmd-facts.davidsling.in/r/${item.name}.json`)
+      expect(openInV0Url(item.name)).toContain(encodeURIComponent(`/r/${opens!.name}.json`))
+    }
   })
 
   const pages = ['index', 'sentence', 'command-line', 'styling', 'examples'].map((p) => [p, read(`../docs/react/${p}.mdx`)] as const)
@@ -183,7 +215,7 @@ describe('Open in v0', () => {
     const readme = read('../../../README.md')
     const linked = [
       ...readme.matchAll(
-        /```tsx\n((?:(?!```)[\s\S])*?)\n```\n\n\[Open this example in v0\]\(https:\/\/v0\.dev\/chat\/api\/open\?url=([^)]+)\)/g,
+        /```tsx\n((?:(?!```)[\s\S])*?)\n```\n\n\[!\[Open this example in v0\]\([^)]+\)\]\(https:\/\/v0\.dev\/chat\/api\/open\?url=([^)]+)\)/g,
       ),
     ]
     expect(linked.length).toBeGreaterThanOrEqual(2)

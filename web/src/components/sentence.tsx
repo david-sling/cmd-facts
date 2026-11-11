@@ -2,7 +2,7 @@ import * as React from 'react'
 import { explain, listOf, type Explainer, type Explanation, type Input, type Part, type Role } from 'cmd-facts'
 
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { cn } from 'cn'
 
 /**
  * One value off the command line, ready to draw. `text` is what goes in the sentence; `written` is what was typed,

@@ -38,4 +38,17 @@ export const REGISTRY = registry ? registry.replace(/\/$/, '') : SITE
 
 /** A shadcn registry item served by this site, as v0 opens it: v0 fetches the item's JSON and starts a chat from it. */
 export const registryItemUrl = (name: string) => `${REGISTRY}/r/${name}.json`
-export const openInV0Url = (name: string) => `https://v0.dev/chat/api/open?url=${encodeURIComponent(registryItemUrl(name))}`
+
+/**
+ * What v0 opens for a component: its first example. Opened bare, v0 writes its own page, imports the component as a
+ * default export and renders it with no props, and these components have neither; the example installs the component
+ * all the same, onto a page that renders.
+ */
+export const V0_OPENS: Record<string, string> = {
+  sentence: 'sentence-demo',
+  'command-line': 'command-line-demo',
+  'use-explain': 'approve-demo',
+}
+
+export const openInV0Url = (name: string) =>
+  `https://v0.dev/chat/api/open?url=${encodeURIComponent(registryItemUrl(V0_OPENS[name] ?? name))}`
