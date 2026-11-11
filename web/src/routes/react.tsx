@@ -7,6 +7,8 @@ import sentenceSource from '#/components/sentence.tsx?raw'
 import demoSource from '#/registry/examples/sentence-demo.tsx?raw'
 import ApprovalPrompt from '#/registry/examples/sentence-by-role-demo'
 import approvalSource from '#/registry/examples/sentence-by-role-demo.tsx?raw'
+import commandLineSource from '#/components/command-line.tsx?raw'
+import useExplainSource from '#/hooks/use-explain.ts?raw'
 import { OpenInV0 } from '#/components/open-in-v0'
 import { REPO_URL, SITE, registryItemUrl } from '#/site'
 
@@ -121,18 +123,68 @@ function Install() {
 const withCommand = (source: string, line: string) =>
   source.replace(/command="[^"]*"/, line.includes('"') ? `command={${JSON.stringify(line)}}` : `command="${line}"`)
 
+type File = { id: string; label: string; source: string }
+
 // Each tab is a file as it is served from the registry, and opens in v0 as that same item.
-const TABS = [
+const SENTENCE_FILES = [
   { id: 'sentence-demo', label: 'app/page.tsx', source: demoSource },
   { id: 'sentence', label: 'components/sentence.tsx', source: sentenceSource },
-] as const
+] as const satisfies File[]
+
+const PROMPT_FILES = [
+  { id: 'sentence-by-role-demo', label: 'app/page.tsx', source: approvalSource },
+  { id: 'sentence', label: 'components/sentence.tsx', source: sentenceSource },
+  { id: 'command-line', label: 'components/command-line.tsx', source: commandLineSource },
+  { id: 'use-explain', label: 'hooks/use-explain.ts', source: useExplainSource },
+] as const satisfies File[]
 
 /**
- * An approval prompt built from both components, live beside the one file that draws it. Its code is
- * the registry example exactly, so what is read here is what Open in v0 hands over.
+ * The files behind an example, one tab each, with Copy and Open in v0. `opens` is the registry item v0 opens from
+ * every tab, where one example installs them all; without it each tab opens its own file's item. `edit` rewrites a
+ * file's source before it is shown, for a page that writes what was typed into it.
+ */
+function CodeTabs({ files, opens, edit }: { files: readonly File[]; opens?: string; edit?: (file: File) => string }) {
+  const [tab, setTab] = useState(files[0]!.id)
+  const shown = files.find((f) => f.id === tab) ?? files[0]!
+  const code = (edit ? edit(shown) : shown.source).trimEnd()
+  return (
+    <div className="min-w-0 border-t border-line bg-white/[0.015] lg:border-t-0 lg:border-l">
+      <div className="flex items-end justify-between gap-3 border-b border-line pr-3 pb-1.5 sm:pr-5">
+        <div role="tablist" aria-label="Code" className="flex flex-wrap gap-1 px-3 pt-3 sm:px-5">
+          {files.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === f.id}
+              onClick={() => setTab(f.id)}
+              className={`shrink-0 rounded-t-md px-3 py-2 font-mono text-[12px] transition-colors ${
+                tab === f.id ? 'bg-white/[0.06] text-pink' : 'text-ink-3 hover:text-ink-2'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <OpenInV0 item={opens ?? shown.id} className="shrink-0" />
+      </div>
+      <div className="relative px-5 py-5 sm:px-7">
+        <div className="absolute top-5 right-5 sm:right-7">
+          <CopyButton text={code} label={`Copy ${shown.label}`} />
+        </div>
+        <Code className="max-h-[36rem] overflow-y-auto border-none bg-transparent px-0 py-0 pr-8 break-words whitespace-pre-wrap">
+          {code}
+        </Code>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * An approval prompt built from both components, live beside the files that draw it. Its code is the registry's
+ * exactly, so what is read here is what Open in v0 hands over.
  */
 function Showcase() {
-  const code = approvalSource.trimEnd()
   return (
     <div className="grid overflow-hidden rounded-2xl border border-line bg-panel lg:grid-cols-2">
       <div className="flex min-w-0 items-center justify-center px-2 py-6 sm:px-6 lg:py-10">
@@ -140,30 +192,13 @@ function Showcase() {
           <ApprovalPrompt />
         </div>
       </div>
-      <div className="min-w-0 border-t border-line bg-white/[0.015] lg:border-t-0 lg:border-l">
-        <div className="flex items-center justify-between gap-3 border-b border-line py-2 pr-3 pl-5 sm:pr-5 sm:pl-7">
-          <span className="font-mono text-[12px] text-pink">app/page.tsx</span>
-          <OpenInV0 item="sentence-by-role-demo" className="shrink-0" />
-        </div>
-        <div className="relative px-5 py-5 sm:px-7">
-          <div className="absolute top-5 right-5 sm:right-7">
-            <CopyButton text={code} label="Copy app/page.tsx" />
-          </div>
-          <Code className="max-h-[38rem] overflow-y-auto border-none bg-transparent px-0 py-0 pr-8 break-words whitespace-pre-wrap">
-            {code}
-          </Code>
-        </div>
-      </div>
+      <CodeTabs files={PROMPT_FILES} opens="sentence-by-role-demo" />
     </div>
   )
 }
 
 function Playground() {
   const [line, setLine] = useState<string>(EXAMPLES[0])
-  const [tab, setTab] = useState<(typeof TABS)[number]['id']>('sentence-demo')
-  const shown = TABS.find((t) => t.id === tab)!
-  // the example as served, with the command typed above written into it; v0 opens the file with its own
-  const code = (shown.id === 'sentence-demo' ? withCommand(shown.source, line) : shown.source).trimEnd()
 
   return (
     <div className="rounded-2xl border border-line bg-panel">
@@ -190,36 +225,12 @@ function Playground() {
           </p>
         </div>
 
-        {/* beside the previews, so the code and what it draws are read together; long lines wrap rather than hide */}
-        <div className="min-w-0 border-t border-line bg-white/[0.015] lg:border-t-0 lg:border-l">
-          <div className="flex items-center justify-between gap-3 border-b border-line pr-3 sm:pr-5">
-          <div role="tablist" aria-label="Code" className="flex gap-1 overflow-x-auto px-3 pt-3 sm:px-5">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={tab === t.id}
-                onClick={() => setTab(t.id)}
-                className={`shrink-0 rounded-t-md px-3 py-2 font-mono text-[12px] transition-colors ${
-                  tab === t.id ? 'bg-white/[0.06] text-pink' : 'text-ink-3 hover:text-ink-2'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <OpenInV0 item={shown.id} className="shrink-0" />
-          </div>
-          <div className="relative px-5 py-5 sm:px-7">
-            <div className="absolute top-5 right-5 sm:right-7">
-              <CopyButton text={code} label={`Copy ${shown.label}`} />
-            </div>
-            <Code className="max-h-[36rem] overflow-y-auto border-none bg-transparent px-0 py-0 pr-8 break-words whitespace-pre-wrap">
-              {code}
-            </Code>
-          </div>
-        </div>
+        {/* beside the preview, so the code and what it draws are read together; long lines wrap rather than hide.
+            The example as served, with the command typed above written into it; v0 opens the file with its own. */}
+        <CodeTabs
+          files={SENTENCE_FILES}
+          edit={(f) => (f.id === 'sentence-demo' ? withCommand(f.source, line) : f.source)}
+        />
       </div>
     </div>
   )
