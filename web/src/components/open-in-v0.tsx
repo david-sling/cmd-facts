@@ -1,8 +1,7 @@
 import { openInV0Url } from '#/site'
 
 /**
- * v0's own button, as shadcn's docs give it (ui.shadcn.com/docs/registry/open-in-v0), black with a white outline so it
- * stands off the dark page, linking to one of this site's
+ * v0's own button, as shadcn's docs give it (ui.shadcn.com/docs/registry/open-in-v0), black, linking to one of this site's
  * registry items: an example, or a component, which opens onto its first example (see V0_OPENS). `items` is one name
  * or several, space-separated; several get one button each, with the name beside it so they can be told apart.
  */
@@ -19,7 +18,7 @@ export function OpenInV0({ items, className = '' }: { items: string; className?:
             target="_blank"
             rel="noreferrer"
             aria-label={names.length > 1 ? `Open ${name} in v0` : 'Open in v0'}
-            className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] border border-white/40 bg-black px-3 font-sans text-xs font-medium whitespace-nowrap text-white no-underline outline-none hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-pink/60"
+            className="inline-flex h-8 shrink-0 items-center justify-center gap-1 rounded-[6px] bg-black px-3 font-sans text-xs font-medium whitespace-nowrap text-white no-underline outline-none hover:bg-black hover:text-white focus-visible:ring-2 focus-visible:ring-pink/60"
           >
             Open in{' '}
             <svg viewBox="0 0 40 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden className="size-5 text-current">
