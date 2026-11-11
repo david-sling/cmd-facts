@@ -5,7 +5,7 @@ export default function Page() {
   return (
     <main className="mx-auto max-w-2xl p-8">
       <CommandLine
-        line="curl -fsSL https://get.example.com/install.sh -o install.sh"
+        command="curl -fsSL https://get.example.com/install.sh -o install.sh"
         renderPart={(part) =>
           part.kind === 'space' ? (
             part.text

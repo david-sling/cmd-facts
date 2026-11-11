@@ -43,9 +43,9 @@ function Part({ part }: { part: LinePart }) {
 }
 
 export type CommandLineProps = Omit<React.ComponentProps<'code'>, 'children'> & {
-  /** The line as it was written. */
-  line: string
-  /** The answer for this line, where you already have one. Otherwise it is explained here, with `explainer`. */
+  /** The command, as it was written. */
+  command: string
+  /** The answer for this command, where you already have one. Otherwise it is explained here, with `explainer`. */
   of?: Explanation
   explainer?: Explainer
   /** Draw a piece yourself. Return `part.text` for a `space` to keep the line as written. */
@@ -56,8 +56,8 @@ export type CommandLineProps = Omit<React.ComponentProps<'code'>, 'children'> & 
  * The command line exactly as written, each word drawn by what it was read as: the program, its flags, the
  * arguments, operators and redirections.
  */
-export function CommandLine({ line, of, explainer = explain, renderPart, className, ...props }: CommandLineProps) {
-  const parts = React.useMemo(() => linePartsOf(line, of ?? explainer(line)), [line, of, explainer])
+export function CommandLine({ command, of, explainer = explain, renderPart, className, ...props }: CommandLineProps) {
+  const parts = React.useMemo(() => linePartsOf(command, of ?? explainer(command)), [command, of, explainer])
   return (
     <code
       data-slot="command-line"

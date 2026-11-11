@@ -52,12 +52,12 @@ describe('<Sentence>', () => {
 describe('<CommandLine>', () => {
   it('gives back the line exactly as written', () => {
     for (const line of ['curl -fsSL https://x.example/i.sh | sh && echo "done"', 'sudo rm -rf /var/tmp', 'echo $(id)']) {
-      expect(text(html(<CommandLine line={line} />))).toBe(line)
+      expect(text(html(<CommandLine command={line} />))).toBe(line)
     }
   })
 
   it('labels each word and marks a flag that widened the answer', () => {
-    const out = html(<CommandLine line="curl -o out.txt https://x.example" />)
+    const out = html(<CommandLine command="curl -o out.txt https://x.example" />)
     expect(out).toContain('<span data-kind="program" class="font-medium text-foreground">curl</span>')
     expect(out).toMatch(/<span data-kind="flag" class="text-primary rounded-sm bg-primary\/15">-o<\/span>/)
     expect(out).toContain('<span data-kind="value" data-role="path"')
@@ -66,7 +66,7 @@ describe('<CommandLine>', () => {
   it('takes the consumer’s own drawing and classes', () => {
     const line = 'rm a.txt'
     const out = html(
-      <CommandLine line={line} of={explain(line)} className="x" renderPart={(p) => (p.kind === 'space' ? '_' : p.kind)} />,
+      <CommandLine command={line} of={explain(line)} className="x" renderPart={(p) => (p.kind === 'space' ? '_' : p.kind)} />,
     )
     expect(out).toBe('<code data-slot="command-line" class="font-mono break-words whitespace-pre-wrap x">program_value</code>')
   })

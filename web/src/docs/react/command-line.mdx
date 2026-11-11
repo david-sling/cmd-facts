@@ -14,7 +14,7 @@ npx shadcn@latest add https://cmd-facts.davidsling.in/r/command-line.json
 ```tsx
 import { CommandLine } from '@/components/command-line'
 
-const lines = [
+const commands = [
   'curl -o "my file" https://x.example | sh',
   'sudo rm -rf /var/tmp/build',
   'git -C ~/src/app commit -m "ship it" && git push',
@@ -24,8 +24,8 @@ const lines = [
 export default function Page() {
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-3 p-8">
-      {lines.map((line) => (
-        <CommandLine key={line} line={line} className="rounded-md border px-3 py-2 text-sm" />
+      {commands.map((command) => (
+        <CommandLine key={command} command={command} className="rounded-md border px-3 py-2 text-sm" />
       ))}
     </main>
   )
@@ -40,7 +40,7 @@ The first of those renders as:
 <code data-slot="command-line"><span data-kind="program">curl</span> <span data-kind="flag">-o</span> <span data-kind="value" data-role="path">"my file"</span> <span data-kind="value" data-role="url">https://x.example</span> <span data-kind="operator">|</span> <span data-kind="program">sh</span></code>
 ```
 
-Without `of`, it explains the line itself. Pass `of` where you already hold the answer — from `useExplain`, say — so the line is not read twice.
+Pass it the command and it explains it itself. Pass `of` as well where you already hold the answer — from `useExplain`, say — so the command is not read twice.
 
 ## What each word is
 
@@ -62,8 +62,8 @@ Every piece but `space` and `unread` carries `step`, which command of the line i
 
 | Prop | Type | |
 | --- | --- | --- |
-| `line` | `string` | The line as it was written. |
-| `of` | `Explanation` | The answer for this same line, where you have it. |
+| `command` | `string` | The command, as it was written. |
+| `of` | `Explanation` | The answer for this same command, where you have it. |
 | `explainer` | `Explainer` | What to explain with when `of` is left out. Defaults to `explain`. |
 | `renderPart` | `(part: LinePart, index: number) => ReactNode` | Draw each piece yourself. |
 | `className` and the rest | `code` props | Passed to the outer `<code>`. |
@@ -80,7 +80,7 @@ export default function Page() {
   return (
     <main className="mx-auto max-w-2xl p-8">
       <CommandLine
-        line="curl -fsSL https://get.example.com/install.sh -o install.sh"
+        command="curl -fsSL https://get.example.com/install.sh -o install.sh"
         renderPart={(part) =>
           part.kind === 'space' ? (
             part.text
