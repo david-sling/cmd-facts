@@ -49,6 +49,10 @@ jobs:
             exit 1
           fi
 
+      # The site's registry components and its typecheck read cmd-facts the way a consumer does, from dist.
+      - name: Build the library
+        run: pnpm --filter cmd-facts build
+
       - name: Test
         run: pnpm -r test
 
