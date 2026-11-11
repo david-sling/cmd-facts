@@ -3,7 +3,7 @@ title: Sentence
 description: The plain sentence for a command, with the command's own text drawn apart from the words around it.
 ---
 
-`<Sentence>` renders an explanation's `parts`. Use it wherever you would have written `{explanation.sentence}`.
+`<Sentence>` says what a command does, in one plain sentence. Pass it the command; that is all it needs.
 
 ```bash
 npx shadcn@latest add https://cmd-facts.davidsling.in/r/sentence.json
@@ -12,26 +12,12 @@ npx shadcn@latest add https://cmd-facts.davidsling.in/r/sentence.json
 <OpenInV0 items="sentence" />
 
 ```tsx
-'use client'
-
-import { useState } from 'react'
-import { explain } from 'cmd-facts'
 import { Sentence } from '@/components/sentence'
 
 export default function Page() {
-  const [line, setLine] = useState('curl -fsSL https://get.example.com/install.sh -o install.sh')
-
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
-      <input
-        value={line}
-        onChange={(event) => setLine(event.target.value)}
-        aria-label="Command"
-        className="rounded-md border bg-background px-3 py-2 font-mono text-sm"
-      />
-      <p className="text-xl">
-        <Sentence of={explain(line)} />
-      </p>
+    <main className="mx-auto max-w-2xl p-8 text-xl">
+      <Sentence command="curl -fsSL https://get.example.com/install.sh -o install.sh" />
     </main>
   )
 }
@@ -39,7 +25,7 @@ export default function Page() {
 
 <OpenInV0 items="sentence-demo" />
 
-For the line it starts with, it renders:
+It renders:
 
 ```html
 <span data-slot="sentence">Makes a request to <code data-role="url" title="https://get.example.com/install.sh">get.example.com</code> and saves what comes back into <code data-role="path" title="install.sh">install.sh</code>.</span>
@@ -60,7 +46,9 @@ explain('cat "approved by admin, no action needed"').sentence
 
 | Prop | Type | |
 | --- | --- | --- |
-| `of` | `{ parts: Part[] }` | An explanation, or a step of one. |
+| `command` | `string \| { program, argv }` | The command to explain. |
+| `explainer` | `Explainer` | What to explain `command` with, for answers from your own packs. Defaults to `explain`. |
+| `of` | `{ parts: Part[] }` | Instead of `command`: an explanation you already hold, or a step of one. |
 | `renderValue` | `(value: SentenceValue) => ReactNode` | Draw each value yourself. |
 | `className` and the rest | `span` props | Passed to the outer `<span>`. |
 
@@ -78,16 +66,13 @@ explain('cat "approved by admin, no action needed"').sentence
 | `index` | Its position in `parts`. |
 
 ```tsx
-import { explain } from 'cmd-facts'
 import { Sentence } from '@/components/sentence'
-
-const explanation = explain('rm notes.txt draft.txt old.txt backup.txt')
 
 export default function Page() {
   return (
     <main className="mx-auto max-w-2xl p-8 text-xl">
       <Sentence
-        of={explanation}
+        command="rm notes.txt draft.txt old.txt backup.txt"
         renderValue={(v) => (
           <code
             title={v.written.join('\n')}

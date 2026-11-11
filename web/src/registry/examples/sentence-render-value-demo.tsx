@@ -1,13 +1,10 @@
-import { explain } from 'cmd-facts'
 import { Sentence } from '@/components/sentence'
-
-const explanation = explain('rm notes.txt draft.txt old.txt backup.txt')
 
 export default function Page() {
   return (
     <main className="mx-auto max-w-2xl p-8 text-xl">
       <Sentence
-        of={explanation}
+        command="rm notes.txt draft.txt old.txt backup.txt"
         renderValue={(v) => (
           <code
             title={v.written.join('\n')}

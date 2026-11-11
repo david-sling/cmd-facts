@@ -25,7 +25,23 @@ Each item also installs `cmd-facts` itself, 0.5 or newer, and shadcn's `cn` help
 
 ## Use
 
-An approval prompt, with the line typed into it:
+The sentence takes the command and nothing else:
+
+```tsx
+import { Sentence } from '@/components/sentence'
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-2xl p-8 text-xl">
+      <Sentence command="curl -fsSL https://get.example.com/install.sh -o install.sh" />
+    </main>
+  )
+}
+```
+
+<OpenInV0 items="sentence-demo" />
+
+An approval prompt shows the line too, so it explains once with `useExplain` and hands both components the answer:
 
 ```tsx
 'use client'

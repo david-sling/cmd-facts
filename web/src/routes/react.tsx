@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { ArrowRight, Check, Copy, Github } from 'lucide-react'
-import { explain } from 'cmd-facts'
 import { CommandField } from '#/components/command-field'
 import { Sentence } from '#/components/sentence'
 import sentenceSource from '#/components/sentence.tsx?raw'
@@ -115,6 +114,10 @@ function Install() {
   )
 }
 
+/** The example's `command="…"` set to another line, quoted the way JSX needs it. */
+const withCommand = (source: string, line: string) =>
+  source.replace(/command="[^"]*"/, line.includes('"') ? `command={${JSON.stringify(line)}}` : `command="${line}"`)
+
 // Each tab is a file as it is served from the registry, and opens in v0 as that same item.
 const TABS = [
   { id: 'sentence-demo', label: 'app/page.tsx', source: demoSource },
@@ -124,9 +127,9 @@ const TABS = [
 function Playground() {
   const [line, setLine] = useState<string>(EXAMPLES[0])
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('sentence-demo')
-  const explanation = explain(line)
   const shown = TABS.find((t) => t.id === tab)!
-  const code = shown.source.trimEnd()
+  // the example as served, with the command typed above written into it; v0 opens the file with its own
+  const code = (shown.id === 'sentence-demo' ? withCommand(shown.source, line) : shown.source).trimEnd()
 
   return (
     <div className="rounded-2xl border border-line bg-panel">
@@ -149,7 +152,7 @@ function Playground() {
         <div className="min-w-0 px-5 py-6 sm:px-7 lg:py-8">
           <p className="eyebrow normal-case tracking-[0.04em]">&lt;Sentence /&gt;</p>
           <p className="mt-5 text-[21px] font-light leading-snug text-ink sm:text-[26px]">
-            <Sentence of={explanation} />
+            <Sentence command={line} />
           </p>
         </div>
 

@@ -58,10 +58,7 @@
       "name": "sentence-demo",
       "type": "registry:block",
       "title": "Sentence example",
-      "description": "Type a command and read what it does, with the command's own text drawn apart.",
-      "dependencies": [
-        "cmd-facts@^0.5.0"
-      ],
+      "description": "What a command does, in one line: <Sentence command=\"\u2026\" />.",
       "registryDependencies": [
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
@@ -112,9 +109,6 @@
       "type": "registry:block",
       "title": "Sentence with renderValue",
       "description": "Drawing a sentence's values yourself, with a count in place of a long list.",
-      "dependencies": [
-        "cmd-facts@^0.5.0"
-      ],
       "registryDependencies": [
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],

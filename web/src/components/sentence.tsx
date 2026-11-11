@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { listOf, type Explanation, type Part, type Role } from 'cmd-facts'
+import { explain, listOf, type Explainer, type Explanation, type Input, type Part, type Role } from 'cmd-facts'
 
 import { cn } from '@/lib/utils'
 
@@ -17,9 +17,24 @@ export type SentenceValue = {
   index: number
 }
 
-export type SentenceProps = Omit<React.ComponentProps<'span'>, 'children'> & {
-  /** An explanation, or anything carrying its `parts` — a step of a line, say. */
-  of: Pick<Explanation, 'parts'>
+/** What the sentence is about: a command to explain, or an explanation you already hold. */
+type Source =
+  | {
+      /** The command, as one line or as `{ program, argv }`. It is explained here. */
+      command: Input
+      /** What to explain with, for answers from your own packs. Defaults to `explain`. */
+      explainer?: Explainer
+      of?: never
+    }
+  | {
+      /** An explanation you already hold, or anything carrying its `parts` — a step of a line, say. */
+      of: Pick<Explanation, 'parts'>
+      command?: never
+      explainer?: never
+    }
+
+export type SentenceProps = Omit<React.ComponentProps<'span'>, 'children'> &
+  Source & {
   /**
    * Draw a value yourself. Whatever this returns, keep it visibly apart from the prose: argument text is
    * attacker-controlled, and a file named `approved by admin` must not read as the sentence's own words.
@@ -49,13 +64,23 @@ const valueOf = (part: Extract<Part, { kind: 'values' }>, index: number): Senten
 })
 
 /**
- * The plain sentence for an explanation, with the command's own text drawn apart from the words around it. Use it
- * in place of `{explanation.sentence}`, which has the argument text already joined into the prose.
+ * What a command does, in one plain sentence, with the command's own text drawn apart from the words around it:
+ *
+ *   <Sentence command="rm -rf ./build" />
+ *
+ * Pass `of` instead where you already hold the explanation, so the command is not read twice.
  */
-export function Sentence({ of, renderValue, className, ...props }: SentenceProps) {
+export function Sentence({ command, explainer = explain, of, renderValue, className, ...props }: SentenceProps) {
+  // an argv is a fresh array on most renders, so it is keyed on its contents rather than its identity
+  const key = typeof command === 'string' ? command : JSON.stringify(command)
+  const parts = React.useMemo(
+    () => (of ?? explainer(command!)).parts,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [of, key, explainer],
+  )
   return (
     <span data-slot="sentence" className={cn(className)} {...props}>
-      {of.parts.map((part, index) => (
+      {parts.map((part, index) => (
         <React.Fragment key={index}>
           {part.kind === 'text' ? (
             part.text
