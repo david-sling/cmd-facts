@@ -30,7 +30,8 @@
         "cmd-facts@^0.5.0"
       ],
       "registryDependencies": [
-        "utils"
+        "utils",
+        "badge"
       ],
       "files": [
         {
@@ -92,6 +93,8 @@
       "title": "Approval prompt example",
       "description": "An approval prompt: the command line, and the sentence for it.",
       "registryDependencies": [
+        "input",
+        "card",
         "https://cmd-facts.davidsling.in/r/command-line.json",
         "https://cmd-facts.davidsling.in/r/sentence.json",
         "https://cmd-facts.davidsling.in/r/use-explain.json"
@@ -110,6 +113,7 @@
       "title": "Sentence with renderValue",
       "description": "Drawing a sentence's values yourself, with a count in place of a long list.",
       "registryDependencies": [
+        "badge",
         "https://cmd-facts.davidsling.in/r/sentence.json"
       ],
       "files": [
@@ -132,6 +136,87 @@
       "files": [
         {
           "path": "src/registry/examples/command-line-render-part-demo.tsx",
+          "type": "registry:page",
+          "target": "app/page.tsx"
+        }
+      ]
+    },
+    {
+      "name": "tooltip-demo",
+      "type": "registry:block",
+      "title": "Tooltips",
+      "description": "Hover any word of the command, or any value in the sentence, to see what it was read as.",
+      "dependencies": [
+        "cmd-facts@^0.5.0"
+      ],
+      "registryDependencies": [
+        "badge",
+        "tooltip",
+        "https://cmd-facts.davidsling.in/r/command-line.json",
+        "https://cmd-facts.davidsling.in/r/sentence.json",
+        "https://cmd-facts.davidsling.in/r/use-explain.json"
+      ],
+      "files": [
+        {
+          "path": "src/registry/examples/tooltip-demo.tsx",
+          "type": "registry:page",
+          "target": "app/page.tsx"
+        }
+      ]
+    },
+    {
+      "name": "redacted-demo",
+      "type": "registry:block",
+      "title": "Redacted",
+      "description": "The sentence as a classified document: every value blacked out, declassified on hover.",
+      "registryDependencies": [
+        "badge",
+        "tooltip",
+        "https://cmd-facts.davidsling.in/r/sentence.json"
+      ],
+      "files": [
+        {
+          "path": "src/registry/examples/redacted-demo.tsx",
+          "type": "registry:page",
+          "target": "app/page.tsx"
+        }
+      ]
+    },
+    {
+      "name": "ransom-note-demo",
+      "type": "registry:block",
+      "title": "Ransom note",
+      "description": "Every value cut out of magazines, one letter at a time.",
+      "registryDependencies": [
+        "tooltip",
+        "https://cmd-facts.davidsling.in/r/sentence.json"
+      ],
+      "files": [
+        {
+          "path": "src/registry/examples/ransom-note-demo.tsx",
+          "type": "registry:page",
+          "target": "app/page.tsx"
+        }
+      ]
+    },
+    {
+      "name": "receipt-demo",
+      "type": "registry:block",
+      "title": "Receipt",
+      "description": "The whole answer as a shop receipt, each line a field with a tooltip.",
+      "dependencies": [
+        "cmd-facts@^0.5.0"
+      ],
+      "registryDependencies": [
+        "separator",
+        "tooltip",
+        "https://cmd-facts.davidsling.in/r/command-line.json",
+        "https://cmd-facts.davidsling.in/r/sentence.json",
+        "https://cmd-facts.davidsling.in/r/use-explain.json"
+      ],
+      "files": [
+        {
+          "path": "src/registry/examples/receipt-demo.tsx",
           "type": "registry:page",
           "target": "app/page.tsx"
         }

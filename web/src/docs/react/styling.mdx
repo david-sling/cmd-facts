@@ -26,10 +26,14 @@ const tone = {
 
 A flag that widened the answer adds `rounded-sm bg-primary/15`, and the program another one hands over to adds a dotted underline; both are in `commandLinePartClassName`, just below the map.
 
-In `components/sentence.tsx`, each value is drawn by the `Value` element:
+In `components/sentence.tsx`, each value is drawn by the `Value` element — shadcn's `Badge`, set to sit inline and wrap with the sentence, around a `<code>`:
 
 ```tsx
-<code className="rounded-sm bg-primary/10 px-1 py-0.5 font-mono text-[0.85em] text-primary">
+<Badge
+  asChild
+  variant="outline"
+  className="inline rounded-sm border-transparent bg-primary/10 px-1 py-0.5 font-mono text-[0.85em] font-normal whitespace-normal text-primary"
+>
 ```
 
 <OpenInV0 items="sentence" />
@@ -44,6 +48,7 @@ For one place that needs something else, pass `renderValue` to [`Sentence`](/doc
 
 ```tsx
 import { Sentence } from '@/components/sentence'
+import { Badge } from '@/components/ui/badge'
 
 export default function Page() {
   return (
@@ -51,12 +56,12 @@ export default function Page() {
       <Sentence
         command="rm notes.txt draft.txt old.txt backup.txt"
         renderValue={(v) => (
-          <code
+          <Badge
             title={v.written.join('\n')}
-            className="rounded bg-amber-400/15 px-1 font-mono text-amber-700 dark:text-amber-300"
+            className="bg-amber-400/15 font-mono text-amber-700 dark:text-amber-300"
           >
             {v.values.length > 3 ? `${v.values.length} files` : v.text}
-          </code>
+          </Badge>
         )}
       />
     </main>

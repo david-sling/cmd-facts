@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { explain, listOf, type Explainer, type Explanation, type Input, type Part, type Role } from 'cmd-facts'
 
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 /**
@@ -44,13 +45,16 @@ export type SentenceProps = Omit<React.ComponentProps<'span'>, 'children'> &
 
 function Value({ value }: { value: SentenceValue }) {
   return (
-    <code
-      data-role={value.role}
-      title={value.written.join('\n')}
-      className="rounded-sm bg-primary/10 px-1 py-0.5 font-mono text-[0.85em] text-primary"
+    // a badge that reads as part of the line: it wraps with the sentence instead of sitting as a pill
+    <Badge
+      asChild
+      variant="outline"
+      className="inline rounded-sm border-transparent bg-primary/10 px-1 py-0.5 font-mono text-[0.85em] font-normal whitespace-normal text-primary"
     >
-      {value.text}
-    </code>
+      <code data-role={value.role} title={value.written.join('\n')}>
+        {value.text}
+      </code>
+    </Badge>
   )
 }
 

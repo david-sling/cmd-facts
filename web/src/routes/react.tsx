@@ -46,6 +46,7 @@ const DOCS = [
   { href: '/docs/react/sentence', title: 'Sentence', says: 'Why values are drawn apart from the prose, its props, and renderValue.' },
   { href: '/docs/react/command-line', title: 'Command line', says: 'The line exactly as written, each word drawn by what it was read as.' },
   { href: '/docs/react/styling', title: 'Styling', says: 'Where the colours live in your copy, and how to change them.' },
+  { href: '/docs/react/examples', title: 'Examples', says: 'Tooltips, a redacted dossier, a ransom note and a shop receipt.' },
 ] as const
 
 // Enough of TSX to tell the parts of the page's own snippets apart; not a parser.
@@ -237,7 +238,7 @@ function ReactPage() {
         <h2 className="mt-4 text-[clamp(1.75rem,3vw,2.6rem)] font-light leading-[1.08] tracking-[-0.03em] text-ink">
           The rest of it.
         </h2>
-        <ul className="mt-10 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="mt-10 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-5">
           {DOCS.map((doc) => (
             <li key={doc.href} className="bg-panel">
               <a href={doc.href} className="group flex h-full flex-col gap-2 px-5 py-5 transition-colors hover:bg-panel-2">

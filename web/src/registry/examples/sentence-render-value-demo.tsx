@@ -1,4 +1,5 @@
 import { Sentence } from '@/components/sentence'
+import { Badge } from '@/components/ui/badge'
 
 export default function Page() {
   return (
@@ -6,12 +7,12 @@ export default function Page() {
       <Sentence
         command="rm notes.txt draft.txt old.txt backup.txt"
         renderValue={(v) => (
-          <code
+          <Badge
             title={v.written.join('\n')}
-            className="rounded bg-amber-400/15 px-1 font-mono text-amber-700 dark:text-amber-300"
+            className="bg-amber-400/15 font-mono text-amber-700 dark:text-amber-300"
           >
             {v.values.length > 3 ? `${v.values.length} files` : v.text}
-          </code>
+          </Badge>
         )}
       />
     </main>

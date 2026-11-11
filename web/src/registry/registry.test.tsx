@@ -138,16 +138,20 @@ describe('Open in v0', () => {
     }
   })
 
-  it('points examples at the components on this site', () => {
+  it('points examples at components this site serves or has', () => {
     for (const item of examples)
       for (const dep of item.registryDependencies ?? []) {
-        if (dep === 'utils') continue
+        // a bare name is shadcn's own item; the site has it installed, or the preview could not draw the example
+        if (!dep.includes('/')) {
+          if (dep !== 'utils') expect(() => read(`../components/ui/${dep}.tsx`), `${item.name} → ${dep}`).not.toThrow()
+          continue
+        }
         const name = /^https:\/\/cmd-facts\.davidsling\.in\/r\/([a-z-]+)\.json$/.exec(dep)?.[1]
         expect(name && names.has(name), `${item.name} → ${dep}`).toBe(true)
       }
   })
 
-  const pages = ['index', 'sentence', 'command-line', 'styling'].map((p) => [p, read(`../docs/react/${p}.mdx`)] as const)
+  const pages = ['index', 'sentence', 'command-line', 'styling', 'examples'].map((p) => [p, read(`../docs/react/${p}.mdx`)] as const)
 
   it('names a registry item with every button and preview', () => {
     for (const [page, mdx] of pages) {
@@ -172,7 +176,7 @@ describe('Open in v0', () => {
         checked++
       }
     }
-    expect(checked).toBe(7)
+    expect(checked).toBe(11)
   })
 
   it('shows the README examples it links to, exactly', () => {
