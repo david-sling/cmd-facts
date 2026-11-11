@@ -1,7 +1,7 @@
 {
   "$schema": "https://ui.shadcn.com/schema/registry.json",
   "name": "cmd-facts",
-  "homepage": "https://cmd-facts.vercel.app/react",
+  "homepage": "https://cmd-facts.davidsling.in/react",
   "items": [
     {
       "name": "command-line",

@@ -9,7 +9,7 @@ export const SITE = host
   ? host.startsWith('http')
     ? host.replace(/\/$/, '')
     : `https://${host}`
-  : 'https://cmd-facts.vercel.app'
+  : 'https://cmd-facts.davidsling.in'
 
 export const TITLE = 'cmd-facts — structured facts about what a command does'
 

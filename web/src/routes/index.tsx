@@ -4,9 +4,14 @@ import AnimatedGradient from '#/components/animated-gradient'
 import { ExplainDemo } from '#/components/explain-demo'
 import { HeroGlass } from '#/components/hero-glass'
 import { InstallCommand } from '#/components/install-command'
-import { MISSING_URL, REPORT_URL, REPO_URL } from '#/site'
+import { MISSING_URL, REPORT_URL, REPO_URL, SITE } from '#/site'
 
-export const Route = createFileRoute('/')({ component: Home })
+// Each page names its own canonical address; one set on the root would be inherited by every page and name the home
+// page as the original of all of them.
+export const Route = createFileRoute('/')({
+  head: () => ({ links: [{ rel: 'canonical', href: SITE }] }),
+  component: Home,
+})
 
 function Home() {
   return (

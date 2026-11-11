@@ -290,7 +290,7 @@ The React components are not in this package. They are a [shadcn](https://ui.sha
 into your project, styled with your theme's tokens, and yours to change:
 
 ```bash
-npx shadcn@latest add https://cmd-facts.vercel.app/r/command-line.json https://cmd-facts.vercel.app/r/sentence.json https://cmd-facts.vercel.app/r/use-explain.json
+npx shadcn@latest add https://cmd-facts.davidsling.in/r/command-line.json https://cmd-facts.davidsling.in/r/sentence.json https://cmd-facts.davidsling.in/r/use-explain.json
 ```
 
 ```tsx
@@ -316,7 +316,7 @@ explanation, and `linePartsOf(line, explanation)`, which returns the line in pie
 `flag`, `value` with its `role`, `operator`, `redirect`, `word` — that join back to the line character for
 character. A flag that widened the answer carries `escalated`, one the row does not know `unread`, and the program
 another one hands over to (`rm` in `sudo rm`) `nested`. A line that could not be read comes back as one `unread`
-piece. See [cmd-facts.vercel.app/react](https://cmd-facts.vercel.app/react).
+piece. See [cmd-facts.davidsling.in/react](https://cmd-facts.davidsling.in/react).
 
 ### A line that runs more than one command
 
