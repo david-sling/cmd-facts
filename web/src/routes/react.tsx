@@ -90,13 +90,51 @@ const ticks = (text: string) =>
     ),
   )
 
-function Code({ children }: { children: string }) {
+// Enough of TSX and CSS to tell the parts of a short snippet apart; not a parser, and only ever fed the page's own code.
+const TOKEN =
+  /(\/\/[^\n]*)|('(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`)|\b(import|from|function|const|return|export)\b|(<\/?[A-Z][A-Za-z]*|<\/?>|\/>)/g
+const TONE = ['text-ink-3', 'text-[#9fc7ff]', 'text-pink', 'text-ink']
+
+function highlight(code: string) {
+  const out: React.ReactNode[] = []
+  let at = 0
+  for (const m of code.matchAll(TOKEN)) {
+    if (m.index > at) out.push(code.slice(at, m.index))
+    const group = [m[1], m[2], m[3], m[4]].findIndex((g) => g !== undefined)
+    out.push(
+      <span key={m.index} className={TONE[group]}>
+        {m[0]}
+      </span>,
+    )
+    at = m.index + m[0].length
+  }
+  out.push(code.slice(at))
+  return out
+}
+
+function Code({ children, className = '' }: { children: string; className?: string }) {
   return (
-    <pre className="overflow-x-auto rounded-xl border border-line bg-panel px-5 py-4 font-mono text-[12.5px] leading-[1.7] text-ink-2 sm:text-[13px]">
-      {children}
+    <pre
+      className={`overflow-x-auto rounded-xl border border-line bg-panel px-5 py-4 font-mono text-[12.5px] leading-[1.7] text-ink-2 sm:text-[13px] ${className}`}
+    >
+      <code>{highlight(children)}</code>
     </pre>
   )
 }
+
+/** The component the playground is, written the way a consumer would write it, with the line typed above in it. */
+const playgroundCode = (line: string) => `import { CommandLine, Sentence, useExplain } from 'cmd-facts/react'
+
+function Approve() {
+  const line = ${JSON.stringify(line)}
+  const explanation = useExplain(line)
+  return (
+    <>
+      <CommandLine line={line} of={explanation} className="line" />
+      <Sentence of={explanation} className="said" />
+    </>
+  )
+}`
 
 function Install() {
   const command = 'npm i cmd-facts react'
@@ -170,9 +208,13 @@ function Playground() {
         </div>
         <div className="min-w-0 border-t border-line px-5 py-6 sm:px-7">
           <p className="eyebrow normal-case tracking-[0.04em]">&lt;Sentence of={'{explanation}'} /&gt;</p>
-          <p className="said mt-4 text-[19px] font-light leading-snug text-ink sm:text-[22px]">
-            <Sentence of={explanation} />
+          <p className="mt-4 text-[19px] font-light leading-snug text-ink sm:text-[22px]">
+            <Sentence of={explanation} className="said" />
           </p>
+        </div>
+        <div className="min-w-0 border-t border-line bg-white/[0.015] px-5 py-6 sm:px-7">
+          <p className="eyebrow">The code</p>
+          <Code className="mt-4 border-none bg-transparent px-0 py-0">{playgroundCode(line)}</Code>
         </div>
       </div>
     </div>
