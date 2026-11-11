@@ -151,7 +151,7 @@ describe('Open in v0', () => {
   })
 
   it("installs shadcn's components where shadcn would", () => {
-    expect(SHADCN.map((i) => i.name).sort()).toEqual(['badge', 'card', 'input', 'separator', 'tooltip'])
+    expect(SHADCN.map((i) => i.name).sort()).toEqual(['badge', 'button', 'card', 'input', 'separator', 'tooltip'])
     for (const item of SHADCN)
       expect(item.files, item.name).toEqual([
         { path: `src/components/ui/${item.name}.tsx`, type: 'registry:ui', target: `components/ui/${item.name}.tsx` },
@@ -187,8 +187,7 @@ describe('Open in v0', () => {
 
   it('names a registry item with every button and preview', () => {
     for (const [page, mdx] of pages) {
-      for (const [, list] of mdx.matchAll(/<OpenInV0 items="([^"]+)" \/>/g))
-        for (const name of list!.split(/\s+/)) expect(names.has(name), `${page}: ${name}`).toBe(true)
+      for (const [, name] of mdx.matchAll(/<OpenInV0 item="([^"]+)" \/>/g)) expect(names.has(name!), `${page}: ${name}`).toBe(true)
       for (const [, name] of mdx.matchAll(/<ComponentPreview name="([^"]+)">/g))
         expect(examples.some((e) => e.name === name), `${page}: ${name}`).toBe(true)
     }

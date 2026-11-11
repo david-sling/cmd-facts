@@ -22,6 +22,24 @@
       ]
     },
     {
+      "name": "button",
+      "type": "registry:ui",
+      "title": "Button",
+      "description": "shadcn/ui's button, as this site uses it.",
+      "dependencies": [
+        "cn",
+        "radix-ui",
+        "class-variance-authority"
+      ],
+      "files": [
+        {
+          "path": "src/components/ui/button.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/button.tsx"
+        }
+      ]
+    },
+    {
       "name": "card",
       "type": "registry:ui",
       "title": "Card",
@@ -203,6 +221,31 @@
       "files": [
         {
           "path": "src/registry/examples/sentence-render-value-demo.tsx",
+          "type": "registry:page",
+          "target": "app/page.tsx"
+        }
+      ]
+    },
+    {
+      "type": "registry:block",
+      "registryDependencies": [
+        "https://cmd-facts.davidsling.in/r/badge.json",
+        "https://cmd-facts.davidsling.in/r/button.json",
+        "https://cmd-facts.davidsling.in/r/card.json",
+        "https://cmd-facts.davidsling.in/r/command-line.json",
+        "https://cmd-facts.davidsling.in/r/sentence.json",
+        "https://cmd-facts.davidsling.in/r/use-explain.json"
+      ],
+      "name": "sentence-by-role-demo",
+      "title": "An approval prompt, values by role",
+      "description": "An approval prompt: the command's values coloured by role, the sentence's underlined with an icon; pointing at either lights its pair.",
+      "dependencies": [
+        "cmd-facts@^0.5.0",
+        "lucide-react"
+      ],
+      "files": [
+        {
+          "path": "src/registry/examples/sentence-by-role-demo.tsx",
           "type": "registry:page",
           "target": "app/page.tsx"
         }

@@ -1,7 +1,8 @@
 /* The docs layout: a sticky top bar, a sidebar of sections, one column of prose, a contents rail.
    The page is black here for the same reason the landing page is, so there is no light theme to
-   pick; the only colour is the pink the rest of the site uses. */
-.docs {
+   pick; the only colour is the pink the rest of the site uses. The search dialog is drawn outside .docs, at the end
+   of the body, so it takes the same tokens. */
+.docs, .docs-search {
   --sans: 'Manrope', ui-sans-serif, system-ui, sans-serif;
   --mono: 'Spline Sans Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
@@ -19,7 +20,8 @@
   --hover: rgba(255, 255, 255, 0.05);
   --soft: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px -12px rgba(0, 0, 0, 0.8);
   --top: 64px;
-
+}
+.docs {
   min-height: 100vh;
   background: var(--ground);
   color: var(--ink);
@@ -272,3 +274,65 @@ html:has(.docs) { scroll-padding-top: 88px; }
 .docs-preview-stage > * { width: 100%; }
 .docs-preview .docs-code { margin: 0; }
 .docs-preview .docs-code pre { border: 0; border-radius: 0; max-height: 32rem; }
+
+/* Search: a button in the top bar, and a dialog over the page. */
+.docs-search-btn {
+  display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px 0 11px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--ink-3);
+  font: 400 13.5px/1 var(--sans); cursor: pointer; transition: color 160ms, border-color 160ms;
+}
+.docs-search-btn:hover { color: var(--ink-2); border-color: var(--line-strong); }
+.docs-search-btn svg { width: 16px; height: 16px; }
+.docs-search-btn kbd {
+  padding: 4px 6px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line);
+  font: 500 11px/1 var(--mono); color: var(--ink-3);
+}
+.docs-search-label { margin-right: 18px; }
+@media (max-width: 639.98px) {
+  .docs-search-btn { width: 36px; padding: 0; justify-content: center; color: var(--ink-2); }
+  .docs-search-label, .docs-search-btn kbd { display: none; }
+}
+
+.docs-search-overlay {
+  position: fixed; inset: 0; z-index: 50; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(2px);
+}
+.docs-search {
+  position: fixed; z-index: 51; left: 50%; top: min(12vh, 96px); transform: translateX(-50%);
+  width: min(640px, calc(100vw - 32px)); max-height: min(560px, calc(100dvh - 2 * min(12vh, 96px)));
+  display: flex; flex-direction: column; overflow: hidden;
+  border: 1px solid var(--line-strong); border-radius: 14px; background: var(--panel); color: var(--ink);
+  box-shadow: 0 24px 64px -16px rgba(0, 0, 0, 0.9); font-family: var(--sans); color-scheme: dark;
+}
+.docs-search:focus { outline: none; }
+.docs-search-field { display: flex; align-items: center; gap: 10px; padding: 0 12px 0 16px; border-bottom: 1px solid var(--line); }
+.docs-search-field > svg { width: 18px; height: 18px; flex: none; color: var(--ink-3); }
+.docs-search-field input {
+  flex: 1; min-width: 0; height: 54px; border: 0; background: none; outline: none;
+  font: 400 16px/1 var(--sans); color: var(--ink);
+}
+.docs-search-field input::placeholder { color: var(--ink-3); }
+.docs-search-esc {
+  padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2);
+  font: 500 11px/1 var(--mono); color: var(--ink-3); cursor: pointer;
+}
+.docs-search-esc:hover { color: var(--ink); }
+.docs-search-results { margin: 0; padding: 6px; list-style: none; overflow-y: auto; overscroll-behavior: contain; }
+.docs-search-results li {
+  display: flex; align-items: flex-start; gap: 12px; padding: 10px 12px; border-radius: 9px; cursor: pointer;
+}
+.docs-search-results li[aria-selected="true"] { background: var(--panel-2); box-shadow: inset 2px 0 0 var(--accent); }
+.docs-search-results li > svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--ink-3); }
+.docs-search-enter { margin-left: auto; opacity: 0; }
+.docs-search-results li[aria-selected="true"] .docs-search-enter { opacity: 1; }
+.docs-search-hit { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.docs-search-where { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 14px; line-height: 1.35; }
+.docs-search-page { color: var(--ink-3); }
+.docs-search-page::after { content: "›"; margin-left: 6px; }
+.docs-search-heading { color: var(--ink); font-weight: 600; }
+.docs-search-snippet {
+  font-size: 13px; line-height: 1.5; color: var(--ink-2);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+.docs-search mark { background: var(--accent-soft); color: var(--accent); border-radius: 3px; padding: 0 1px; }
+.docs-search-empty { margin: 0; padding: 28px 16px; text-align: center; font-size: 14px; color: var(--ink-3); }
+
