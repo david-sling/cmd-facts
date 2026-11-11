@@ -2,7 +2,8 @@ import { ArrowUpRight } from 'lucide-react'
 import { openInV0Url } from '#/site'
 
 /**
- * A link that opens one of this site's registry items in v0: a component on its own, or an example built from them.
+ * A link that opens one of this site's registry items in v0: an example, or a component, which opens onto its first
+ * example (see V0_OPENS).
  * `items` is one name or several, space-separated; several get one link each, named so they can be told apart.
  */
 export function OpenInV0({ items, className = '' }: { items: string; className?: string }) {

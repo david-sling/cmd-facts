@@ -5,6 +5,7 @@ import { BUILTIN, createExplainer, explain } from 'cmd-facts'
 import { CommandLine } from '@/components/command-line'
 import { Sentence } from '@/components/sentence'
 import { useExplain } from '@/hooks/use-explain'
+import { openInV0Url, V0_OPENS } from '@/site'
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(<>{node}</>)
 const text = (markup: string) => markup.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
@@ -169,6 +170,16 @@ describe('Open in v0', () => {
           if (SHADCN.some((i) => own.endsWith(`/r/${i.name}.json`)))
             expect(deps, `${item.name} → ${used!.name} → ${own}`).toContain(own)
       }
+    }
+  })
+
+  // opened bare, v0 renders `<Component />` from a default export, so a component's button opens an example that uses it
+  it('opens every component onto an example that installs it', () => {
+    for (const item of items.filter((i) => i.type === 'registry:component' || i.type === 'registry:hook')) {
+      const opens = items.find((i) => i.name === V0_OPENS[item.name])
+      expect(opens?.type, item.name).toBe('registry:block')
+      expect(opens!.registryDependencies, item.name).toContain(`https://cmd-facts.davidsling.in/r/${item.name}.json`)
+      expect(openInV0Url(item.name)).toContain(encodeURIComponent(`/r/${opens!.name}.json`))
     }
   })
 
