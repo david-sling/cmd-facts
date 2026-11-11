@@ -215,7 +215,7 @@ describe('Open in v0', () => {
     const readme = read('../../../README.md')
     const linked = [
       ...readme.matchAll(
-        /```tsx\n((?:(?!```)[\s\S])*?)\n```\n\n\[Open this example in v0\]\(https:\/\/v0\.dev\/chat\/api\/open\?url=([^)]+)\)/g,
+        /```tsx\n((?:(?!```)[\s\S])*?)\n```\n\n\[!\[Open this example in v0\]\([^)]+\)\]\(https:\/\/v0\.dev\/chat\/api\/open\?url=([^)]+)\)/g,
       ),
     ]
     expect(linked.length).toBeGreaterThanOrEqual(2)

@@ -150,8 +150,8 @@ html:has(.docs) { scroll-padding-top: 88px; }
 .docs-prose li { margin: 6px 0; }
 .docs-prose li::marker { color: var(--ink-3); }
 .docs-prose strong { font-weight: 600; color: var(--ink); }
-.docs-prose a:not(.docs-preview *) { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); }
-.docs-prose a:hover { text-decoration-color: currentColor; }
+.docs-prose a:not(.docs-preview *):not([data-slot="open-in-v0"]) { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.docs-prose a:not([data-slot="open-in-v0"]):hover { text-decoration-color: currentColor; }
 .docs-prose hr { margin: 40px 0; border: 0; border-top: 1px solid var(--line-2); }
 .docs-prose :not(pre) > code:not(.docs-preview *) {
   padding: 2px 6px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line-2);

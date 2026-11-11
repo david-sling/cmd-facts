@@ -293,7 +293,7 @@ into your project, styled with your theme's tokens, and yours to change:
 npx shadcn@latest add https://cmd-facts.davidsling.in/r/command-line.json https://cmd-facts.davidsling.in/r/sentence.json https://cmd-facts.davidsling.in/r/use-explain.json
 ```
 
-Open a component on its own in v0: [command-line](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fcommand-line.json) · [sentence](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fsentence.json) · [use-explain](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fuse-explain.json)
+Open a component in v0, on an example that uses it: `command-line` [![Open command-line in v0](https://cmd-facts.davidsling.in/open-in-v0.svg)](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fcommand-line-demo.json) · `sentence` [![Open sentence in v0](https://cmd-facts.davidsling.in/open-in-v0.svg)](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fsentence-demo.json) · `use-explain` [![Open use-explain in v0](https://cmd-facts.davidsling.in/open-in-v0.svg)](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fapprove-demo.json)
 
 The sentence takes the command and nothing else:
 
@@ -309,7 +309,7 @@ export default function Page() {
 }
 ```
 
-[Open this example in v0](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fsentence-demo.json)
+[![Open this example in v0](https://cmd-facts.davidsling.in/open-in-v0.svg)](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fsentence-demo.json)
 
 And an approval prompt, with the line typed into it:
 
@@ -351,7 +351,7 @@ export default function Page() {
 }
 ```
 
-[Open this example in v0](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fapprove-demo.json)
+[![Open this example in v0](https://cmd-facts.davidsling.in/open-in-v0.svg)](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fapprove-demo.json)
 
 `<Sentence>` renders `parts`, so each value is drawn as a value and not joined into the prose; `renderValue` draws them
 your own way. `<CommandLine>` shows the line exactly as written, each word drawn by what it was read as, and
