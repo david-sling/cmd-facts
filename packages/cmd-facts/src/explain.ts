@@ -2,6 +2,7 @@ import { effectsOf, merge } from './facts.ts'
 import type { Facts } from './facts.ts'
 import { buildRegistry } from './registry.ts'
 import type { Registry, RegistryOptions } from './registry.ts'
+import { reach } from './entry.ts'
 import type { FlagRule, Role, Rule } from './entry.ts'
 import { tokenize } from './line.ts'
 import type { Op, Step } from './line.ts'
@@ -44,6 +45,12 @@ export type Explanation = {
   args: ArgSlot[]
   /** Flags on this command line that widened the fact set, in the form the table declares them. */
   escalated: string[]
+  /**
+   * Words on this command line the row does not account for: a flag nobody has looked at for this command, or an
+   * argument where the row expects none. What they do is not known, so `facts` is the program's widest row at
+   * `derived` rather than the row for this command, and the arguments after an unread flag carry no role.
+   */
+  unread?: string[]
   /**
    * The command this one hands over to, where that command is on this same line and runs on this computer:
    * `sudo rm -rf x`, `xargs rm`, `env FOO=1 node app.js`, `find . -exec rm {} +`. Its `args` indexes point into the
@@ -166,9 +173,30 @@ function roleAt(operands: Role[] | undefined, n: number): Role {
   return operands[Math.min(n, operands.length - 1)] ?? 'unknown'
 }
 
+const declared = (rule: Rule, flag: string) =>
+  (rule.flags ?? []).some((r) => r.flags.includes(flag)) || rule.values?.[flag] !== undefined || (rule.plain ?? []).includes(flag)
+
+const takes = (rule: Rule, flag: string) =>
+  (rule.flags ?? []).some((r) => r.takesValue && r.flags.includes(flag)) || rule.values?.[flag] !== undefined
+
+/**
+ * Whether the table has looked at this flag for this row. A bundle (`-la`) is read only if every letter in it is,
+ * up to a letter that takes a value, after which the rest of the word is that value.
+ */
+function isRead(rule: Rule, head: string): boolean {
+  if (declared(rule, head)) return true
+  if (rule.flagStyle === 'words' || !/^-[A-Za-z0-9]{2,}$/.test(head)) return false
+  for (const c of head.slice(1)) {
+    if (!declared(rule, `-${c}`)) return false
+    if (takes(rule, `-${c}`)) return true
+  }
+  return true
+}
+
 function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
   const args: ArgSlot[] = []
   const escalated: string[] = []
+  const unread: string[] = []
   let out = facts
   let operand = 0
   let literal = false
@@ -191,6 +219,10 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
       const eq = spelled.indexOf('=')
       const head = eq > 1 ? spelled.slice(0, eq) : spelled
       const inline = eq > 1 ? spelled.slice(eq + 1) : undefined
+      if (!isRead(rule, head)) {
+        unread.push(token)
+        continue
+      }
       const matched = flagsOf(rule, head)
       for (const m of matched) {
         if (!Object.keys(m.facts).length) continue
@@ -208,11 +240,14 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
       }
       continue
     }
-    const role = roleAt(rule.operands, operand++)
+    // A row that declares no operands was not written to be pointed at anything, so a word here is one it has not read.
+    if (!rule.operands?.length) unread.push(token)
+    // After a flag nobody has read, the word that follows may be that flag's value, so no position is certain.
+    const role = unread.length ? 'unknown' : roleAt(rule.operands, operand++)
     args.push({ index: i, value: token, role })
     if (role === 'command') nested = true
   }
-  return { facts: out, args, escalated: [...new Set(escalated)] }
+  return { facts: out, args, escalated: [...new Set(escalated)], unread }
 }
 
 const MAX_DEPTH = 4
@@ -274,29 +309,31 @@ function at(registry: Registry, program: string, argv: string[], depth: number):
   // A word the table holds no row for, and a leading option it does not declare, both leave the exact subcommand
   // unresolved, so the base row answers at `derived` either way.
   const missed = entry.sub !== undefined && word !== undefined && !sub
-  const base: Facts = sub
-    ? sub.facts
-    : missed
-      ? merge(entry.facts, { confidence: 'derived', source: 'subcommand-miss' })
-      : entry.facts
-  const seeded = preRules.reduce(
-    (acc, g) => merge(acc, { ...g.facts, source: 'curated+flags' as const }),
-    trimmed ? merge(base, { source: 'name-fallback' }) : base,
-  )
+  const seed = (base: Facts) =>
+    preRules.reduce(
+      (acc, g) => merge(acc, { ...g.facts, source: 'curated+flags' as const }),
+      trimmed ? merge(base, { source: 'name-fallback' }) : base,
+    )
+  const widest = (source: 'subcommand-miss' | 'unread') => merge(reach(entry), { confidence: 'derived', source })
 
-  const stepped = parse(argv, start, rule, seeded)
-  const parsed =
-    preArgs.length || preRules.length
-      ? {
-          facts: stepped.facts,
-          args: [...preArgs, ...stepped.args],
-          escalated: [...new Set([...preRules.map((g) => g.flags[0]!), ...stepped.escalated])],
-        }
-      : stepped
+  // The row answers for the line only where the table has read every word of it. A flag it has not looked at, or a
+  // word where it expects none, could be doing anything the program can do, so the line is answered from the
+  // program's widest row instead, the same as an unrecognised subcommand.
+  const first = parse(argv, start, rule, seed(sub ? sub.facts : missed ? widest('subcommand-miss') : entry.facts))
+  const fell = missed ? 'subcommand-miss' : 'unread'
+  const stepped = first.unread.length ? parse(argv, start, rule, seed(widest(fell))) : first
+  const unread = stepped.unread.length ? { unread: stepped.unread } : {}
+  const parsed = {
+    // A flag that widened the answer on the way does not make it a row written for this line.
+    facts: stepped.unread.length ? merge(stepped.facts, { source: fell }) : stepped.facts,
+    args: [...preArgs, ...stepped.args],
+    escalated: [...new Set([...preRules.map((g) => g.flags[0]!), ...stepped.escalated])],
+    ...unread,
+  }
   const head = { program, name, key, origin: origin.pack, ...(wantsSub ? { subcommand: word } : {}) }
   // The row that answered, not the words on the line: an unrecognised subcommand was answered by the base row.
   const own: Attribution[] = [
-    { pack: origin.pack, version: origin.version, trusted: origin.trusted, commands: [sub ? `${key} ${word}` : key] },
+    { pack: origin.pack, version: origin.version, trusted: origin.trusted, commands: [sub && !stepped.unread.length ? `${key} ${word}` : key] },
   ]
 
   const wanted = nestedAt(argv, parsed.args, rule)

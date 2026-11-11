@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { explain } from './index.ts'
-import { effectsOf, isComplete, merge } from './facts.ts'
+import { RANK, effectsOf, isComplete, merge } from './facts.ts'
 import type { Facts } from './facts.ts'
+import { reach } from './entry.ts'
+import type { Rule } from './entry.ts'
+import { COMMANDS } from './data/index.ts'
 
 const run = (line: string, program?: string) => {
   const argv = line.split(' ')
@@ -136,6 +139,67 @@ describe('escalating flags', () => {
   it('stops reading flags after a bare double dash', () => {
     expect(roles('rm -- -r')).toEqual(['-r:path'])
     expect(run('rm -- -r').escalated).toEqual([])
+  })
+})
+
+describe('a line the table has not read all of', () => {
+  it('answers from the widest row at derived, and names the flag it did not read', () => {
+    const got = run('rm --no-preserve-root -rf /')
+    expect(got.unread).toEqual(['--no-preserve-root'])
+    expect(got.facts.confidence).toBe('derived')
+    expect(got.facts.source).toBe('unread')
+    expect(effectsOf(got.facts)).toContain('delete')
+  })
+
+  // The flag nobody looked at may take the next word as its value, so no word after it can be named as a path.
+  it('gives no role to the words after a flag it did not read', () => {
+    expect(roles('rm --no-preserve-root -rf /')).toEqual(['/:unknown'])
+  })
+
+  it('reads a bundle only if it reads every letter in it', () => {
+    expect(run('rm -rf x').unread).toBeUndefined()
+    expect(run('rm -rZ x').unread).toEqual(['-rZ'])
+  })
+
+  it('falls back past a known subcommand to the program, which is where the widest reach is written', () => {
+    const got = run('git log --oneline')
+    expect(got.unread).toEqual(['--oneline'])
+    expect(got.facts.opaque).toBe(true)
+    expect(got.facts.says).toBe(run('git frobnicate').facts.says)
+    expect(got.attribution[0]!.commands).toEqual(['git'])
+  })
+
+  it('treats a word on a row written to take none as one it has not read', () => {
+    const got = run('whoami extra')
+    expect(got.unread).toEqual(['extra'])
+    expect(got.facts.confidence).toBe('derived')
+  })
+
+  it('leaves a line it read in full verified', () => {
+    for (const line of ['rm -rf x', 'tar -xzf backup.tgz', 'curl -fsSL https://x.example']) {
+      expect(run(line).unread, line).toBeUndefined()
+      expect(run(line).facts.confidence, line).toBe('verified')
+    }
+  })
+
+  // Whatever a row says it can do with the flags it knows, a line carrying one it does not know is answered at least
+  // that wide. Otherwise a flag nobody read would be a way to get a narrower answer than a flag somebody did.
+  const lines = Object.entries(COMMANDS).flatMap(([name, entry]) => [
+    { line: `${name} --cmdfacts-unread`, rule: entry as Rule },
+    ...Object.entries(entry.sub ?? {}).map(([word, sub]) => ({ line: `${name} ${word} --cmdfacts-unread`, rule: sub })),
+  ])
+  it.each(lines)('$line', ({ line, rule }) => {
+    const got = run(line).facts
+    const own = reach(rule)
+    expect(got.confidence).not.toBe('verified')
+    expect(RANK.network[got.network]).toBeGreaterThanOrEqual(RANK.network[own.network])
+    expect(RANK.privilege[got.privilege]).toBeGreaterThanOrEqual(RANK.privilege[own.privilege])
+    if (own.touchesCredentials) expect(got.touchesCredentials).toBe(true)
+    if (own.opaque) expect(got.opaque).toBe(true)
+    if (!got.opaque) {
+      expect(effectsOf(got)).toEqual(expect.arrayContaining(effectsOf(own)))
+      expect(RANK.reversible[got.reversible]).toBeGreaterThanOrEqual(RANK.reversible[own.reversible])
+    }
   })
 })
 
