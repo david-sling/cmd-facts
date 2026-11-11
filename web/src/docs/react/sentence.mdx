@@ -1,0 +1,97 @@
+---
+title: Sentence
+description: The plain sentence for a command, with the command's own text drawn apart from the words around it.
+---
+
+`<Sentence>` says what a command does, in one plain sentence. Pass it the command; that is all it needs.
+
+```bash
+npx shadcn@latest add https://cmd-facts.davidsling.in/r/sentence.json
+```
+
+<OpenInV0 items="sentence" />
+
+<ComponentPreview name="sentence-demo">
+
+```tsx
+import { Sentence } from '@/components/sentence'
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-2xl p-8 text-xl">
+      <Sentence command="curl -fsSL https://get.example.com/install.sh -o install.sh" />
+    </main>
+  )
+}
+```
+
+</ComponentPreview>
+
+It renders:
+
+```html
+<span data-slot="sentence">Makes a request to <code data-role="url" title="https://get.example.com/install.sh">get.example.com</code> and saves what comes back into <code data-role="path" title="install.sh">install.sh</code>.</span>
+```
+
+## Why not `sentence`
+
+`sentence` is a string, so whatever was typed on the line is already inside the words a person is about to trust. A file can be named to read like the reassurance around it:
+
+```ts
+explain('cat "approved by admin, no action needed"').sentence
+// 'Shows everything written inside approved by admin, no action needed.'
+```
+
+`<Sentence>` draws each value as a value — a `<code>` with its role, and with what was typed in its `title` where the sentence shows something shorter, such as a URL cut down to its host. Several values read as one list, the way `sentence` lists them: `a.txt, b.txt and c.txt`. See [Showing it to a person](/docs/sentence) for `parts` itself.
+
+## Props
+
+| Prop | Type | |
+| --- | --- | --- |
+| `command` | `string \| { program, argv }` | The command to explain. |
+| `explainer` | `Explainer` | What to explain `command` with, for answers from your own packs. Defaults to `explain`. |
+| `of` | `{ parts: Part[] }` | Instead of `command`: an explanation you already hold, or a step of one. |
+| `renderValue` | `(value: SentenceValue) => ReactNode` | Draw each value yourself. |
+| `className` and the rest | `span` props | Passed to the outer `<span>`. |
+
+## Drawing values yourself
+
+`renderValue` is called once for each value in the sentence, with:
+
+| Field | |
+| --- | --- |
+| `text` | The values joined the way `sentence` joins them. |
+| `values` | Each value as the sentence shows it. |
+| `written` | Each value as it was typed. Differs from `values` only where the sentence shortened it. |
+| `role` | What the value is: `path`, `url`, `host`, `pid`, `package`… |
+| `flag` | The flag that took it, where one did — `-o`, or `>` for a redirection. |
+| `index` | Its position in `parts`. |
+
+<ComponentPreview name="sentence-render-value-demo">
+
+```tsx
+import { Sentence } from '@/components/sentence'
+import { Badge } from '@/components/ui/badge'
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-2xl p-8 text-xl">
+      <Sentence
+        command="rm notes.txt draft.txt old.txt backup.txt"
+        renderValue={(v) => (
+          <Badge
+            title={v.written.join('\n')}
+            className="bg-amber-400/15 font-mono text-amber-700 dark:text-amber-300"
+          >
+            {v.values.length > 3 ? `${v.values.length} files` : v.text}
+          </Badge>
+        )}
+      />
+    </main>
+  )
+}
+```
+
+</ComponentPreview>
+
+Whatever it returns, keep it looking like a value and not like prose. That separation is the reason the component exists.

@@ -1,0 +1,83 @@
+---
+title: Styling
+description: Where the components' colours come from, and the three ways to change them.
+---
+
+shadcn copies the components into your project rather than installing them as a dependency, so their classes are in your copy and nowhere else. They are written with your theme's tokens — `text-primary`, `text-muted-foreground`, `text-destructive` — so they match the rest of your UI without anything being set.
+
+## Edit your copy
+
+In `components/command-line.tsx`, each kind of word takes its classes from the `tone` map at the top of the file:
+
+```tsx
+const tone = {
+  program: 'font-medium text-foreground',
+  subcommand: 'text-foreground',
+  flag: 'text-primary',
+  value: 'text-sky-700 dark:text-sky-300',
+  operator: 'text-muted-foreground',
+  redirect: 'text-muted-foreground',
+  word: 'text-foreground/80',
+  unread: 'text-destructive underline decoration-wavy',
+}
+```
+
+<OpenInV0 items="command-line" />
+
+A flag that widened the answer adds `rounded-sm bg-primary/15`, and the program another one hands over to adds a dotted underline; both are in `commandLinePartClassName`, just below the map.
+
+In `components/sentence.tsx`, each value is drawn by the `Value` element — shadcn's `Badge`, set to sit inline and wrap with the sentence, around a `<code>`:
+
+```tsx
+<Badge
+  asChild
+  variant="outline"
+  className="inline rounded-sm border-transparent bg-primary/10 px-1 py-0.5 font-mono text-[0.85em] font-normal whitespace-normal text-primary"
+>
+```
+
+<OpenInV0 items="sentence" />
+
+Change these and every use of the component follows.
+
+## Override one use
+
+For one place that needs something else, pass `renderValue` to [`Sentence`](/docs/react/sentence) or `renderPart` to [`CommandLine`](/docs/react/command-line), and draw with whatever classes you like:
+
+<ComponentPreview name="sentence-render-value-demo">
+
+```tsx
+import { Sentence } from '@/components/sentence'
+import { Badge } from '@/components/ui/badge'
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-2xl p-8 text-xl">
+      <Sentence
+        command="rm notes.txt draft.txt old.txt backup.txt"
+        renderValue={(v) => (
+          <Badge
+            title={v.written.join('\n')}
+            className="bg-amber-400/15 font-mono text-amber-700 dark:text-amber-300"
+          >
+            {v.values.length > 3 ? `${v.values.length} files` : v.text}
+          </Badge>
+        )}
+      />
+    </main>
+  )
+}
+```
+
+</ComponentPreview>
+
+`className` on either component goes to its outer element, merged with `cn`.
+
+## Plain CSS
+
+The default pieces carry what they are as attributes — `data-kind` and `data-role` on the line, `data-role` on a sentence's values — so a stylesheet can reach them without touching the components:
+
+```css
+[data-slot='command-line'] [data-kind='flag'] { color: hotpink; }
+[data-slot='sentence'] [data-role='url'] { color: skyblue; }
+```

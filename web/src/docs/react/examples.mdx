@@ -1,0 +1,294 @@
+---
+title: Examples
+description: The components pushed somewhere silly — tooltips, a redacted dossier, a ransom note and a shop receipt — every one of them drawn from the real answer.
+---
+
+`renderValue` and `renderPart` hand over each piece with what it was read as, so a value can become whatever you like. These go further than anyone should. Everything they show is still the explanation's own: no label, number or verdict here is invented.
+
+Each one uses shadcn's [tooltip](https://ui.shadcn.com/docs/components/tooltip), and opens in v0 as it stands.
+
+## Tooltips
+
+Hover any word of the command, or any value in the sentence, to see what it was read as. The useful one.
+
+<ComponentPreview name="tooltip-demo">
+
+```tsx
+'use client'
+
+import type { LinePart } from 'cmd-facts'
+import { CommandLine, commandLinePartClassName } from '@/components/command-line'
+import { Sentence } from '@/components/sentence'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useExplain } from '@/hooks/use-explain'
+
+const command = 'curl -fsSL https://get.example.com/install.sh -o install.sh'
+
+/** What to say when someone hovers a word of the line. */
+function whatItIs(part: Exclude<LinePart, { kind: 'space' }>) {
+  if (part.kind === 'flag' && part.escalated) return 'A flag that widens what this command can do'
+  if (part.kind === 'flag' && part.unread) return 'A flag nothing here knows'
+  if (part.kind === 'program') return part.nested ? 'The command the one before it runs' : 'The program that runs'
+  if (part.kind === 'value') return `An argument, read as a ${part.role}${part.flag ? `, taken by ${part.flag}` : ''}`
+  if (part.kind === 'operator') return 'Joins this command to the next'
+  if (part.kind === 'redirect') return 'Sends output somewhere'
+  if (part.kind === 'unread') return 'A line that could not be read'
+  return part.kind === 'subcommand' ? 'Picks what the program does' : 'A word read as nothing in particular'
+}
+
+export default function Page() {
+  const explanation = useExplain(command)
+
+  return (
+    <TooltipProvider>
+      <main className="mx-auto flex max-w-2xl flex-col gap-4 p-8">
+        <CommandLine
+          command={command}
+          of={explanation}
+          className="rounded-md border px-3 py-2 text-sm"
+          renderPart={(part) =>
+            part.kind === 'space' ? (
+              part.text
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span tabIndex={0} className={`${commandLinePartClassName(part)} cursor-help`}>
+                    {part.text}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{whatItIs(part)}</TooltipContent>
+              </Tooltip>
+            )
+          }
+        />
+        <p className="text-lg">
+          <Sentence
+            of={explanation}
+            renderValue={(v) => (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge tabIndex={0} variant="secondary" className="cursor-help font-mono">
+                    {v.text}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {v.role}, typed as {v.written.join(', ')}
+                </TooltipContent>
+              </Tooltip>
+            )}
+          />
+        </p>
+      </main>
+    </TooltipProvider>
+  )
+}
+```
+
+</ComponentPreview>
+
+## Redacted
+
+Every value blacked out, declassified on hover. Each path gets its own bar, because `written` keeps them apart.
+
+<ComponentPreview name="redacted-demo">
+
+```tsx
+'use client'
+
+import { Fragment } from 'react'
+import { Sentence } from '@/components/sentence'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+
+const command = 'rm -rf ~/Desktop/evidence ~/Documents/plans.txt'
+
+export default function Page() {
+  return (
+    <TooltipProvider>
+      <main className="flex justify-center p-8">
+        <article className="relative w-full max-w-xl -rotate-1 border border-stone-300 bg-amber-50 p-8 font-serif text-stone-900 shadow-xl">
+          <Badge
+            variant="outline"
+            className="absolute top-6 right-6 rotate-12 rounded-none border-4 border-red-700 font-sans text-sm font-black tracking-widest text-red-700 uppercase opacity-80"
+          >
+            Top secret
+          </Badge>
+          <p className="font-mono text-xs tracking-widest text-stone-500 uppercase">Subject: one shell command</p>
+          <p className="mt-6 text-xl leading-relaxed">
+            <Sentence
+              command={command}
+              renderValue={(v) =>
+                v.written.map((written, i) => (
+                  <Fragment key={written}>
+                    {i > 0 && (i === v.written.length - 1 ? ' and ' : ', ')}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          tabIndex={0}
+                          aria-label={`${v.role}: ${written}`}
+                          className="cursor-help bg-stone-950 font-mono text-transparent select-none"
+                        >
+                          {written}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Declassified {v.role}: {written}
+                      </TooltipContent>
+                    </Tooltip>
+                  </Fragment>
+                ))
+              }
+            />
+          </p>
+          <p className="mt-8 font-mono text-xs text-stone-500">
+            Hover a bar to declassify it. This document will not self-destruct. The command would.
+          </p>
+        </article>
+      </main>
+    </TooltipProvider>
+  )
+}
+```
+
+</ComponentPreview>
+
+## Ransom note
+
+Every value cut out of magazines, one letter at a time. A screen reader still hears the path, from `aria-label`.
+
+<ComponentPreview name="ransom-note-demo">
+
+```tsx
+'use client'
+
+import { Sentence } from '@/components/sentence'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+
+const command = 'mv ~/Documents/ransom.txt ~/Desktop/note.txt'
+
+// Each letter is cut from a different magazine. The same letter always comes from the same one.
+const paper = ['bg-yellow-300', 'bg-white', 'bg-sky-300', 'bg-pink-300', 'bg-lime-300', 'bg-orange-300']
+const ink = ['font-serif', 'font-mono font-bold', 'font-sans font-black', 'font-serif italic']
+const tilt = ['-rotate-6', 'rotate-3', '-rotate-2', 'rotate-6', 'rotate-1', '-rotate-3']
+
+function Cutout({ text }: { text: string }) {
+  return (
+    <span aria-hidden className="inline-flex flex-wrap gap-0.5 align-middle">
+      {[...text].map((letter, i) => {
+        const n = letter.charCodeAt(0) + i
+        return (
+          <span
+            key={i}
+            className={`inline-block px-1 text-black shadow ${paper[n % paper.length]} ${ink[n % ink.length]} ${tilt[n % tilt.length]} ${i % 2 ? 'uppercase' : ''}`}
+          >
+            {letter}
+          </span>
+        )
+      })}
+    </span>
+  )
+}
+
+export default function Page() {
+  return (
+    <TooltipProvider>
+      <main className="mx-auto max-w-2xl p-8 text-xl leading-[2.6]">
+        <Sentence
+          command={command}
+          renderValue={(v) => (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0} aria-label={`${v.role}: ${v.text}`} className="cursor-help">
+                  <Cutout text={v.text} />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>The letters spell {v.text}</TooltipContent>
+            </Tooltip>
+          )}
+        />
+      </main>
+    </TooltipProvider>
+  )
+}
+```
+
+</ComponentPreview>
+
+## Receipt
+
+The whole answer as a shop receipt. Each line is a field of the explanation — hover it to see which.
+
+<ComponentPreview name="receipt-demo">
+
+```tsx
+'use client'
+
+import { effectsOf } from 'cmd-facts'
+import { CommandLine } from '@/components/command-line'
+import { Sentence } from '@/components/sentence'
+import { Separator } from '@/components/ui/separator'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useExplain } from '@/hooks/use-explain'
+
+const command = 'scp ~/.ssh/id_ed25519 backup@vault.example.com:/srv/keys'
+
+export default function Page() {
+  const explanation = useExplain(command)
+  const { facts } = explanation
+  const effects = effectsOf(facts)
+
+  // every line of the receipt is a field of the answer, and its tooltip says which
+  const lines = [
+    ['Effects', effects.join(', '), facts.opaque ? 'What it does, at least — it hands over to something not shown' : 'What it does'],
+    ['Reversible', facts.reversible, 'Whether it can be undone: yes, no, with a backup, or unknown'],
+    ['Network', facts.network, 'Whether it reaches beyond this computer, and how far'],
+    ['Privilege', facts.privilege, 'Whether it needs an administrator'],
+    ['Secrets', facts.touchesCredentials ? 'touched' : 'not by nature', 'Whether the program reaches passwords and keys whatever it is given'],
+  ] as const
+
+  return (
+    <TooltipProvider>
+      <main className="flex justify-center p-8">
+        <section className="w-80 rotate-1 bg-white px-6 py-8 font-mono text-[13px] text-zinc-900 shadow-xl [mask:radial-gradient(6px_at_50%_100%,#0000_98%,#000)_50%_100%/14px_100%_repeat-x]">
+          <p className="text-center font-bold tracking-widest">CMD-FACTS GENERAL STORE</p>
+          <p className="text-center text-xs text-zinc-500">no refunds on rm</p>
+          <Separator className="my-4 bg-zinc-300" />
+          <p>1 x</p>
+          <CommandLine command={command} of={explanation} className="text-xs text-zinc-700" />
+          <p className="mt-3 font-sans text-sm leading-snug">
+            <Sentence of={explanation} />
+          </p>
+          <Separator className="my-4 bg-zinc-300" />
+          <dl className="space-y-1">
+            {lines.map(([label, value, says]) => (
+              <Tooltip key={label}>
+                <TooltipTrigger asChild>
+                  <div tabIndex={0} className="flex cursor-help gap-1">
+                    <dt className="uppercase">{label}</dt>
+                    <span aria-hidden className="flex-1 overflow-hidden whitespace-nowrap text-zinc-400">
+                      {'.'.repeat(40)}
+                    </span>
+                    <dd className="font-bold">{value}</dd>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>{says}</TooltipContent>
+              </Tooltip>
+            ))}
+          </dl>
+          <Separator className="my-4 bg-zinc-300" />
+          <p className="flex justify-between font-bold">
+            <span>TOTAL</span>
+            <span>
+              {effects.length} effects, {facts.reversible === 'yes' ? 'refundable' : 'no refunds'}
+            </span>
+          </p>
+          <p className="mt-6 text-center text-xs text-zinc-500">THANK YOU FOR READING BEFORE RUNNING</p>
+        </section>
+      </main>
+    </TooltipProvider>
+  )
+}
+```
+
+</ComponentPreview>

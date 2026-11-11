@@ -76,7 +76,7 @@ console.log(sentence) // "Makes a request to get.example.com and saves what come
     { "index": 4, "value": "install.sh", "role": "path", "flag": "-o" }
   ],
   "escalated": ["-o"],
-  "attribution": [{ "pack": "@cmd-facts/builtin", "version": "0.4.0", "trusted": true, "commands": ["curl"] }]
+  "attribution": [{ "pack": "@cmd-facts/builtin", "version": "0.5.0", "trusted": true, "commands": ["curl"] }]
 }
 ```
 
@@ -284,6 +284,84 @@ fallback for ever.
 
 Rows without `tell` keep answering with `says`, so coverage can grow a row at a time.
 
+### In React
+
+The React components are not in this package. They are a [shadcn](https://ui.shadcn.com) registry, so they are copied
+into your project, styled with your theme's tokens, and yours to change:
+
+```bash
+npx shadcn@latest add https://cmd-facts.davidsling.in/r/command-line.json https://cmd-facts.davidsling.in/r/sentence.json https://cmd-facts.davidsling.in/r/use-explain.json
+```
+
+Open a component on its own in v0: [command-line](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fcommand-line.json) · [sentence](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fsentence.json) · [use-explain](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fuse-explain.json)
+
+The sentence takes the command and nothing else:
+
+```tsx
+import { Sentence } from '@/components/sentence'
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-2xl p-8 text-xl">
+      <Sentence command="curl -fsSL https://get.example.com/install.sh -o install.sh" />
+    </main>
+  )
+}
+```
+
+[Open this example in v0](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fsentence-demo.json)
+
+And an approval prompt, with the line typed into it:
+
+```tsx
+'use client'
+
+import { useState } from 'react'
+import { CommandLine } from '@/components/command-line'
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Sentence } from '@/components/sentence'
+import { useExplain } from '@/hooks/use-explain'
+
+export default function Page() {
+  const [command, setCommand] = useState('curl https://get.example.com/i.sh | sh')
+  const explanation = useExplain(command)
+
+  return (
+    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
+      <Input
+        value={command}
+        onChange={(event) => setCommand(event.target.value)}
+        aria-label="Command"
+        className="font-mono"
+      />
+      <Card>
+        <CardHeader>
+          <CardDescription>An agent wants to run</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <CommandLine command={command} of={explanation} className="rounded-md bg-muted px-3 py-2 text-sm" />
+          <p className="text-lg">
+            <Sentence of={explanation} />
+          </p>
+        </CardContent>
+      </Card>
+    </main>
+  )
+}
+```
+
+[Open this example in v0](https://v0.dev/chat/api/open?url=https%3A%2F%2Fcmd-facts.davidsling.in%2Fr%2Fapprove-demo.json)
+
+`<Sentence>` renders `parts`, so each value is drawn as a value and not joined into the prose; `renderValue` draws them
+your own way. `<CommandLine>` shows the line exactly as written, each word drawn by what it was read as, and
+`renderPart` takes that over. Both are built on what this package exports for any renderer: `parts` on every
+explanation, and `linePartsOf(line, explanation)`, which returns the line in pieces — `program`, `subcommand`,
+`flag`, `value` with its `role`, `operator`, `redirect`, `word` — that join back to the line character for
+character. A flag that widened the answer carries `escalated`, one the row does not know `unread`, and the program
+another one hands over to (`rm` in `sudo rm`) `nested`. A line that could not be read comes back as one `unread`
+piece. See [cmd-facts.davidsling.in/react](https://cmd-facts.davidsling.in/react).
+
 ### A line that runs more than one command
 
 `curl … | sh` is one line and two commands. Each is answered on its own, under `steps`, and the fact set at the top
@@ -428,7 +506,7 @@ draw on three. A pack that answered at two depths appears once, with both rows n
 
 ```json
 [
-  { "pack": "@cmd-facts/builtin", "version": "0.4.0", "trusted": true, "commands": ["sudo"] },
+  { "pack": "@cmd-facts/builtin", "version": "0.5.0", "trusted": true, "commands": ["sudo"] },
   { "pack": "@acme/tools", "version": "1.2.0", "trusted": false, "commands": ["flowctl"] },
   { "pack": "@acme/kube", "version": "2.4.0", "trusted": false, "commands": ["kubectl delete"] }
 ]

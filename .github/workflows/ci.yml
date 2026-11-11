@@ -37,11 +37,18 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # The site's registry components and its typecheck read cmd-facts the way a consumer does, from dist.
+      - name: Build the library
+        run: pnpm --filter cmd-facts build
+
       - name: Test
         run: pnpm -r test
 
       - name: Typecheck
         run: pnpm -r typecheck
+
+      - name: Build the shadcn registry
+        run: pnpm --filter web registry:build
 
       # Fails only where the table and Fig's specs disagree on whether a flag takes a value. Flags the table has
       # not declared yet are reported, not failed on.

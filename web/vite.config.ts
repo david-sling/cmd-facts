@@ -8,6 +8,7 @@ import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { nitro } from 'nitro/vite'
 
+import { PRODUCTION, registryOrigin } from './scripts/origin.mjs'
 import mdx from '@mdx-js/rollup'
 import remarkGfm from 'remark-gfm'
 import remarkFrontmatter from 'remark-frontmatter'
@@ -23,6 +24,12 @@ const docs = mdx({
 })
 
 const config = defineConfig({
+  // decided here, where Vercel's own variables are readable: the canonical address, and where this build's registry
+  // is served — on a preview, the preview itself, so its Open in v0 buttons open what it built
+  define: {
+    'import.meta.env.VITE_SITE_URL': JSON.stringify(process.env.VITE_SITE_URL || PRODUCTION),
+    'import.meta.env.VITE_REGISTRY_URL': JSON.stringify(registryOrigin()),
+  },
   // pnpm hoists motion's own react copy; without dedupe the app ends up with two Reacts
   resolve: { tsconfigPaths: true, dedupe: ['react', 'react-dom'] },
   // a leading dot matches the domain and its subdomains, so any tunnel this machine

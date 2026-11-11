@@ -1,0 +1,110 @@
+---
+title: Command line
+description: The command line exactly as written, each word drawn by what cmd-facts read it as.
+---
+
+`<CommandLine>` shows a person the line they are approving with its program, flags, arguments and operators told apart. It changes nothing in the text: quotes, spacing and line breaks come back as they were written.
+
+```bash
+npx shadcn@latest add https://cmd-facts.davidsling.in/r/command-line.json
+```
+
+<OpenInV0 items="command-line" />
+
+<ComponentPreview name="command-line-demo">
+
+```tsx
+import { CommandLine } from '@/components/command-line'
+
+const commands = [
+  'curl -o "my file" https://x.example | sh',
+  'sudo rm -rf /var/tmp/build',
+  'git -C ~/src/app commit -m "ship it" && git push',
+  'echo token 2>&1 >> ~/.profile',
+]
+
+export default function Page() {
+  return (
+    <main className="mx-auto flex max-w-2xl flex-col gap-3 p-8">
+      {commands.map((command) => (
+        <CommandLine key={command} command={command} className="rounded-md border px-3 py-2 text-sm" />
+      ))}
+    </main>
+  )
+}
+```
+
+</ComponentPreview>
+
+The first of those renders as:
+
+```html
+<code data-slot="command-line"><span data-kind="program">curl</span> <span data-kind="flag">-o</span> <span data-kind="value" data-role="path">"my file"</span> <span data-kind="value" data-role="url">https://x.example</span> <span data-kind="operator">|</span> <span data-kind="program">sh</span></code>
+```
+
+Pass it the command and it explains it itself. Pass `of` as well where you already hold the answer — from `useExplain`, say — so the command is not read twice.
+
+## What each word is
+
+| `kind` | What it is |
+| --- | --- |
+| `program` | The program a command runs. `nested` where another command hands over to it, as `rm` in `sudo rm`. |
+| `subcommand` | A word that picks the row, as `commit` in `git commit`. |
+| `flag` | A flag. `escalated` where it widened what the command can do; `unread` where the row does not know it. |
+| `value` | An argument, with its `role`, and `flag` where a flag took it. A redirection's target is a `path`. |
+| `operator` | What joins one command to the next: `\|`, `&&`, `\|\|`, `;` or `&`. |
+| `redirect` | Where output is sent: `>`, `2>>`, `&>`, `2>&1`. |
+| `word` | A word the row reads as nothing in particular. |
+| `space` | What sits between words. |
+| `unread` | The whole line, where it could not be read — a substitution, or a quote that never closes. |
+
+Every piece but `space` and `unread` carries `step`, which command of the line it belongs to.
+
+## Props
+
+| Prop | Type | |
+| --- | --- | --- |
+| `command` | `string` | The command, as it was written. |
+| `of` | `Explanation` | The answer for this same command, where you have it. |
+| `explainer` | `Explainer` | What to explain with when `of` is left out. Defaults to `explain`. |
+| `renderPart` | `(part: LinePart, index: number) => ReactNode` | Draw each piece yourself. |
+| `className` and the rest | `code` props | Passed to the outer `<code>`. |
+
+## Drawing pieces yourself
+
+Return `part.text` for a `space`, or the line stops reading as written. `commandLinePartClassName(part)` gives the component's own classes for a piece, for a `renderPart` that wants the defaults and something more:
+
+<ComponentPreview name="command-line-render-part-demo">
+
+```tsx
+import { CommandLine, commandLinePartClassName } from '@/components/command-line'
+import { cn } from '@/lib/utils'
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-2xl p-8">
+      <CommandLine
+        command="curl -fsSL https://get.example.com/install.sh -o install.sh"
+        renderPart={(part) =>
+          part.kind === 'space' ? (
+            part.text
+          ) : (
+            <span
+              title={part.kind === 'value' ? part.role : part.kind}
+              className={cn(commandLinePartClassName(part), part.kind === 'value' && 'cursor-help underline decoration-dotted')}
+            >
+              {part.text}
+            </span>
+          )
+        }
+      />
+    </main>
+  )
+}
+```
+
+</ComponentPreview>
+
+## Without React
+
+The pieces come from `linePartsOf(line, explanation)` in `cmd-facts`. Joined, their `text` is the line, character for character, so any renderer can draw the same thing.

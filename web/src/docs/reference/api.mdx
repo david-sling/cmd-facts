@@ -3,7 +3,7 @@ title: API reference
 description: Every export of cmd-facts, with its signature and the page that explains it.
 ---
 
-`cmd-facts` is ESM only and needs Node 20 or newer. It has no runtime dependencies.
+`cmd-facts` is ESM only and needs Node 20 or newer. It has no runtime dependencies. The React components are a [shadcn registry](/docs/react), installed into your own project.
 
 ```ts
 import { explain } from 'cmd-facts'           // the curated table, wired and trusted
@@ -46,6 +46,10 @@ See [The fact fields](/docs/facts).
 | `partsOf` | `(facts: Facts, args: ArgSlot[]) => Part[]` |
 | `tellOf` | `(e: Explanation) => Part[]` |
 | `flatten` | `(parts: Part[]) => string` |
+| `listOf` | `(values: string[]) => string` — several values as one phrase, the way `flatten` lists them. |
+| `linePartsOf` | `(line: string, e: Explanation) => LinePart[]` — the line as written, each word labelled program, flag, value, operator…; joined, the text is the line. |
+
+React components — `command-line`, `sentence` and `use-explain` — come from the [shadcn registry](/docs/react), not from this package.
 
 See [Showing it to a person](/docs/sentence).
 

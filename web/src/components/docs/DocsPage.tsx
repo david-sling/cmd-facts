@@ -6,6 +6,8 @@ import { Check, Copy, Github, SquareCode } from 'lucide-react'
 import { REPO_URL, SECTIONS, absolutise, getDoc, neighbours } from '#/lib/docs'
 import { REPORT_URL } from '#/site'
 import type { Doc, Heading } from '#/lib/docs'
+import { OpenInV0 } from '#/components/open-in-v0'
+import { ComponentPreview } from '#/components/docs/ComponentPreview'
 
 function useCopy() {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle')
@@ -60,6 +62,9 @@ function CodeBlock(props: ComponentProps<'pre'>) {
 
 const components: MDXComponents = {
   pre: CodeBlock,
+  // a docs page places these right under the code they open; see OpenInV0
+  OpenInV0: ({ items }: { items: string }) => <OpenInV0 items={items} className="-mt-2 mb-6" />,
+  ComponentPreview,
   table: (props) => (
     <div className="docs-table">
       <table {...props} />

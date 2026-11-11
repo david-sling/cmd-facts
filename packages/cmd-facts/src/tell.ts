@@ -10,7 +10,15 @@ import type { ArgSlot, Explanation } from './explain.ts'
  */
 export type Part =
   | { kind: 'text'; text: string }
-  | { kind: 'values'; values: string[]; role: Role; flag?: string; show?: 'host' }
+  | {
+      kind: 'values'
+      values: string[]
+      role: Role
+      flag?: string
+      show?: 'host'
+      /** The arguments as they were typed, where `show` printed something shorter. Hover text, not prose. */
+      written?: string[]
+    }
 
 const host = (value: string): string => {
   try {
@@ -65,7 +73,7 @@ export function partsOf(facts: Facts, args: ArgSlot[]): Part[] {
       values: found.map((a) => (segment.show === 'host' ? host(a.value) : a.value)),
       role: segment.role,
       ...(found[0]!.flag ? { flag: found[0]!.flag } : {}),
-      ...(segment.show ? { show: segment.show } : {}),
+      ...(segment.show ? { show: segment.show, written: found.map((a) => a.value) } : {}),
     })
   }
   return parts
@@ -81,9 +89,10 @@ export const tellOf = (e: Explanation): Part[] => partsOf(e.facts, e.args)
  */
 export const flatten = (parts: Part[]): string =>
   parts
-    .map((p) => (p.kind === 'text' ? p.text : list(p.values)))
+    .map((p) => (p.kind === 'text' ? p.text : listOf(p.values)))
     .join('')
     .trim()
 
-const list = (values: string[]): string =>
+/** Several values as one phrase — `a.txt, b.txt and c.txt` — the way `sentence` lists them. */
+export const listOf = (values: string[]): string =>
   values.length <= 1 ? (values[0] ?? '') : `${values.slice(0, -1).join(', ')} and ${values.at(-1)}`

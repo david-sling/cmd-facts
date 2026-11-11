@@ -1,0 +1,96 @@
+---
+title: React components
+description: Two components and a hook, installed into your own project through shadcn rather than shipped in the package.
+---
+
+The React components are not part of `cmd-facts`. They are a [shadcn](https://ui.shadcn.com) registry: `shadcn add` copies them into your project, where they are styled with your theme's tokens and are yours to change. The package stays free of React, and nothing here is a dependency you cannot read.
+
+## Install
+
+You need a project already set up for shadcn — a `components.json` and Tailwind. Then add all three:
+
+```bash
+npx shadcn@latest add https://cmd-facts.davidsling.in/r/command-line.json https://cmd-facts.davidsling.in/r/sentence.json https://cmd-facts.davidsling.in/r/use-explain.json
+```
+
+<OpenInV0 items="command-line sentence use-explain" />
+
+Each item also installs `cmd-facts` itself, 0.5 or newer, and what it uses from shadcn: the `cn` helper, and `badge` for the sentence's values. The files land where your `components.json` says components and hooks go:
+
+| Item | File | What it is |
+| --- | --- | --- |
+| `sentence` | `components/sentence.tsx` | The plain sentence, each value drawn as a value. See [Sentence](/docs/react/sentence). |
+| `command-line` | `components/command-line.tsx` | The line exactly as written, each word drawn by what it was read as. See [Command line](/docs/react/command-line). |
+| `use-explain` | `hooks/use-explain.ts` | `explain()`, recomputed only when the line changes. |
+
+## Use
+
+The sentence takes the command and nothing else:
+
+<ComponentPreview name="sentence-demo">
+
+```tsx
+import { Sentence } from '@/components/sentence'
+
+export default function Page() {
+  return (
+    <main className="mx-auto max-w-2xl p-8 text-xl">
+      <Sentence command="curl -fsSL https://get.example.com/install.sh -o install.sh" />
+    </main>
+  )
+}
+```
+
+</ComponentPreview>
+
+An approval prompt shows the line too, so it explains once with `useExplain` and hands both components the answer:
+
+<ComponentPreview name="approve-demo">
+
+```tsx
+'use client'
+
+import { useState } from 'react'
+import { CommandLine } from '@/components/command-line'
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Sentence } from '@/components/sentence'
+import { useExplain } from '@/hooks/use-explain'
+
+export default function Page() {
+  const [command, setCommand] = useState('curl https://get.example.com/i.sh | sh')
+  const explanation = useExplain(command)
+
+  return (
+    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
+      <Input
+        value={command}
+        onChange={(event) => setCommand(event.target.value)}
+        aria-label="Command"
+        className="font-mono"
+      />
+      <Card>
+        <CardHeader>
+          <CardDescription>An agent wants to run</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <CommandLine command={command} of={explanation} className="rounded-md bg-muted px-3 py-2 text-sm" />
+          <p className="text-lg">
+            <Sentence of={explanation} />
+          </p>
+        </CardContent>
+      </Card>
+    </main>
+  )
+}
+```
+
+</ComponentPreview>
+
+`useExplain` takes a line or a split argv, the same `Input` as `explain`, and an optional explainer from `createExplainer` for answering from your own packs. Keep that explainer stable — at module scope, or in a `useMemo` — or every render explains again.
+
+Try it on [the React page](/react), and see [Styling](/docs/react/styling) for where the colours come from.
+
+## Not on React
+
+Both components are drawn from what the package exports for any renderer: `parts` on every explanation, and `linePartsOf(line, explanation)`. A Vue, Svelte or server-rendered page builds the same thing from those. See [Showing it to a person](/docs/sentence) and the [API reference](/docs/reference/api).

@@ -1,12 +1,18 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { ArrowDown, ArrowUpRight, Github } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUpRight, Github } from 'lucide-react'
 import AnimatedGradient from '#/components/animated-gradient'
 import { ExplainDemo } from '#/components/explain-demo'
 import { HeroGlass } from '#/components/hero-glass'
 import { InstallCommand } from '#/components/install-command'
-import { MISSING_URL, REPORT_URL, REPO_URL } from '#/site'
+import { Sentence } from '#/components/sentence'
+import { MISSING_URL, REPORT_URL, REPO_URL, SITE } from '#/site'
 
-export const Route = createFileRoute('/')({ component: Home })
+// Each page names its own canonical address; one set on the root would be inherited by every page and name the home
+// page as the original of all of them.
+export const Route = createFileRoute('/')({
+  head: () => ({ links: [{ rel: 'canonical', href: SITE }] }),
+  component: Home,
+})
 
 function Home() {
   return (
@@ -17,6 +23,9 @@ function Home() {
           cmd-facts
         </a>
         <nav className="flex items-center gap-6">
+          <a href="/react" className="text-[15px] text-ink-2 transition-colors hover:text-ink">
+            React
+          </a>
           <a href="/docs" className="text-[15px] text-ink-2 transition-colors hover:text-ink">
             Docs
           </a>
@@ -67,6 +76,39 @@ function Home() {
         </div>
       </section>
 
+      {/* the way in for a React app: the one-line usage, drawn by the real component, all of it one link */}
+      <section className="mx-4 mt-8 sm:mx-8 lg:mx-14">
+        <a
+          href="/react"
+          className="group grid gap-8 rounded-2xl border border-line bg-panel px-6 py-8 transition-colors hover:border-line-2 hover:bg-panel-2 sm:px-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:items-center lg:gap-16 lg:py-10"
+        >
+          <div>
+            <p className="eyebrow">shadcn registry</p>
+            <h2 className="mt-3 text-[clamp(1.9rem,3.4vw,3rem)] font-light leading-[1.05] tracking-[-0.03em] text-ink">
+              Use React?
+            </h2>
+            <p className="mt-4 max-w-[42ch] text-[16px] leading-relaxed text-ink-2">
+              Show what a command does in one line. The components install into your app with shadcn, styled with your
+              theme.
+            </p>
+            <span className="mt-6 inline-flex items-center gap-2 text-[15px] font-medium text-ink transition-colors group-hover:text-pink">
+              See the React components
+              <ArrowRight aria-hidden className="size-4 transition-transform group-hover:translate-x-0.5" />
+            </span>
+          </div>
+          <div className="min-w-0 rounded-xl border border-line bg-bg px-5 py-5 sm:px-6">
+            <p className="font-mono text-[13px] break-words text-ink-2 sm:text-[14px]">
+              <span className="text-ink">&lt;Sentence</span> command=
+              <span className="text-[#9fc7ff]">&quot;rm -rf ./build&quot;</span>{' '}
+              <span className="text-ink">/&gt;</span>
+            </p>
+            <p className="mt-4 border-t border-line pt-4 text-[18px] font-light leading-snug text-ink sm:text-[20px]">
+              <Sentence command="rm -rf ./build" />
+            </p>
+          </div>
+        </a>
+      </section>
+
       <section id="try" className="mx-4 mt-24 scroll-mt-8 sm:mx-8 lg:mx-14">
         <ExplainDemo />
         {/* the demo answers any line typed into it, so the page has to say how complete the table is */}
@@ -111,6 +153,9 @@ function Home() {
           <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[14px] text-ink-2">
             <a href="/docs" className="transition-colors hover:text-ink">
               Docs
+            </a>
+            <a href="/react" className="transition-colors hover:text-ink">
+              React
             </a>
             <a href={REPO_URL} target="_blank" rel="noreferrer" className="transition-colors hover:text-ink">
               GitHub

@@ -2,6 +2,8 @@ import type { ComponentType } from 'react'
 import type { MDXComponents } from 'mdx/types'
 import GithubSlugger from 'github-slugger'
 
+import { openInV0Url } from '#/site'
+
 export { REPO_URL } from '#/site'
 
 type Frontmatter = { title: string; description: string }
@@ -20,6 +22,7 @@ export type Doc = Frontmatter & {
 export const SECTIONS: Array<{ title: string; pages: string[] }> = [
   { title: 'Start here', pages: ['', 'quickstart'] },
   { title: 'Reading an answer', pages: ['explanation', 'facts', 'sentence', 'lines'] },
+  { title: 'React', pages: ['react', 'react/sentence', 'react/command-line', 'react/styling', 'react/examples'] },
   { title: 'Packs', pages: ['packs/using', 'packs/writing'] },
   { title: 'Reference', pages: ['reference/api', 'reference/limits'] },
 ]
@@ -29,8 +32,22 @@ const sources = import.meta.glob<string>('../docs/**/*.mdx', { eager: true, quer
 
 const slugOf = (path: string) => path.replace(/^\.\.\/docs\//, '').replace(/\.mdx$/, '').replace(/(^|\/)index$/, '')
 
+// A pasted page has no buttons: each one becomes the link it opens.
+const V0 = /^<OpenInV0 items="([^"]+)" \/>$/gm
+// …and no tabs: an example is its code, followed by the link that opens it.
+const PREVIEW = /^<ComponentPreview name="([^"]+)">\n\n([\s\S]*?)\n\n<\/ComponentPreview>$/gm
+
 function body(source: string) {
-  return source.replace(/^---\n[\s\S]*?\n---\n+/, '').trim()
+  return source
+    .replace(/^---\n[\s\S]*?\n---\n+/, '')
+    .replace(PREVIEW, (_, name: string, code: string) => `${code}\n\n[Open ${name} in v0](${openInV0Url(name)})`)
+    .replace(V0, (_, items: string) =>
+      items
+        .split(/\s+/)
+        .map((name) => `[Open ${name} in v0](${openInV0Url(name)})`)
+        .join(' · '),
+    )
+    .trim()
 }
 
 function plain(text: string) {

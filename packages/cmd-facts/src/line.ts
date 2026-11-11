@@ -48,7 +48,27 @@ const BRACES = /\{[^{}]*(,|\.\.)[^{}]*\}/
 // A word that opens with a wildcard can match a file whose name starts with a dash.
 const LEADING_GLOB = /^([*?]|\[.*\])/
 
+/**
+ * Where each piece of a line sits in the text it was read from, so a renderer can show the line exactly as written
+ * and still say what each word is. Offsets are UTF-16 indexes into the line, `end` exclusive. Anything between two
+ * marks — spaces, a backslash that joins two lines — belongs to no word.
+ */
+export type Mark = { start: number; end: number; step: number } & (
+  | { kind: 'word'; index: number }
+  | { kind: 'op'; op: Op }
+  /** `>`, `2>>`, `&>`; `redirect` is absent where the stream was pointed at another one (`2>&1`) and nothing lands. */
+  | { kind: 'redirect'; redirect?: number }
+  | { kind: 'path'; redirect: number }
+)
+
 export function tokenize(line: string): Tokens {
+  return scan(line).tokens
+}
+
+/** `tokenize`, with where each word, operator and redirection sat in the line. */
+export function scan(line: string): { tokens: Tokens; marks: Mark[] } {
+  const marks: Mark[] = []
+  const done = (tokens: Tokens) => ({ tokens, marks })
   const steps: Step[] = []
   let argv: string[] = []
   let redirects: Redirect[] = []
@@ -61,17 +81,27 @@ export function tokenize(line: string): Tokens {
   let started = false
   let quote: '"' | "'" | null = null
   let pending: { op: Redirect['op']; at: number; fd?: string } | null = null
+  // Where the character being read sits, and where the word being built began.
+  let cursor = 0
+  let wordStart = 0
+  const begin = () => {
+    if (!started) wordStart = cursor
+    started = true
+  }
 
   const endWord = () => {
     if (!started) return
+    const span = { start: wordStart, end: cursor, step: steps.length }
     const opened = expands || BRACES.test(bare) || LEADING_GLOB.test(bare)
     bare = ''
     expands = false
     if (pending) {
+      marks.push({ ...span, kind: 'path', redirect: redirects.length })
       redirects.push({ op: pending.op, path: word, ...(pending.fd ? { fd: pending.fd } : {}) })
       pending = null
     } else {
       if (opened) open.push(argv.length)
+      marks.push({ ...span, kind: 'word', index: argv.length })
       argv.push(word)
     }
     word = ''
@@ -91,7 +121,10 @@ export function tokenize(line: string): Tokens {
     after = next
   }
 
+  const op = (start: number, end: number, value: Op) => marks.push({ start, end, step: steps.length, kind: 'op', op: value })
+
   for (let i = 0; i < line.length; i++) {
+    cursor = i
     const c = line[i]!
     const next = line[i + 1]
 
@@ -128,11 +161,11 @@ export function tokenize(line: string): Tokens {
 
     if (c === "'" || c === '"') {
       quote = c
-      started = true
+      begin()
       continue
     }
     if (c === '\\') {
-      if (next === undefined) return { ok: false, why: 'unterminated' }
+      if (next === undefined) return done({ ok: false, why: 'unterminated' })
       // A backslash before a line break joins the two lines: `curl \⏎-o x` is `curl -o x`.
       if (next === '\n') {
         i++
@@ -140,7 +173,7 @@ export function tokenize(line: string): Tokens {
       }
       word += next
       bare += ' '
-      started = true
+      begin()
       i++
       continue
     }
@@ -150,15 +183,17 @@ export function tokenize(line: string): Tokens {
     }
 
     // What a substitution or a subshell stands for is not on this line, so there is nothing here to read.
-    if (c === '`' || (c === '$' && next === '(') || c === '(' || c === ')') return { ok: false, why: 'substitution' }
+    if (c === '`' || (c === '$' && next === '(') || c === '(' || c === ')') return done({ ok: false, why: 'substitution' })
 
     if (c === '\n' || c === ';') {
       endStep(';')
+      op(cursor, i + 1, ';')
       continue
     }
     if (c === '|') {
       if (next === '|') i++
       endStep(next === '|' ? '||' : '|')
+      op(cursor, i + 1, next === '|' ? '||' : '|')
       continue
     }
     if (c === '&') {
@@ -169,6 +204,11 @@ export function tokenize(line: string): Tokens {
         if (next !== '-') while (j < line.length && DIGITS.test(line[j]!)) j++
         const boundary = line[j] === undefined || ' \t\n;|&<>'.includes(line[j]!)
         if (boundary) {
+          const dup = marks.at(-1)
+          if (dup?.kind === 'redirect') {
+            dup.end = j
+            delete dup.redirect
+          }
           pending = null
           i = j - 1
           continue
@@ -181,15 +221,18 @@ export function tokenize(line: string): Tokens {
         if (double) i++
         pending = { op: double ? '>>' : '>', at: i + 1, fd: '&' }
         i++
+        marks.push({ start: cursor, end: i + 1, step: steps.length, kind: 'redirect', redirect: redirects.length })
         continue
       }
       if (next === '&') i++
       endStep(next === '&' ? '&&' : '&')
+      op(cursor, i + 1, next === '&' ? '&&' : '&')
       continue
     }
     if (c === '>' || c === '<') {
       // `2> log` names the stream in the word just read, which belongs to the redirection rather than to argv.
       const fd = started && DIGITS.test(word) ? word : undefined
+      const from = fd !== undefined ? wordStart : cursor
       if (fd !== undefined) {
         word = ''
         bare = ''
@@ -202,26 +245,28 @@ export function tokenize(line: string): Tokens {
       // `>|` overwrites even where the shell was set not to; it reads as `>`.
       else if (c === '>' && next === '|') i++
       pending = { op: double ? '>>' : (c as Redirect['op']), at: i, ...(fd !== undefined ? { fd } : {}) }
+      marks.push({ start: from, end: i + 1, step: steps.length, kind: 'redirect', redirect: redirects.length })
       continue
     }
 
     if (c === '$' && next !== undefined && EXPANDS.test(next)) expands = true
+    begin()
     word += c
     bare += c
-    started = true
   }
 
-  if (quote) return { ok: false, why: 'unterminated' }
+  if (quote) return done({ ok: false, why: 'unterminated' })
+  cursor = line.length
   endWord()
-  if (pending) return { ok: false, why: 'unterminated' }
+  if (pending) return done({ ok: false, why: 'unterminated' })
   const trailing = after !== undefined && !argv.length && !redirects.length
   if (argv.length || redirects.length) push()
 
-  if (!steps.length) return { ok: false, why: 'empty' }
+  if (!steps.length) return done({ ok: false, why: 'empty' })
   // A command on one side of an operator and nothing on the other, as in `ls |` or `| ls`, is not a line this can
   // account for: something was meant to run there and it is not written down.
   if (trailing || steps[0]!.after !== undefined || steps.some((x) => !x.argv.length)) {
-    return { ok: false, why: 'unterminated' }
+    return done({ ok: false, why: 'unterminated' })
   }
-  return { ok: true, steps }
+  return done({ ok: true, steps })
 }
