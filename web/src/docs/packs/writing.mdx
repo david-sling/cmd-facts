@@ -69,7 +69,7 @@ Beyond `facts`, a row describes just enough grammar for the line to be read.
 | `values` | Flags that take a value whose role matters, where the flag changes nothing else. |
 | `plain` | Flags that were looked at and change nothing the fields carry, and take no value: `rm -v`, `curl -s`. |
 | `flagStyle` | `posix` by default; `words` turns off single-dash bundling for programs whose flags are whole words, such as `find -exec`. |
-| `sub` | Subcommands, each a row of its own. A key may run to several words, as `'pr create'` does, and the longest key the words after the program spell out answers. |
+| `sub` | Subcommands, each a row of its own. A key may run to several words, as `'pr create'` does, and the longest key the words after the program spell out answers. An option the shorter key declares may sit between the words, as in `docker compose -f prod.yml down`. |
 | `versioned` | The program answers to a version-suffixed name too: `python3` reaches the `python` row. |
 | `nestedHere` | This command hands over to another one carried as separate words on the same line. |
 | `assignmentsFirst` | The command carries leading `NAME=value` settings before the command, as `env` does. |
