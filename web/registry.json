@@ -22,6 +22,24 @@
       ]
     },
     {
+      "name": "button",
+      "type": "registry:ui",
+      "title": "Button",
+      "description": "shadcn/ui's button, as this site uses it.",
+      "dependencies": [
+        "cn",
+        "radix-ui",
+        "class-variance-authority"
+      ],
+      "files": [
+        {
+          "path": "src/components/ui/button.tsx",
+          "type": "registry:ui",
+          "target": "components/ui/button.tsx"
+        }
+      ]
+    },
+    {
       "name": "card",
       "type": "registry:ui",
       "title": "Card",
@@ -212,12 +230,15 @@
       "type": "registry:block",
       "registryDependencies": [
         "https://cmd-facts.davidsling.in/r/badge.json",
+        "https://cmd-facts.davidsling.in/r/button.json",
+        "https://cmd-facts.davidsling.in/r/card.json",
         "https://cmd-facts.davidsling.in/r/command-line.json",
-        "https://cmd-facts.davidsling.in/r/sentence.json"
+        "https://cmd-facts.davidsling.in/r/sentence.json",
+        "https://cmd-facts.davidsling.in/r/use-explain.json"
       ],
       "name": "sentence-by-role-demo",
-      "title": "Sentence, one style per role",
-      "description": "The command line, and under it each value in the sentence drawn by what it is, with an icon: a URL, a host, a file, a user.",
+      "title": "An approval prompt, values by role",
+      "description": "An approval prompt whose sentence draws each value by role, with an icon; pointing at a value or a word lights its pair.",
       "dependencies": [
         "cmd-facts@^0.5.0",
         "lucide-react"

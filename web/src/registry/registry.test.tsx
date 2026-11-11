@@ -151,7 +151,7 @@ describe('Open in v0', () => {
   })
 
   it("installs shadcn's components where shadcn would", () => {
-    expect(SHADCN.map((i) => i.name).sort()).toEqual(['badge', 'card', 'input', 'separator', 'tooltip'])
+    expect(SHADCN.map((i) => i.name).sort()).toEqual(['badge', 'button', 'card', 'input', 'separator', 'tooltip'])
     for (const item of SHADCN)
       expect(item.files, item.name).toEqual([
         { path: `src/components/ui/${item.name}.tsx`, type: 'registry:ui', target: `components/ui/${item.name}.tsx` },
