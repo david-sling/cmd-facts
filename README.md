@@ -1,5 +1,11 @@
 # cmd-facts
 
+[![npm version](https://img.shields.io/npm/v/cmd-facts.svg)](https://www.npmjs.com/package/cmd-facts)
+[![npm downloads](https://img.shields.io/npm/dm/cmd-facts.svg)](https://www.npmjs.com/package/cmd-facts)
+[![CI](https://github.com/david-sling/cmd-facts/actions/workflows/ci.yml/badge.svg)](https://github.com/david-sling/cmd-facts/actions/workflows/ci.yml)
+[![node](https://img.shields.io/node/v/cmd-facts.svg)](https://www.npmjs.com/package/cmd-facts)
+[![license](https://img.shields.io/npm/l/cmd-facts.svg)](https://github.com/david-sling/cmd-facts/blob/main/LICENSE)
+
 Structured facts about what a command does, for the person who has to approve it and did not write it.
 
 It exists for approval prompts: a remote support session where a customer clicks Allow, a CI gate where a release
