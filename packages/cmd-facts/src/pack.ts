@@ -155,7 +155,7 @@ function checkRule(bad: Bad, where: string, rule: Rule) {
   const gives = new Set<Role>([
     ...(rule.operands ?? []),
     ...Object.values(rule.values ?? {}),
-    ...(rule.flags ?? []).flatMap((f) => (f.role ? [f.role] : [])),
+    ...(rule.flags ?? []).flatMap((f) => [...(f.role ? [f.role] : []), ...(f.operands ?? [])]),
   ])
   checkTell(bad, where, rule.facts?.tell, gives)
   for (const f of rule.flags ?? []) checkTell(bad, `${where} ${f.flags?.[0] ?? '(unnamed flag)'}`, f.facts?.tell, gives)
@@ -186,6 +186,13 @@ function checkRule(bad: Bad, where: string, rule: Rule) {
     for (const flag of f.flags) if (!flag.startsWith('-')) bad(at, `\`${flag}\` has to be declared with its dash.`)
     if (f.role && !has(ROLES, f.role)) bad(at, `\`${f.role}\` is not a known role.`)
     if (f.role && !f.takesValue) bad(at, 'A flag that gives its value a role has to take a value.')
+    if (f.operands !== undefined) {
+      if (!Array.isArray(f.operands) || !f.operands.length) bad(at, '`operands` on a flag lists at least one role.')
+      else for (const role of f.operands) if (!has(ROLES, role)) bad(at, `\`${role}\` in \`operands\` is not a known role.`)
+      // A handover is found while the line is still being read, before a later flag could move it.
+      if (Array.isArray(f.operands) && f.operands.includes('command')) bad(at, 'A flag cannot move another command into a position.')
+      if (rule.operands?.includes('command')) bad(at, 'A flag cannot change the operands of a row whose operands hold a command.')
+    }
     if (!Object.keys(f.facts ?? {}).length && !f.takesValue) bad(at, 'A flag that changes nothing and takes no value belongs in `plain`.')
     if (f.role === 'command' && !(rule.facts?.opaque || f.facts?.opaque === true)) {
       bad(at, 'A flag that holds another command has to leave the row opaque.')

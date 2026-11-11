@@ -267,11 +267,13 @@ describe('argument roles', () => {
     expect(got.facts.source).not.toBe('subcommand-miss')
   })
 
-  // `-e` would move the pattern off the first operand, and a row cannot say that, so it stays undeclared. Undeclared
-  // is unread: neither word after it is named, and the line is not answered as a plain search.
-  it('leaves grep -e unread rather than guessing where the pattern went', () => {
-    expect(roles('grep -e foo notes.txt')).toEqual(['foo:unknown', 'notes.txt:unknown'])
-    expect(run('grep -e foo notes.txt').unread).toEqual(['-e'])
+  it('lets a flag that carries the pattern turn every operand into a file', () => {
+    expect(roles('grep foo notes.txt')).toEqual(['foo:pattern', 'notes.txt:path'])
+    expect(roles('grep -e foo -e bar notes.txt')).toEqual(['foo:pattern', 'bar:pattern', 'notes.txt:path'])
+    // grep reads its options anywhere on the line, so one after the operands still moves them.
+    expect(roles('grep notes.txt -e foo')).toEqual(['notes.txt:path', 'foo:pattern'])
+    expect(explain('grep -e TODO a.ts b.ts').sentence).toBe('Searches a.ts and b.ts for the lines that contain TODO.')
+    expect(roles('grep -f patterns.txt notes.txt')).toEqual(['patterns.txt:path', 'notes.txt:path'])
   })
 })
 

@@ -99,6 +99,34 @@ describe('the grammar layer', () => {
     const entry: Entry = { facts: opaqueFact('Runs a thing.', 'what it was given', { ...LOCAL }), assignmentsFirst: true }
     expect(says(packOf({ k: entry }))).toContainEqual(expect.stringContaining('`assignmentsFirst` only means something'))
   })
+
+  // The handover is found while the line is read, so a flag further on cannot be allowed to move it.
+  it('never lets a flag move a command into or out of a position', () => {
+    const into: Entry = {
+      facts: opaqueFact('Runs a thing.', 'what it was given', { ...LOCAL }),
+      operands: ['path'],
+      flags: [{ flags: ['-x'], facts: {}, operands: ['command'] }],
+    }
+    expect(says(packOf({ k: into }))).toContainEqual(expect.stringContaining('cannot move another command'))
+    const outOf: Entry = {
+      facts: opaqueFact('Runs a thing.', 'what it was given', { ...LOCAL }),
+      operands: ['command'],
+      flags: [{ flags: ['-x'], facts: {}, operands: ['path'] }],
+    }
+    expect(says(packOf({ k: outOf }))).toContainEqual(expect.stringContaining('whose operands hold a command'))
+  })
+
+  it('accepts a flag that turns operands into files, and lets `tell` name them', () => {
+    const entry: Entry = {
+      facts: fact('Searches files.', { ...LOOKS, tell: ['Searches ', { role: 'path', which: 'all' }, '.'] }),
+      operands: ['pattern'],
+      flags: [{ flags: ['-e'], takesValue: true, role: 'pattern', facts: {}, operands: ['path'] }],
+    }
+    expect(says(packOf({ k: entry }))).toEqual([])
+    expect(says(packOf({ k: { ...entry, flags: [{ flags: ['-e'], facts: {}, operands: ['nonsense' as never] }] } }))).toContainEqual(
+      expect.stringContaining('is not a known role'),
+    )
+  })
 })
 
 describe('a base row stands in for its subcommands', () => {

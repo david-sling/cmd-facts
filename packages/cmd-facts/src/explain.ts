@@ -211,6 +211,9 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
   let operand = 0
   let literal = false
   let nested = false
+  // Where each operand landed in `args`, so a flag that changes their roles can still do so once the line is read.
+  const positional: number[] = []
+  let moved: Role[] | undefined
 
   for (let i = start; i < argv.length; i++) {
     const token = argv[i]!
@@ -231,6 +234,7 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
         continue
       }
       for (const m of matched) {
+        if (m.operands) moved = m.operands
         if (!Object.keys(m.facts).length) continue
         out = merge(out, { ...m.facts, source: 'curated+flags' })
         escalated.push(m.flags[0]!)
@@ -242,13 +246,21 @@ function parse(argv: string[], start: number, rule: Rule, facts: Facts) {
       }
       continue
     }
-    // A row that declares no operands was not written to be pointed at anything, so a word here is one it has not read.
-    if (!rule.operands?.length) unread.push(token)
+    // A row that declares no operands, and has no flag that gives it some, was not written to be pointed at anything,
+    // so a word here is one it has not read.
+    if (!rule.operands?.length && !(rule.flags ?? []).some((f) => f.operands?.length)) unread.push(token)
     // After a flag nobody has read, the word that follows may be that flag's value, so no position is certain.
-    const role = unread.length ? 'unknown' : roleAt(rule.operands, operand++)
+    if (unread.length) {
+      args.push({ index: i, value: token, role: 'unknown' })
+      continue
+    }
+    const role = roleAt(rule.operands, operand++)
+    positional.push(args.length)
     args.push({ index: i, value: token, role })
     if (role === 'command') nested = true
   }
+  // The flag can come after the operands it changes (`grep foo -e bar notes.txt`), so they are settled last.
+  if (moved) for (const [n, at] of positional.entries()) args[at] = { ...args[at]!, role: roleAt(moved, n) }
   return { facts: out, args, escalated: [...new Set(escalated)], unread }
 }
 

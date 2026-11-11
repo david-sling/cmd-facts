@@ -84,9 +84,7 @@ export const FILES: Record<string, Entry> = {
       docs: 'man 1 grep',
     }),
     operands: ['pattern', 'path'],
-    // `-e` and `-f` are left out: either one moves the pattern off the line's first operand, which then names a
-    // file, and a row has no way to say so. Declaring them would read `grep -e foo notes.txt` with notes.txt as the
-    // pattern. `--color` is left out because its value is optional.
+    // `--color` is left out because its value is optional.
     values: {
       ...valuesOf('pattern', ['--include', '--exclude', '--exclude-dir']),
       ...valuesOf('text', [
@@ -95,6 +93,9 @@ export const FILES: Record<string, Entry> = {
       ]),
     },
     flags: [
+      // Given a pattern this way, the line's first operand is a file like the rest of them.
+      { flags: ['-e', '--regexp'], takesValue: true, role: 'pattern', operands: ['path'], facts: {} },
+      { flags: ['-f', '--file'], takesValue: true, role: 'path', operands: ['path'], facts: {} },
       {
         flags: ['-r', '-R', '--recursive'],
         facts: {
