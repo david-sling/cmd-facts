@@ -149,22 +149,30 @@ describe('Open in v0', () => {
 
   const pages = ['index', 'sentence', 'command-line', 'styling'].map((p) => [p, read(`../docs/react/${p}.mdx`)] as const)
 
-  it('names a registry item with every button', () => {
-    for (const [page, mdx] of pages)
+  it('names a registry item with every button and preview', () => {
+    for (const [page, mdx] of pages) {
       for (const [, list] of mdx.matchAll(/<OpenInV0 items="([^"]+)" \/>/g))
         for (const name of list!.split(/\s+/)) expect(names.has(name), `${page}: ${name}`).toBe(true)
+      for (const [, name] of mdx.matchAll(/<ComponentPreview name="([^"]+)">/g))
+        expect(examples.some((e) => e.name === name), `${page}: ${name}`).toBe(true)
+    }
   })
 
-  // the code above a button is the example it opens, so what is read is what v0 gets
-  it('shows the example a button opens, exactly', () => {
+  // the code under a preview's Code tab is the example it draws and opens, so what is read is what v0 gets
+  it('shows the example a preview draws and opens, exactly', () => {
     let checked = 0
-    for (const [page, mdx] of pages)
-      for (const [, code, name] of mdx.matchAll(/```tsx\n([\s\S]*?)\n```\n\n<OpenInV0 items="([^"]+)" \/>/g)) {
-        if (!examples.some((e) => e.name === name)) continue
+    for (const [page, mdx] of pages) {
+      const previews = [
+        ...mdx.matchAll(/<ComponentPreview name="([^"]+)">\n\n```tsx\n((?:(?!```)[\s\S])*?)\n```\n\n<\/ComponentPreview>/g),
+      ]
+      // a preview that is not exactly one tsx block would show code the test never compared
+      expect(previews.length, page).toBe(mdx.match(/<ComponentPreview /g)?.length ?? 0)
+      for (const [, name, code] of previews) {
         expect(code, `${page}: ${name}`).toBe(source(name!))
         checked++
       }
-    expect(checked).toBeGreaterThanOrEqual(5)
+    }
+    expect(checked).toBe(7)
   })
 
   it('shows the README examples it links to, exactly', () => {

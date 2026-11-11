@@ -34,10 +34,13 @@ const slugOf = (path: string) => path.replace(/^\.\.\/docs\//, '').replace(/\.md
 
 // A pasted page has no buttons: each one becomes the link it opens.
 const V0 = /^<OpenInV0 items="([^"]+)" \/>$/gm
+// …and no tabs: an example is its code, followed by the link that opens it.
+const PREVIEW = /^<ComponentPreview name="([^"]+)">\n\n([\s\S]*?)\n\n<\/ComponentPreview>$/gm
 
 function body(source: string) {
   return source
     .replace(/^---\n[\s\S]*?\n---\n+/, '')
+    .replace(PREVIEW, (_, name: string, code: string) => `${code}\n\n[Open ${name} in v0](${openInV0Url(name)})`)
     .replace(V0, (_, items: string) =>
       items
         .split(/\s+/)

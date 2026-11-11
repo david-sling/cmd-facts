@@ -40,6 +40,8 @@ Change these and every use of the component follows.
 
 For one place that needs something else, pass `renderValue` to [`Sentence`](/docs/react/sentence) or `renderPart` to [`CommandLine`](/docs/react/command-line), and draw with whatever classes you like:
 
+<ComponentPreview name="sentence-render-value-demo">
+
 ```tsx
 import { Sentence } from '@/components/sentence'
 
@@ -62,7 +64,7 @@ export default function Page() {
 }
 ```
 
-<OpenInV0 items="sentence-render-value-demo" />
+</ComponentPreview>
 
 `className` on either component goes to its outer element, merged with `cn`.
 

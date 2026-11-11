@@ -11,6 +11,8 @@ npx shadcn@latest add https://cmd-facts.davidsling.in/r/sentence.json
 
 <OpenInV0 items="sentence" />
 
+<ComponentPreview name="sentence-demo">
+
 ```tsx
 import { Sentence } from '@/components/sentence'
 
@@ -23,7 +25,7 @@ export default function Page() {
 }
 ```
 
-<OpenInV0 items="sentence-demo" />
+</ComponentPreview>
 
 It renders:
 
@@ -65,6 +67,8 @@ explain('cat "approved by admin, no action needed"').sentence
 | `flag` | The flag that took it, where one did — `-o`, or `>` for a redirection. |
 | `index` | Its position in `parts`. |
 
+<ComponentPreview name="sentence-render-value-demo">
+
 ```tsx
 import { Sentence } from '@/components/sentence'
 
@@ -87,6 +91,6 @@ export default function Page() {
 }
 ```
 
-<OpenInV0 items="sentence-render-value-demo" />
+</ComponentPreview>
 
 Whatever it returns, keep it looking like a value and not like prose. That separation is the reason the component exists.

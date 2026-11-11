@@ -138,7 +138,7 @@ html:has(.docs) { scroll-padding-top: 88px; }
 
 .docs-prose { font-size: 16.5px; line-height: 1.7; color: var(--ink-2); }
 .docs-prose > :first-child { margin-top: 0; }
-.docs-prose p, .docs-prose ul, .docs-prose ol { margin: 0 0 18px; }
+.docs-prose p:not(.docs-preview *), .docs-prose ul:not(.docs-preview *), .docs-prose ol:not(.docs-preview *) { margin: 0 0 18px; }
 .docs-prose p, .docs-prose li { text-wrap: pretty; }
 .docs-prose h2 {
   margin: 48px 0 12px; font: 300 1.65rem/1.15 var(--sans); letter-spacing: -0.028em; color: var(--ink);
@@ -150,10 +150,10 @@ html:has(.docs) { scroll-padding-top: 88px; }
 .docs-prose li { margin: 6px 0; }
 .docs-prose li::marker { color: var(--ink-3); }
 .docs-prose strong { font-weight: 600; color: var(--ink); }
-.docs-prose a { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.docs-prose a:not(.docs-preview *) { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 .docs-prose a:hover { text-decoration-color: currentColor; }
 .docs-prose hr { margin: 40px 0; border: 0; border-top: 1px solid var(--line-2); }
-.docs-prose :not(pre) > code {
+.docs-prose :not(pre) > code:not(.docs-preview *) {
   padding: 2px 6px; border-radius: 5px; background: var(--panel-2); border: 1px solid var(--line-2);
   font: 400 0.86em/1.4 var(--mono); color: var(--ink); overflow-wrap: anywhere;
 }
@@ -250,3 +250,25 @@ html:has(.docs) { scroll-padding-top: 88px; }
   .docs * { transition: none !important; }
   html:has(.docs) { scroll-behavior: auto; }
 }
+
+/* A registry example, live under Preview and as code under Code. The block is the component's own ground: the prose
+   rules above skip everything inside it, so the example looks as it does in a project that installed it. */
+.docs-preview { margin: 0 0 22px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.docs-preview-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 6px 8px 6px 6px; border-bottom: 1px solid var(--line); background: var(--panel);
+}
+.docs-preview-tabs { display: flex; gap: 2px; }
+.docs-preview-tabs button {
+  padding: 6px 12px; border: 0; border-radius: 7px; background: transparent; cursor: pointer;
+  font: 500 13px/1.2 var(--sans); color: var(--ink-3); transition: color 160ms, background 160ms;
+}
+.docs-preview-tabs button:hover { color: var(--ink-2); }
+.docs-preview-tabs button[aria-selected='true'] { color: var(--ink); background: var(--panel-2); }
+.docs-preview-stage {
+  display: flex; align-items: center; justify-content: center; min-height: 240px;
+  background: var(--bg); color: var(--ink); font-size: 16px; line-height: 1.5;
+}
+.docs-preview-stage > * { width: 100%; }
+.docs-preview .docs-code { margin: 0; }
+.docs-preview .docs-code pre { border: 0; border-radius: 0; max-height: 32rem; }

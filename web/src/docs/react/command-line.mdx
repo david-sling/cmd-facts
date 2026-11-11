@@ -11,6 +11,8 @@ npx shadcn@latest add https://cmd-facts.davidsling.in/r/command-line.json
 
 <OpenInV0 items="command-line" />
 
+<ComponentPreview name="command-line-demo">
+
 ```tsx
 import { CommandLine } from '@/components/command-line'
 
@@ -32,7 +34,7 @@ export default function Page() {
 }
 ```
 
-<OpenInV0 items="command-line-demo" />
+</ComponentPreview>
 
 The first of those renders as:
 
@@ -72,6 +74,8 @@ Every piece but `space` and `unread` carries `step`, which command of the line i
 
 Return `part.text` for a `space`, or the line stops reading as written. `commandLinePartClassName(part)` gives the component's own classes for a piece, for a `renderPart` that wants the defaults and something more:
 
+<ComponentPreview name="command-line-render-part-demo">
+
 ```tsx
 import { CommandLine, commandLinePartClassName } from '@/components/command-line'
 import { cn } from '@/lib/utils'
@@ -99,7 +103,7 @@ export default function Page() {
 }
 ```
 
-<OpenInV0 items="command-line-render-part-demo" />
+</ComponentPreview>
 
 ## Without React
 

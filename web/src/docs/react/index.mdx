@@ -27,6 +27,8 @@ Each item also installs `cmd-facts` itself, 0.5 or newer, and shadcn's `cn` help
 
 The sentence takes the command and nothing else:
 
+<ComponentPreview name="sentence-demo">
+
 ```tsx
 import { Sentence } from '@/components/sentence'
 
@@ -39,9 +41,11 @@ export default function Page() {
 }
 ```
 
-<OpenInV0 items="sentence-demo" />
+</ComponentPreview>
 
 An approval prompt shows the line too, so it explains once with `useExplain` and hands both components the answer:
+
+<ComponentPreview name="approve-demo">
 
 ```tsx
 'use client'
@@ -75,7 +79,7 @@ export default function Page() {
 }
 ```
 
-<OpenInV0 items="approve-demo" />
+</ComponentPreview>
 
 `useExplain` takes a line or a split argv, the same `Input` as `explain`, and an optional explainer from `createExplainer` for answering from your own packs. Keep that explainer stable — at module scope, or in a `useMemo` — or every render explains again.
 
